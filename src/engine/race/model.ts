@@ -1,9 +1,12 @@
 // Tuning knobs of the race engine (check with `npm run calibrate`). Times are seconds.
+import { makeRng } from "../rng";
 import type { CircuitDef, Compound } from "../types";
 
 export const RACE = {
   carK: 0.00064, // fraction of the base lap per car-pace point below 100 (75-80% of the spread)
   drvK: 0.0003, // fraction of the base lap per driver point below 100
+  raceSpread: 1.6, // car and driver gaps open up over a race distance (tyre wear, traffic) vs one lap
+  dayForm: 0.0011, // sd of a car's pace on the day (setup, track temperature suiting it), fraction of the lap
   fuelPerLapKg: 1.6,
   fuelSecPerKg: 0.032,
   noise: 0.17, // lap-to-lap noise for a perfectly consistent driver
@@ -21,8 +24,7 @@ export const RACE = {
   lap1Contact: 0.05, // chance of a first-lap incident somewhere in the pack (scaled by track)
   startLoss: 2.6, // standing start
   gridGap: 0.22, // grid slot spacing at the start
-  launchSd: 0.28,
-  pitStationary: 2.4,
+  launchSd: 0.2,
   slowStop: 0.035,
   scLapFactor: 1.38,
   vscLapFactor: 1.3,
@@ -57,4 +59,10 @@ export function tyreCost(c: Compound, wear: number, base: number): number {
   const w = Math.max(0, wear);
   const cliff = w > 1 ? 7 * (w - 1) + 18 * (w - 1) ** 2 : 0;
   return scale * (COMPOUNDS[c].grip + 1.1 * Math.pow(Math.min(w, 1), 1.7) + cliff);
+}
+
+/** Each car's pace on the day (fraction of a lap; negative = quicker), shared by qualifying and the race. */
+export function dayForms(seed: number, n: number): number[] {
+  const rng = makeRng(seed ^ 0xf0f0f);
+  return Array.from({ length: n }, () => rng.normal(0, RACE.dayForm));
 }

@@ -1,6 +1,7 @@
 // The season: run the next round (qualifying + race), standings, in-season car development.
 import { hashString, makeRng } from "../rng";
 import { carPace } from "../ratings";
+import { dayForms } from "../race/model";
 import { qualify } from "../race/qualifying";
 import { simRace, type Entry } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
@@ -35,20 +36,22 @@ export function simNextRound(w: World): RaceSummary | null {
   const circuit = circuitOf(w, r.circuitId);
   const seed = roundSeed(w, r.round);
   const field = lineup(w);
+  const form = dayForms(seed, field.length);
   const quali = qualify(
     seed,
     circuit,
-    field.map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings })),
+    field.map(({ team, driver }, i) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings, form: form[i] })),
   );
   const gridPos = new Map(quali.map((q) => [q.driverId, q.pos]));
   const entries: Entry[] = field
-    .map(({ team, driver }) => ({
+    .map(({ team, driver }, i) => ({
       driverId: driver.id,
       teamId: team.id,
       grid: gridPos.get(driver.id)!,
       car: carPace(team.car, circuit),
       reliability: team.car.reliability,
       r: driver.ratings,
+      form: form[i],
     }))
     .sort((a, b) => a.grid - b.grid);
   const { result, state } = simRace({ seed, circuit, pitLoss: circuit.pitLoss, entries });

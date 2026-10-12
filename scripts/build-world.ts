@@ -208,7 +208,7 @@ function buildTeams(ds: Driver[]): Team[] {
     const level = g === undefined ? 80 : 94 - (g - minGap) / RACE.carK;
     const r = rel.get(t.openf1);
     const rate = r ? (r.dnf + allRate * 8) / (r.n + 8) : allRate; // shrink toward the grid
-    const reliability = Math.max(74, Math.min(95, 100 - ((rate * 0.7) / (RACE.mech * 57)) * 100));
+    const reliability = Math.max(74, Math.min(95, 100 - ((rate * 0.55) / (RACE.mech * 57)) * 100));
     console.log(`${t.short} car ${level.toFixed(1)} (gap ${g === undefined ? "?" : ((g - minGap) * 100).toFixed(2) + "%"}) rel ${reliability.toFixed(1)} dnf ${(rate * 100).toFixed(1)}%`);
     return {
       id: t.id,
@@ -272,7 +272,7 @@ function buildCalendar(): Round[] {
 }
 
 // ---------- calibration targets ----------
-function buildTargets() {
+function buildTargets(years: number[]) {
   const out: Record<string, { value: number; n: number; note: string }> = {};
   const add = (k: string, xs: number[], note: string) => {
     if (xs.length) out[k] = { value: Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 1000) / 1000, n: xs.length, note };
@@ -288,7 +288,7 @@ function buildTargets() {
   const lapped: number[] = [];
   const spearman: number[] = [];
   const top3Pole: number[] = [];
-  for (const y of [2023, 2024, 2025, 2026]) {
+  for (const y of years) {
     const qByMeeting = new Map(sessions(y, "Qualifying").map((s) => [s.meeting_key, s.session_key]));
     for (const s of sessions(y, "Race")) {
       const res = result(y, s.session_key);
@@ -309,7 +309,7 @@ function buildTargets() {
       const nSc = sc.filter((m) => /^SAFETY CAR DEPLOYED/.test(m.message)).length;
       scAny.push(nSc > 0 ? 1 : 0);
       scCount.push(nSc);
-      vscAny.push(sc.some((m) => /VIRTUAL SAFETY CAR DEPLOYED/.test(m.message)) ? 1 : 0);
+      vscAny.push(sc.some((m) => /(VIRTUAL SAFETY CAR|VSC) DEPLOYED/.test(m.message)) ? 1 : 0);
       const ot = readRaw<unknown[]>(`openf1/${y}/overtakes-${s.session_key}.json`);
       if (ot && ot.length) overtakes.push(ot.length);
       const qk = qByMeeting.get(s.meeting_key);
@@ -330,7 +330,7 @@ function buildTargets() {
       }
     }
   }
-  add("dnfPerRace", dnf, "retirements per race (OpenF1 2023-26)");
+  add("dnfPerRace", dnf, "retirements per race");
   add("pitsPerFinisher", pits, "pit stops per classified finisher");
   add("scShare", scAny, "share of races with a safety car");
   add("scPerRace", scCount, "safety-car periods per race");
@@ -384,7 +384,7 @@ const world: World = {
 mkdirSync(join(ROOT, "public/data"), { recursive: true });
 writeFileSync(join(ROOT, `public/data/world-${SEASON}.json`), JSON.stringify(world));
 mkdirSync(join(ROOT, "data/generated"), { recursive: true });
-const targets = buildTargets();
+const targets = { all: buildTargets([2023, 2024, 2025, 2026]), y2026: buildTargets([2026]) };
 writeFileSync(join(ROOT, "data/generated/targets.json"), JSON.stringify(targets, null, 2));
 console.log(`world-${SEASON}: ${calendar.length} rounds, ${f1Teams.length} F1 teams, ${world.drivers.length} drivers, car mean ${carMean.toFixed(1)}`);
 console.log(targets);

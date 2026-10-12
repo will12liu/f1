@@ -27,12 +27,12 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - 2026 grid: 11 teams (Cadillac joined), 22 drivers, confirmed from OpenF1 session data.
 
 ## Race engine (src/engine/race)
-- Lap time = base × (1 + carK·(100 − car pace at this track) + drvK·(100 − race pace)) + tyre cost(compound, wear) + fuel + damage + dirty air + noise (consistency) + mistakes. Car ≈ 75-80% of the spread (carK 0.064%/pt, drvK 0.03%/pt).
+- Lap time = base × (1 + raceSpread·(carK·(100 − car pace at this track) + drvK·(100 − race pace)) + day form) + tyre cost(compound, wear) + fuel + damage + dirty air + noise (consistency) + mistakes. Car ≈ 75-80% of the spread (carK 0.064%/pt, drvK 0.03%/pt); gaps open up 1.6x over a race vs one lap. Day form (`dayForms(seed)`) is shared by qualifying and the race.
 - Road order each lap, front to back: a car that would cross the line within `minGap` of the car ahead must pass it (logistic on pace advantage vs the track's overtaking difficulty, overtaking vs defending, racecraft, composure late on); failing leaves it stuck behind (dirty air next lap). Lap 1 and restarts pass easier. Contact chance per attempt (aggression, racecraft): damage, puncture, DNF, spin, penalties. Incident time losses go through `lapExtra` (never touch `cum` mid-lap).
 - Pit strategy: `plans()` enumerates 0/1/2-stop compound sequences against the same tyre model (prefix sums); AI teams take the best or a close second. Cheap stops under SC/VSC are taken when they beat staying out. Two dry compounds are mandatory.
 - Safety car / VSC: from crashes, collisions, stopped cars and debris (scaled by the track's `sc`). SC compresses the field and costs less in the pits.
 - `createRace(input)` is a runner (`step()` = one lap, `result()`); `simRace` drains it. Deterministic from the seed (tested). Phase 6 adds `pending()/choose()` for duels with their own RNG.
-- Calibration (230-460 races, `npm run calibrate`): DNFs, stops per finisher, SC/VSC shares, passes after lap 1, pole-to-win, winner from top 3, P1-P2 margin, lapped cars, quali→finish rank correlation.
+- Calibration (`npm run calibrate 500`): DNFs, stops per finisher, SC/VSC shares, passes after lap 1, pole-to-win, winner from top 3, P1-P2 margin, lapped cars, quali→finish rank correlation. Targets: OpenF1 2023-26 and 2026 alone (`data/generated/targets.json`); passes and stops are hand targets (OpenF1's overtakes and pit lists count other things). All within 20% as of Phase 2. OpenF1 2026 race control says "VSC DEPLOYED", older seasons "VIRTUAL SAFETY CAR DEPLOYED".
 
 ## Season (src/engine/season)
 - `simNextRound`: knockout qualifying (Q1/Q2/Q3) → race → `RaceSummary` + `Replay` stored on the world (`world.replays`, current season only), then in-season car development (dev rate, budget, harder near the top).

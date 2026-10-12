@@ -15,6 +15,7 @@ export interface Entry {
   car: number; // car pace at this track (0-100)
   reliability: number;
   r: DriverRatings;
+  form?: number; // pace on the day, fraction of the lap (dayForms)
 }
 
 export interface RaceInput {
@@ -151,7 +152,7 @@ export function createRace(input: RaceInput): RaceRunner {
       first: keep ? { c: car.compound, age: car.age } : undefined,
       maxStops,
     });
-    const pick = ps.length > 1 && ps[1].cost - ps[0].cost < 4 && rng.chance(0.3) ? ps[1] : ps[0];
+    const pick = ps.length > 1 && ps[1].cost - ps[0].cost < 4 && rng.chance(0.15) ? ps[1] : ps[0];
     return pick;
   };
 
@@ -304,9 +305,9 @@ export function createRace(input: RaceInput): RaceRunner {
       if (flag === "sc") t = base * RACE.scLapFactor + rng.normal(0, 0.1);
       else if (flag === "vsc") t = base * RACE.vscLapFactor + rng.normal(0, 0.1);
       else {
-        t = base * (1 + RACE.carK * (100 - car.e.car) + RACE.drvK * (100 - r.pace));
+        t = base * (1 + RACE.raceSpread * (RACE.carK * (100 - car.e.car) + RACE.drvK * (100 - r.pace)));
         t += tyreCost(car.compound, car.wear + wearRate(r)[car.compound] / 2, base);
-        t += car.fuel * RACE.fuelSecPerKg;
+        t += car.fuel * RACE.fuelSecPerKg + (car.e.form ?? 0) * base;
         t += car.damage;
         if (car.dirty) t += RACE.dirtyAir;
         if (car.age === 0 && L > 1) t += 0.4; // tyres coming in
@@ -390,7 +391,7 @@ export function createRace(input: RaceInput): RaceRunner {
             fights.set(x.idx, n + 1);
             const adv = fy + RACE.minGap - f;
             let T = RACE.passT[otIdx];
-            if (L === 1 || restart) T *= 0.6;
+            if (L === 1 || restart) T *= 0.7;
             const late = laps - L < 8 ? 1 : 0;
             const press = (car: CarState) => late * (100 - car.e.r.composure) * 0.15;
             const skill = (x.e.r.overtaking - press(x) - (y.e.r.defending - press(y))) / 100 + (x.e.r.racecraft - y.e.r.racecraft) / 200;
@@ -415,7 +416,8 @@ export function createRace(input: RaceInput): RaceRunner {
             at--;
             continue;
           }
-          f = fy + RACE.minGap + rng.next() * 0.15;
+          // can't get by: drop back a little to cool the tyres and try again later
+          f = fy + RACE.minGap + rng.next() * 0.9;
           break;
         }
         if (x.out) continue;

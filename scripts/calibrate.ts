@@ -2,6 +2,7 @@
 // (data/generated/targets.json from `npm run data`, plus a few hand targets). Usage: npm run calibrate [races]
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { dayForms } from "../src/engine/race/model";
 import { qualify } from "../src/engine/race/qualifying";
 import { simRace } from "../src/engine/race/race";
 import { carPace } from "../src/engine/ratings";
@@ -10,7 +11,8 @@ import type { World } from "../src/engine/types";
 
 const ROOT = join(import.meta.dirname, "..");
 const world = JSON.parse(readFileSync(join(ROOT, "public/data/world-2026.json"), "utf8")) as World;
-const targets = JSON.parse(readFileSync(join(ROOT, "data/generated/targets.json"), "utf8")) as Record<string, { value: number; note: string }>;
+type Targets = Record<string, { value: number; note: string }>;
+const { all: targets, y2026 } = JSON.parse(readFileSync(join(ROOT, "data/generated/targets.json"), "utf8")) as { all: Targets; y2026: Targets };
 
 // Hand targets where the data can't measure the same thing.
 const HAND: Record<string, { value: number; note: string }> = {
@@ -28,10 +30,11 @@ for (let i = 0; i < n; i++) {
   const round = world.calendar[i % world.calendar.length];
   const circuit = world.circuits.find((c) => c.id === round.circuitId)!;
   const seed = 1000 + i;
-  const q = qualify(seed, circuit, field.map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings })));
+  const form = dayForms(seed, field.length);
+  const q = qualify(seed, circuit, field.map(({ team, driver }, k) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings, form: form[k] })));
   const grid = new Map(q.map((x) => [x.driverId, x.pos]));
   const entries = field
-    .map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, grid: grid.get(driver.id)!, car: carPace(team.car, circuit), reliability: team.car.reliability, r: driver.ratings }))
+    .map(({ team, driver }, k) => ({ driverId: driver.id, teamId: team.id, grid: grid.get(driver.id)!, car: carPace(team.car, circuit), reliability: team.car.reliability, r: driver.ratings, form: form[k] }))
     .sort((a, b) => a.grid - b.grid);
   const { result, state } = simRace({ seed, circuit, pitLoss: circuit.pitLoss, entries });
   const rows = result.rows;
@@ -67,10 +70,16 @@ function rankCorr(a: number[], b: number[]) {
 
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 console.log(`${n} races in ${((Date.now() - leadT0) / 1000).toFixed(1)}s\n`);
-console.log("metric".padEnd(18), "sim".padStart(8), "real".padStart(8), "  note");
+console.log("metric".padEnd(18), "sim".padStart(8), "2023-26".padStart(8), "2026".padStart(8), "  note");
+let off = 0;
 for (const [k, xs] of Object.entries(sums)) {
   const t = HAND[k] ?? targets[k];
+  const t26 = HAND[k] ? undefined : y2026[k];
   const sim = mean(xs);
-  const flag = t ? (Math.abs(sim - t.value) / Math.max(0.05, Math.abs(t.value)) > 0.2 ? " <-" : "") : "";
-  console.log(k.padEnd(18), sim.toFixed(3).padStart(8), (t ? t.value.toFixed(3) : "-").padStart(8), flag.padEnd(4), t?.note ?? "");
+  // within 20% of either the multi-season average or the 2026 number counts as on target
+  const near = (v?: number) => v !== undefined && Math.abs(sim - v) / Math.max(0.05, Math.abs(v)) <= 0.2;
+  const flag = t ? (near(t.value) || near(t26?.value) ? "" : " <-") : "";
+  if (flag) off++;
+  console.log(k.padEnd(18), sim.toFixed(3).padStart(8), (t ? t.value.toFixed(3) : "-").padStart(8), (t26 ? t26.value.toFixed(3) : "-").padStart(8), flag.padEnd(4), t?.note ?? "");
 }
+console.log(off ? `\n${off} metric(s) more than 20% off` : "\nall metrics within 20%");

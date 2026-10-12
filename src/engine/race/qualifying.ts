@@ -9,6 +9,7 @@ export interface QualiEntry {
   teamId: string;
   car: number;
   r: DriverRatings;
+  form?: number;
 }
 
 export interface QualiRow {
@@ -35,7 +36,7 @@ export function qualify(seed: number, circuit: CircuitDef, entries: QualiEntry[]
   const q2 = Math.min(n, q3 + Math.ceil((n - q3) / 2));
   const lap = (e: QualiEntry, s: number): number | null => {
     if (rng.chance(QUALI.noTime * (1 + (100 - e.r.consistency) / 20))) return null;
-    let t = circuit.base * (1 + RACE.carK * (100 - e.car) + RACE.drvK * (100 - e.r.quali)) - 0.4;
+    let t = circuit.base * (1 + RACE.carK * (100 - e.car) + RACE.drvK * (100 - e.r.quali) + (e.form ?? 0)) - 0.4;
     t += QUALI.evolution[s];
     t += rng.normal(0, QUALI.sd + (100 - e.r.consistency) * QUALI.sdPerPoint);
     t += rng.normal(0, QUALI.tow);

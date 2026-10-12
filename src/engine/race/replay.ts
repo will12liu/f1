@@ -125,10 +125,15 @@ export function viewAt(ix: ReplayIndex, t: number): RaceView {
     let interval: number | null = null;
     let lapsDown = 0;
     if (i > 0 && !x.out && x.crossed > 0) {
-      lapsDown = leader.crossed - x.crossed;
-      gap = lapsDown > 0 ? null : x.crossT - r.lapEnd[leader.idx][x.crossed];
+      // lapped = the leader had already finished another lap when he crossed the line
+      const le = r.lapEnd[leader.idx];
+      let leaderLaps = x.crossed;
+      while (leaderLaps + 1 < le.length && le[leaderLaps + 1] <= x.crossT) leaderLaps++;
+      lapsDown = leaderLaps - x.crossed;
+      gap = lapsDown > 0 ? null : x.crossT - le[x.crossed];
       const ahead = order[i - 1];
-      interval = ahead.crossed === x.crossed ? x.crossT - ahead.crossT : null;
+      const aheadT = r.lapEnd[ahead.idx][x.crossed];
+      interval = aheadT !== undefined && x.crossT - aheadT < (le[x.crossed] - le[x.crossed - 1] || 90) ? x.crossT - aheadT : null;
     }
     return { idx: x.idx, lap: x.lap, frac: x.frac, pit: x.pit, out: x.out, done: x.done, pos: i + 1, gap, interval, lapsDown, compound: x.compound, pits: x.pits };
   });
