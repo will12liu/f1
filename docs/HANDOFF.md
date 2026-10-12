@@ -1,3 +1,64 @@
+# Where we are (read this first)
+
+_Last updated 2026-10-12. Everything below the line "Original brief" is the original handoff, unchanged._
+
+## Paste this into the new session
+> Read `docs/HANDOFF.md` (status first, then the original brief) and `CLAUDE.md`. We're building a browser F1 driver-career game in `~/Coding/f1`, same stack and structure as `/Users/williamliu/Coding/nba-gm` (read it for reference, never edit it). Phases 0-4 are done. Start Phase 5 (resource dials). The in-race mechanics must be resource dials plus attack/defend duels, not timing bars. After each batch: `npx tsc --noEmit -p . && npm test`, then commit and push to main.
+
+## Done
+| Phase | State | Where |
+| --- | --- | --- |
+| 0 Project and docs | Done except hosting (see Blocked) | `package.json` (same versions as nba-gm), `CLAUDE.md`, `wrangler.jsonc`, `public/_redirects`, `public/favicon.svg` |
+| 1 Data and types | Done | `src/engine/types.ts`, `scripts/fetch.ts`, `scripts/build-world.ts`, `data/manual/{circuits,teams,drivers}.ts`, `public/data/world-2026.json`, `public/data/tracks/*.json` |
+| 2 Headless race engine | Done, calibrated (500 races, all 13 metrics within 20%) | `src/engine/race/{model,strategy,race,qualifying}.ts`, `scripts/calibrate.ts` |
+| 3 Season engine | Done | `src/engine/season/{season,development,offseason}.ts`, `scripts/season-check.ts` |
+| 4 2D race view | Done, checked in the browser (desktop + phone width) | `src/engine/race/replay.ts`, `src/ui/race/RaceViewer.tsx`, pages in `src/ui/pages/` |
+
+Tests: 12 passing (`src/engine/world.test.ts`, `race/race.test.ts`, `season/season.test.ts`). Typecheck and `npm run build` pass. Two local commits on `main`.
+
+## Open questions from section 10: what was picked (change any of them)
+1. Data scope: real F1 grid only; F2 (22) and F3 (30) are generated drivers on real junior team names.
+2. Sprint weekends and practice depth: later (not in v1 so far).
+3. Single-player only; team-principal mode stays a later phase.
+4. Visual style: team-coloured dots with codes on the track outline.
+5. Car vs driver: realistic, about 75-80% car (carK 0.064%/pt vs drvK 0.03%/pt; race gaps 1.6x one-lap gaps).
+6. Mobile: works at phone width, desktop first.
+
+## Things that differ from the brief
+- **Data source.** Jolpica stopped responding mid-download, so everything comes from **OpenF1** (results, qualifying, pit stops, race control, overtakes, drivers) and **MultiViewer** (circuit outlines, pit-lane loss). Madring and Sepang are not in MultiViewer: their outlines are traced from one OpenF1 race lap. Jolpica is optional (`npm run data:fetch jolpica`).
+- **2026 grid** was confirmed from OpenF1 session data: 11 teams (Cadillac joined, Sauber is Audi), 22 drivers. The calendar is the 23 non-cancelled 2026 races (Bahrain/Jeddah cancelled; a "Bahrain GP" ran at Sepang).
+- **Ratings.** Drivers: hand ratings (2/3) + a least-squares solve of teammate gaps in 2025-26 qualifying and races (1/3). Cars: each team's 2026 Q1 gap to the fastest, minus its driver's share, then a hand tilt to power/aero/mech. Aston Martin (~56) and Cadillac (~64) come out far behind because the 2026 data says so. Contract end years are approximate.
+- **2026 regs:** no DRS; "follow within a second" is already in the pass model's threshold (overtake mode). There's no separate DRS/overtake-mode system yet; Phase 5 ERS is where it belongs.
+- **Calibration targets.** OpenF1's overtakes (~265/race, counts every position swap) and pit lists (count drive-throughs) don't measure the same thing, so passes (45 after lap 1) and stops per finisher (1.6) are hand targets. The others come from OpenF1 2023-26 and 2026 alone. 2026 race control writes "VSC DEPLOYED", older seasons "VIRTUAL SAFETY CAR DEPLOYED".
+- **The game currently starts at round 1 of 2026** with the real grid and simulates the whole season (it doesn't import the real 2026 results so far).
+
+## Current calibration (npm run calibrate 500)
+DNF/race 3.5 (real 2.6 all years, 4.2 in 2026) · stops/finisher 1.65 (1.6) · SC share 0.56 (0.48/0.53) · VSC share 0.39 (0.45/0.71) · passes after lap 1 44 (45) · pole wins 0.52 (0.63/0.71) · winner from top 3 0.84 (0.90/0.94) · P1-P2 margin 5.9s (8.6/6.5) · lapped cars 4.5 (4.7/6.4) · quali-finish rank corr 0.88 (0.79/0.85). Weakest: pole-to-win and margins are a little low.
+
+## Blocked / needs the user
+- **GitHub:** no remote yet and `gh` isn't installed. User creates an empty repo (e.g. `will12liu/f1-career`), then `git remote add origin https://github.com/will12liu/f1-career.git && git push -u origin main`.
+- **Cloudflare Pages:** connect the repo, build `npm run build`, output `dist`.
+- The preview tool in the old session started nba-gm's dev server (it read nba-gm's launch config). Run the F1 server on its own port: `npx vite --port 5174` (or the `f1-career` entry in `.claude/launch.json`).
+
+## Next: Phase 5 (dials), then 6 (duels)
+Phase 5 plan, following section 5a:
+1. Add `dials` to `CarState` (pace 1-5, tyre care 1-5, fuel mix, ERS deploy mode + battery charge, engine mode) with 3 = today's behaviour so calibration doesn't move. AI teams stay neutral (maybe vary late in races).
+2. Effects in `race.ts` lap time / wear / fuel / reliability: push = faster now, more wear and fuel; tyre care = slower, less wear; ERS = a battery that drains in overtake/defend mode and refills when harvesting (adds to pass chance in `passT`/skill); engine high = power + mech DNF risk.
+3. Runner API: `setDials(carIdx, dials)` applied from the next lap (stamp changes like the NBA live coach), stored as adjustments so `liveResult`-style replay reproduces the race.
+4. Forecast helpers (pure): laps until the tyres are gone at current dials, battery empty lap, fuel to the end.
+5. Engineer proposals: pit call from `plans()`; accepting/ignoring depends on trust (trust comes in Phase 8, stub it).
+6. UI: pit-wall panel next to the timing tower in `RaceViewer` for the followed car, with gauges + forecast text.
+7. Tests: each dial trades off correctly (push faster now, worse tyres later; ERS empty = no overtake mode), and a race with all-neutral dials is byte-identical to before.
+
+Phase 6 needs: `pending()/choose()` on the runner, a duel when the focus car is within ~1s of another (freeze-frame with inside/outside arrows on the canvas), payoff tables, opponent tendencies (`career.reads`), own RNG keyed by lap + car pair, stored choices replayed so watched = recorded.
+
+## Useful commands
+`npm run dev` · `npm test` · `npm run typecheck` · `npm run data:fetch [openf1|tracks|jolpica]` · `npm run data` · `npm run calibrate 500` · `npm run check:season [seed] [seasons]`
+
+---
+
+# Original brief
+
 # F1 Career Sim: handoff
 
 A browser Formula 1 career game, built the way the NBA GM game was built: you are one person (a young driver), the AI runs everything else (teams, the grid, the seat market). Same stack, same philosophy, **different feel and different moment-to-moment mechanics**. This file is the brief for a fresh Claude Code session in a new folder. Copy it into the new project as `docs/HANDOFF.md`.
