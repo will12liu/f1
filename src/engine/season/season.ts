@@ -1,0 +1,136 @@
+// The season: run the next round (qualifying + race), standings, in-season car development.
+import { hashString, makeRng } from "../rng";
+import { carPace } from "../ratings";
+import { qualify } from "../race/qualifying";
+import { simRace, type Entry } from "../race/race";
+import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
+import { developCarsAfterRound } from "./development";
+
+export const f1Teams = (w: World) => w.teams.filter((t) => t.series === "F1");
+export const driverMap = (w: World) => new Map(w.drivers.map((d) => [d.id, d]));
+export const teamMap = (w: World) => new Map(w.teams.map((t) => [t.id, t]));
+export const circuitOf = (w: World, id: string): Circuit => {
+  const c = w.circuits.find((x) => x.id === id);
+  if (!c) throw new Error(`unknown circuit ${id}`);
+  return c;
+};
+
+export const nextRound = (w: World) => w.calendar.find((r) => !w.results.some((x) => x.round === r.round)) ?? null;
+export const seasonOver = (w: World) => nextRound(w) === null;
+
+/** The two race drivers of every F1 team (skipping any missing id). */
+export function lineup(w: World): { team: Team; driver: Driver }[] {
+  const dm = driverMap(w);
+  return f1Teams(w).flatMap((team) => team.drivers.map((id) => dm.get(id)).filter((d): d is Driver => !!d).map((driver) => ({ team, driver })));
+}
+
+export function roundSeed(w: World, round: number) {
+  return hashString(`${w.seed}:${w.season}:${round}`);
+}
+
+/** Qualifying + race for the next round. Records the summary and the replay on the world. */
+export function simNextRound(w: World): RaceSummary | null {
+  const r = nextRound(w);
+  if (!r) return null;
+  const circuit = circuitOf(w, r.circuitId);
+  const seed = roundSeed(w, r.round);
+  const field = lineup(w);
+  const quali = qualify(
+    seed,
+    circuit,
+    field.map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings })),
+  );
+  const gridPos = new Map(quali.map((q) => [q.driverId, q.pos]));
+  const entries: Entry[] = field
+    .map(({ team, driver }) => ({
+      driverId: driver.id,
+      teamId: team.id,
+      grid: gridPos.get(driver.id)!,
+      car: carPace(team.car, circuit),
+      reliability: team.car.reliability,
+      r: driver.ratings,
+    }))
+    .sort((a, b) => a.grid - b.grid);
+  const { result, state } = simRace({ seed, circuit, pitLoss: circuit.pitLoss, entries });
+
+  const summary: RaceSummary = {
+    round: r.round,
+    circuitId: circuit.id,
+    season: w.season,
+    quali: quali.map((q) => ({ driverId: q.driverId, pos: q.pos, q: q.q })),
+    pole: quali[0].driverId,
+    winner: result.rows[0].driverId,
+    fastestLap: result.fastest ? { driverId: entries[result.fastest.idx].driverId, time: result.fastest.time } : { driverId: "", time: 0 },
+    classification: result.rows.map((x) => ({
+      driverId: x.driverId,
+      teamId: x.teamId,
+      grid: x.grid,
+      pos: x.pos,
+      laps: x.laps,
+      time: x.time,
+      gap: x.gap,
+      status: x.status,
+      points: x.points,
+      pits: x.pits,
+      fastest: x.fastest,
+      passes: x.passes,
+    })),
+    sc: result.sc,
+    vsc: result.vsc,
+    overtakes: result.passes,
+  };
+  const replay: Replay = {
+    season: w.season,
+    round: r.round,
+    circuitId: circuit.id,
+    laps: state.laps,
+    cars: entries.map((e) => ({ driverId: e.driverId, teamId: e.teamId })),
+    grid: entries.map((e) => e.driverId),
+    lapEnd: state.lapEnd.map((a) => a.map((t) => Math.round(t * 1000) / 1000)),
+    events: state.events,
+    flags: state.flagLog.filter((f) => f.flag !== "green") as Replay["flags"],
+    stints: state.cars.map((c) => c.stints),
+  };
+  w.results.push(summary);
+  w.replays[r.round] = replay;
+  developCarsAfterRound(w, makeRng(seed ^ 0xdee));
+  return summary;
+}
+
+export interface StandingRow {
+  driverId: string;
+  teamId: string;
+  points: number;
+  wins: number;
+  podiums: number;
+  best: number;
+}
+
+export function driverStandings(w: World): StandingRow[] {
+  const rows = new Map<string, StandingRow>();
+  const dm = driverMap(w);
+  for (const d of lineup(w)) rows.set(d.driver.id, { driverId: d.driver.id, teamId: d.team.id, points: 0, wins: 0, podiums: 0, best: 99 });
+  for (const res of w.results)
+    for (const c of res.classification) {
+      const row = rows.get(c.driverId) ?? { driverId: c.driverId, teamId: c.teamId, points: 0, wins: 0, podiums: 0, best: 99 };
+      row.points += c.points;
+      if (c.pos === 1 && (c.status === "Finished" || c.status === "Lapped")) row.wins++;
+      if (c.pos <= 3 && (c.status === "Finished" || c.status === "Lapped")) row.podiums++;
+      row.best = Math.min(row.best, c.pos);
+      row.teamId = dm.get(c.driverId)?.teamId ?? c.teamId;
+      rows.set(c.driverId, row);
+    }
+  return [...rows.values()].sort((a, b) => b.points - a.points || b.wins - a.wins || a.best - b.best);
+}
+
+export function teamStandings(w: World): { teamId: string; points: number; wins: number }[] {
+  const rows = new Map(f1Teams(w).map((t) => [t.id, { teamId: t.id, points: 0, wins: 0 }]));
+  for (const res of w.results)
+    for (const c of res.classification) {
+      const row = rows.get(c.teamId);
+      if (!row) continue;
+      row.points += c.points;
+      if (c.pos === 1 && c.status === "Finished") row.wins++;
+    }
+  return [...rows.values()].sort((a, b) => b.points - a.points || b.wins - a.wins);
+}

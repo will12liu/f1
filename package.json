@@ -1,0 +1,38 @@
+{
+  "name": "f1-career",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Formula 1 driver career simulation web game",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc",
+    "data:fetch": "tsx scripts/fetch.ts",
+    "data": "tsx scripts/build-world.ts",
+    "calibrate": "tsx scripts/calibrate.ts",
+    "check:season": "tsx scripts/season-check.ts"
+  },
+  "dependencies": {
+    "comlink": "^4.4.2",
+    "dexie": "^4.4.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^4.1.11"
+  }
+}

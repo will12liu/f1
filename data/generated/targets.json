@@ -1,0 +1,57 @@
+{
+  "dnfPerRace": {
+    "value": 2.63,
+    "n": 73,
+    "note": "retirements per race (OpenF1 2023-26)"
+  },
+  "pitsPerFinisher": {
+    "value": 2.013,
+    "n": 67,
+    "note": "pit stops per classified finisher"
+  },
+  "scShare": {
+    "value": 0.479,
+    "n": 73,
+    "note": "share of races with a safety car"
+  },
+  "scPerRace": {
+    "value": 0.658,
+    "n": 73,
+    "note": "safety-car periods per race"
+  },
+  "vscShare": {
+    "value": 0.288,
+    "n": 73,
+    "note": "share of races with a virtual safety car"
+  },
+  "overtakesPerRace": {
+    "value": 250.014,
+    "n": 71,
+    "note": "OpenF1 overtakes per race (all on-track position swaps, incl. lap 1)"
+  },
+  "poleWin": {
+    "value": 0.683,
+    "n": 41,
+    "note": "pole sitter wins"
+  },
+  "winnerTop3Grid": {
+    "value": 0.951,
+    "n": 41,
+    "note": "winner qualified top 3"
+  },
+  "winMargin": {
+    "value": 8.142,
+    "n": 73,
+    "note": "P1-P2 gap at the flag (s)"
+  },
+  "lappedPerRace": {
+    "value": 4.781,
+    "n": 73,
+    "note": "classified cars a lap down or more"
+  },
+  "qualiFinishCorr": {
+    "value": 0.8,
+    "n": 41,
+    "note": "rank correlation qualifying -> finish (finishers)"
+  }
+}
