@@ -6,7 +6,7 @@ import { engineerAccepts, engineerCalls } from "../../engine/race/engineer";
 import { COMPOUNDS } from "../../engine/race/model";
 import type { RaceRunner } from "../../engine/race/race";
 
-export function PitWall({ runner, idx, code }: { runner: RaceRunner; idx: number; code: string }) {
+export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: number; code: string; mate?: { idx: number; code: string } }) {
   const car = runner.state.cars[idx];
   const [want, setWant] = useState<Dials>(car.dials);
   const [req, setReq] = useState<{ lap: number; c: "S" | "M" | "H" | null; text: string } | null>(null);
@@ -33,6 +33,13 @@ export function PitWall({ runner, idx, code }: { runner: RaceRunner; idx: number
     runner.command({ car: idx, pit: "stay" });
     setReq({ lap: nextLap, c: null, text: `Staying out on lap ${nextLap}.` });
   };
+  const orders = () => {
+    if (over || !mate) return;
+    runner.command({ car: idx, letBy: true });
+    setReq({ lap: nextLap, c: null, text: `${code}, let ${mate.code} through this lap.` });
+  };
+  const myPos = s.order.indexOf(idx);
+  const mateBehind = mate && myPos >= 0 && s.order[myPos + 1] === mate.idx && s.cars[mate.idx].cum - car.cum < 2.5 && !s.cars[mate.idx].out;
   // a request lasts until its lap has been run
   const active = req && req.lap > s.lap ? req : null;
   const boxFor = active?.c ?? null;
@@ -89,6 +96,11 @@ export function PitWall({ runner, idx, code }: { runner: RaceRunner; idx: number
                     {COMPOUNDS[c].name}
                   </button>
                 ))}
+                {mateBehind && !active && (
+                  <button className="btn bg-ink-800 text-slate-200 hover:bg-ink-700 !px-2.5 !py-1" onClick={orders}>
+                    Let {mate!.code} through
+                  </button>
+                )}
                 {stopNext && !active && (
                   <button className="btn bg-ink-800 text-slate-200 hover:bg-ink-700 !px-2.5 !py-1" onClick={stay}>
                     Stay out a lap

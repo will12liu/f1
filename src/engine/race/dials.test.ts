@@ -118,6 +118,27 @@ describe("dials", () => {
     if (!held.state.cars[k].out && !base.state.cars[k].out) expect(held.state.cars[k].stints[0].to).toBeGreaterThan(planned);
   });
 
+  it("team orders: the car told to move over ends the lap behind its team-mate", () => {
+    let checked = 0;
+    for (let seed = 1; seed < 60 && checked < 3; seed++) {
+      const r = createRace(input(seed));
+      for (let l = 0; l < 6; l++) r.step();
+      const s = r.state;
+      // find two team-mates running nose to tail
+      const k = s.order.findIndex((idx, i) => i + 1 < s.order.length && s.cars[s.order[i + 1]].e.teamId === s.cars[idx].e.teamId && s.cars[s.order[i + 1]].cum - s.cars[idx].cum < 2);
+      if (k < 0 || s.flag !== "green") continue;
+      const front = s.order[k];
+      const back = s.order[k + 1];
+      r.command({ car: front, letBy: true });
+      r.step();
+      if (s.cars[front].out || s.cars[back].out || s.flagLog.some((f) => f.lap === s.lap) || s.cars[front].lastPit === s.lap || s.cars[back].lastPit === s.lap) continue;
+      expect(s.order.indexOf(back)).toBeLessThan(s.order.indexOf(front));
+      expect(s.events.some((e) => e.kind === "teamorder" && e.a === front && e.b === back)).toBe(true);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it("a race driven live replays exactly from its commands", () => {
     const r = createRace(input(12));
     while (!r.done()) {

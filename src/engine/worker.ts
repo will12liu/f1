@@ -1,6 +1,8 @@
 // Runs the simulation off the main thread so the UI stays responsive.
 import * as Comlink from "comlink";
 import { endSeason } from "./season/offseason";
+import * as A from "./manager/actions";
+import { startManager } from "./manager/manager";
 import type { Command } from "./race/dials";
 import { prepareNextRound, seasonOver, simNextRound } from "./season/season";
 import type { World } from "./types";
@@ -23,6 +25,17 @@ const api = {
   commitRound(world: World, commands: Command[]) {
     const summary = simNextRound(world, commands);
     return { world, summary };
+  },
+  /** Team-principal mode: take over a team. */
+  startManager(world: World, teamId: string, name: string) {
+    startManager(world, teamId, name);
+    return world;
+  },
+  /** Any team-principal action by name (see manager/actions.ts). */
+  act<K extends keyof typeof A>(world: World, name: K, args: unknown[]) {
+    const fn = A[name] as unknown as (w: World, ...a: unknown[]) => A.Answer;
+    const answer = fn(world, ...args);
+    return { world, answer };
   },
   /** Winter: champions recorded, drivers develop, market, juniors, cars reshuffle, new calendar. */
   nextSeason(world: World) {

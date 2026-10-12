@@ -64,7 +64,11 @@ export function LiveRace() {
 
   const { drivers, team } = useMaps(world!);
   const entries = prep?.input.entries ?? [];
-  const chosen = entries.findIndex((e) => e.driverId === pick);
+  // team principal: you run both of your cars; sandbox: pick any car
+  const myTeamId = world?.manager && !world.manager.fired ? world.manager.teamId : null;
+  const mine = myTeamId ? entries.map((e, i) => (e.teamId === myTeamId ? i : -1)).filter((i) => i >= 0) : [];
+  const [tab, setTab] = useState(0);
+  const chosen = myTeamId ? (mine[0] ?? -1) : entries.findIndex((e) => e.driverId === pick);
   const season = world?.season ?? 0;
 
   const start = () => {
@@ -120,17 +124,20 @@ export function LiveRace() {
         <div>
           <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · drive it live</div>
           <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
-          <p className="mt-2 text-sm text-slate-400">Pick the car you run from the pit wall. Everyone else races on their own. Dial changes count from the next lap.</p>
+          <p className="mt-2 text-sm text-slate-400">
+            {myTeamId ? `You run both ${team(myTeamId)?.name} cars from the pit wall: dials, stops and team orders.` : "Pick the car you run from the pit wall."} Everyone else races on their own. Dial changes count from the next lap.
+          </p>
         </div>
         <div className="panel overflow-hidden">
           <div className="px-3 py-2 border-b border-ink-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Grid</div>
           <ol className="grid sm:grid-cols-2 text-sm">
             {entries.map((e, i) => {
               const d = drivers.get(e.driverId);
-              const sel = e.driverId === pick;
+              const sel = myTeamId ? e.teamId === myTeamId : e.driverId === pick;
               return (
                 <li key={e.driverId}>
                   <button
+                    disabled={!!myTeamId}
                     onClick={() => {
                       setPick(e.driverId);
                       savePick(e.driverId);
@@ -149,7 +156,7 @@ export function LiveRace() {
         </div>
         <div className="flex gap-2">
           <button className="btn-primary" disabled={chosen < 0} onClick={start}>
-            Start the race{chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""}
+            Start the race{myTeamId ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""}
           </button>
           <Link className="btn-ghost" to={base}>
             Back
@@ -160,7 +167,27 @@ export function LiveRace() {
   }
 
   const finished = runner.done();
-  const code = drivers.get(entries[chosen].driverId)?.code ?? "";
+  const codeOf = (i: number) => drivers.get(entries[i].driverId)?.code ?? "";
+  const code = codeOf(chosen);
+  const wall =
+    mine.length === 2 ? (
+      <div className="grid gap-2">
+        <div className="flex gap-1">
+          {mine.map((i, k) => (
+            <button key={i} onClick={() => setTab(k)} className={`btn flex-1 !py-1 ${tab === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+              {codeOf(i)}
+            </button>
+          ))}
+        </div>
+        {mine.map((i, k) => (
+          <div key={i} className={tab === k ? "" : "hidden"}>
+            <PitWall runner={runner} idx={i} code={codeOf(i)} mate={{ idx: mine[1 - k], code: codeOf(mine[1 - k]) }} />
+          </div>
+        ))}
+      </div>
+    ) : (
+      <PitWall runner={runner} idx={chosen} code={code} />
+    );
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
@@ -186,7 +213,7 @@ export function LiveRace() {
           </Link>
         </div>
       </div>
-      <RaceViewer world={world} replay={replay} live={live} follow0={chosen} side={<PitWall runner={runner} idx={chosen} code={code} />} />
+      <RaceViewer world={world} replay={replay} live={live} follow0={mine.length === 2 ? mine[tab] : chosen} side={wall} />
     </div>
   );
 }

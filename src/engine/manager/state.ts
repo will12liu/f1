@@ -137,4 +137,7 @@ export function capSpend(w: World, m: Manager): number {
   return -m.ledger.filter((e) => e.season === w.season && e.capped && e.amount < 0).reduce((s, e) => s + e.amount, 0);
 }
 
-export const fmtM = (x: number) => `${x < 0 ? "-" : ""}$${(Math.abs(x) / 1e6).toFixed(1)}M`;
+export const fmtM = (x: number) => {
+  const a = Math.abs(x);
+  return `${x < 0 ? "-" : ""}$${a >= 1e6 || a === 0 ? `${(a / 1e6).toFixed(1)}M` : `${Math.round(a / 1e3)}K`}`;
+};

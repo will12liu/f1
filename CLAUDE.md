@@ -1,6 +1,6 @@
 # Paddock (F1 career sim)
 
-Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Coding/nba-gm`: read it for reference, never edit it). The plan and phases are in docs/HANDOFF.md. Built so far: Phases 0-5 (scaffold, data + types, headless race engine + calibration, season engine, 2D race view, resource dials + live race).
+Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Coding/nba-gm`: read it for reference, never edit it). The plan and phases are in docs/HANDOFF.md. Built so far: Phases 0-5 (scaffold, data + types, headless race engine + calibration, season engine, 2D race view, resource dials + live race), stewards and flags, and team-principal (manager) mode.
 
 ## Commands
 - `npm run dev`: app at localhost:5173 · `npm test`: vitest · `npm run typecheck`
@@ -8,6 +8,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - `npm run data`: rebuild `public/data/world-2026.json`, `public/data/tracks/*.json` and `data/generated/targets.json`
 - `npm run calibrate [races]`: sim races on the 2026 calendar with the real grid, compare with real averages (tuning knobs: `RACE` in `src/engine/race/model.ts`)
 - `npm run check:season [seed] [seasons]`: sim seasons + winters headlessly (champions, car order, grid changes, development by age)
+- `npm run check:manager [team] [seasons] [seed]`: team-principal seasons with an automatic principal (position, cap spend, profit, car rank, board)
 
 ## Workflow
 - After each batch: `npx tsc --noEmit -p . && npm test`, then commit and push to main (Cloudflare Pages deploys main). Never force-push.
@@ -43,6 +44,16 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - Neutral = the AI. Cars nobody touched skip the dial maths (`car.ctl`), and dials never draw random numbers. Test `dials.test.ts` pins a hash of 60 races from before Phase 5: keep it passing.
 - `runner.command({car, dials | pit: "box"|"stay", compound})` applies at the start of the next lap and is logged in `state.commands`. `RaceInput.commands` replays them: same input + commands = same race. `runner.forecast(idx)`: tyre laps left, battery empty lap, fuel margin, next stop.
 - Live race (`/g/:id/live`, `LiveRace.tsx`): the worker's `prepareRound` gives qualifying + the input; the main thread runs `createRace` one lap ahead of the screen (`LiveSource.advance`); `commitRound(world, commands)` re-sims it in the worker and saves. `PitWall.tsx` is the panel. Trust is stubbed (`engineerAccepts`).
+
+## Stewards and flags
+- Track limits (strikes; black-and-white on the 3rd; 5s from the 4th; a few "prone" drivers per race), jump starts, unsafe release, pit speeding, collision penalties (5s/10s/drive-through, licence points). Drive-through/stop-go served on a later lap (`served` event, shown in the pit lane), else +20/+30s. Blue flags cost the lapped car and the leader a little. Local yellows (sector) after incidents. Red flag: SC-style lap, free tyre change, standing restart.
+- Licence points on `Driver.licence`; 12 in 12 months = ban for the next round (`bannedFor`), `raceLineup` puts in the reserve or best free driver. Knobs in `RACE` (model.ts); calibrate checks red flags, penalties and strikes per race.
+
+## Team-principal mode (src/engine/manager, src/ui/manager)
+- `world.mode = "manager"`, `world.manager` (state.ts), `world.staff` (six key roles for every F1 team + free agents). Real-world money rules in `data/manual/manager.ts` (cost cap, prize fund, ATR scale, sponsor tiers, invented sponsor brands, facilities, staff pay).
+- After each round (`managerAfterRound`, called from `simNextRound`): income (prize instalment, owner, merch, sponsors, bonuses), spending (drivers, staff, ops, engine fee; capped vs not), R&D projects tick and deliver (gain = size x efficiency x quality x room; 7% fail), facilities build, gardening leave ends, ATR refill at mid-season, board confidence (standings vs target), sponsor satisfaction, new offers, cap warnings.
+- Winter: `managerSeasonEnd` (position bonuses, cap breach fines and ATR cut, board review and the sack after 2+ seasons, sponsor renewals/break clauses, staff contracts and ageing), `managerMarket` (our seats: expiring deals leave, pre-contracts arrive, `ensureSeats`), the AI market skips our team, `managerWinter` (next-year car work lands, new targets/ATR/offers). The player's team gets no automatic AI development.
+- Actions (actions.ts, run in the worker via `act`): sponsors, projects, facilities, staff hire/poach/renew/release, drivers renew/release/sign/pre-contract/reserve, inbox, take a job after the sack. Race help: pit crew (stop time, slow stops), strategy (plan choice), engineers + simulator (pace) via `raceBoost` -> `Entry.pit/strat/form`. Team orders: `Command.letBy`.
 
 ## UI rules
 - No gradients, glass, emoji in headings, badge-above-headline, three-icon rows, fade-on-hover or fade-in-on-scroll, buzzword copy. Solid colours, high contrast, one spacing scale, plain labels.

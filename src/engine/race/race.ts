@@ -39,7 +39,8 @@ export type RaceEventKind =
   | "blue" // a = the lapped car shown blue flags, b = the car lapping him
   | "yellow" // local yellow (info = sector 1-3)
   | "served" // drive-through / stop-go served (x = seconds in the pit lane)
-  | "restart"; // standing restart after a red flag
+  | "restart" // standing restart after a red flag
+  | "teamorder"; // a = the car letting its team-mate (b) through
 
 export interface RaceEvent {
   lap: number;
@@ -355,7 +356,8 @@ export function createRace(input: RaceInput): RaceRunner {
     state.standing = false;
     const running = state.order.map((i) => cars[i]).filter((x) => !x.out);
 
-    // Commands for this lap (dials, pit calls).
+    // Commands for this lap (dials, pit calls, team orders).
+    const letBy = new Set<number>();
     for (const cmd of queue.filter((x) => x.lap === L)) {
       const car = cars[cmd.car];
       state.commands.push(cmd);
@@ -364,6 +366,7 @@ export function createRace(input: RaceInput): RaceRunner {
       if (cmd.dials) car.dials = { ...car.dials, ...cmd.dials };
       if (cmd.pit === "box") car.box = cmd.compound ?? "auto";
       if (cmd.pit === "stay") car.hold = true;
+      if (cmd.letBy) letBy.add(car.idx);
     }
     // what each touched car's dials do this lap
     const fxs = new Map<number, DialFx>();
@@ -466,6 +469,17 @@ export function createRace(input: RaceInput): RaceRunner {
       pot.set(car.idx, car.cum + t);
     }
 
+    // Team orders: the car told to move over finishes the lap just behind its team-mate.
+    for (const idx of letBy) {
+      const car = cars[idx];
+      const mate = running.find((x) => x !== car && x.e.teamId === car.e.teamId);
+      if (!mate || car.out || pitting.has(idx) || pitting.has(mate.idx) || flag !== "green") continue;
+      const behind = mate.cum - car.cum;
+      if (behind <= 0 || behind > 2.5) continue;
+      pot.set(idx, Math.max(pot.get(idx)!, pot.get(mate.idx)! + 0.6));
+      ev({ lap: L, t: car.cum + (pot.get(idx)! - car.cum) * 0.5, kind: "teamorder", a: idx, b: mate.idx });
+    }
+
     // Road order, front to back.
     const fin = new Map<number, number>();
     const list: CarState[] = [];
@@ -508,6 +522,13 @@ export function createRace(input: RaceInput): RaceRunner {
               continue;
             }
             break;
+          }
+          // team orders: the team-mate ahead moves over, no fight
+          if (letBy.has(y.idx) && y.e.teamId === x.e.teamId) {
+            f = Math.min(f, fy - 0.05);
+            fin.set(y.idx, Math.max(fy, f + 0.4));
+            at--;
+            continue;
           }
           // a real fight
           const n = fights.get(x.idx) ?? 0;

@@ -41,6 +41,11 @@ DNF/race 3.5 (real 2.6 all years, 4.2 in 2026) · stops/finisher 1.65 (1.6) · S
 - **Cloudflare Pages:** connect the repo, build `npm run build`, output `dist`.
 - The preview tool in the old session started nba-gm's dev server (it read nba-gm's launch config). Run the F1 server on its own port: `npx vite --port 5174` (or the `f1-career` entry in `.claude/launch.json`).
 
+## Added on 2026-10-12 (after Phase 5, on request)
+- Stewards and flags (track limits, black-and-white flag, blue flags, yellows, red flag + standing restart, drive-through/stop-go, licence points and bans). Calibration all within 20% including the new metrics.
+- Cars drawn as top-down F1 cars in team colours, a safety car on track, yellow/red sectors, penalty and flag chips in the timing tower.
+- Team-principal mode (manager): money under the cost cap, sponsors, R&D with wind-tunnel allocation, facilities, staff (with poaching), driver contracts, board and the sack, FIA cap breaches, inbox, two-car pit wall with team orders. `npm run check:manager` for balance.
+
 ## Next: Phase 6 (duels)
 Phase 5 is done (see the table). Open points from it: AI cars always run neutral dials; the trust stub always accepts; the live race needs a driver picked each time (no career yet).
 

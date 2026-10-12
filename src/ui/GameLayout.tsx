@@ -11,6 +11,20 @@ const NAV = [
   ["history", "History"],
 ] as const;
 
+const TEAM_NAV = [
+  ["", "HQ"],
+  ["rnd", "Car & R&D"],
+  ["people", "People"],
+  ["partners", "Partners"],
+  ["finance", "Finance"],
+  ["inbox", "Inbox"],
+  ["calendar", "Calendar"],
+  ["standings", "Standings"],
+  ["teams", "Teams"],
+  ["drivers", "Drivers"],
+  ["history", "History"],
+] as const;
+
 export function GameLayout() {
   const { id = "" } = useParams();
   const nav = useNavigate();
@@ -40,7 +54,7 @@ export function GameLayout() {
           </NavLink>
           <span className="hidden sm:inline text-xs text-slate-500">{meta.name} · {world.season}</span>
           <nav className="flex gap-1 overflow-x-auto text-sm ml-auto">
-            {NAV.map(([to, label]) => (
+            {(world.manager ? TEAM_NAV : NAV).map(([to, label]) => (
               <NavLink
                 key={to}
                 to={to ? `${base}/${to}` : base}
@@ -48,6 +62,7 @@ export function GameLayout() {
                 className={({ isActive }) => `px-2.5 py-1.5 rounded-md whitespace-nowrap ${isActive ? "bg-ink-800 text-white" : "text-slate-400 hover:text-white"}`}
               >
                 {label}
+                {to === "inbox" && world.manager && world.manager.inbox.some((x) => !x.read) ? <span className="ml-1 rounded-sm bg-race px-1 text-[10px] font-bold text-white">{world.manager.inbox.filter((x) => !x.read).length}</span> : null}
               </NavLink>
             ))}
           </nav>

@@ -5,6 +5,7 @@
 // small least-squares problem: qualifying and race-time gaps between teammates (2025 + 2026, every
 // pairing links the grid together) with the hand ratings as the prior.
 // Cars: 2026 qualifying gap of each team to pole, corrected for its drivers, on the engine's scale.
+import { salaryFor } from "../src/engine/season/offseason";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CIRCUITS } from "../data/manual/circuits";
@@ -154,7 +155,7 @@ function buildDrivers(): Driver[] {
       pot: Math.max(ovr, h.pot ?? ovr),
       peak: h.peak ?? 28,
       decline: h.decline ?? 34,
-      contract: { teamId: h.team, until: h.until, salary: Math.round(Math.max(1, (ovr - 70) * 2.3) * 1e6) },
+      contract: { teamId: h.team, until: h.until, salary: salaryFor(ovr) },
       real: true,
     });
     console.log(`${h.code} ovr ${ovr} quali ${r.quali}->${ratings.quali} (data ${q.get(h.code)?.toFixed(1)}) pace ${r.pace}->${ratings.pace} (data ${p.get(h.code)?.toFixed(1)})`);

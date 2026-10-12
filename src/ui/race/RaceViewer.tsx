@@ -212,6 +212,8 @@ function describe(e: Replay["events"][number], cars: { code: string }[]): string
       return `${a} serves a ${e.info}`;
     case "slowstop":
       return `${a} slow stop (+${e.info}s)`;
+    case "teamorder":
+      return `Team orders: ${a} lets ${b} through`;
     default:
       return `${e.kind} ${a}`;
   }

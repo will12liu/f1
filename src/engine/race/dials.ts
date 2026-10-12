@@ -77,6 +77,7 @@ export interface Command {
   car: number;
   dials?: Partial<Dials>;
   pit?: "box" | "stay"; // box at the end of this lap / skip a planned stop this lap
+  letBy?: boolean; // team orders: let the team-mate behind through this lap
   compound?: "S" | "M" | "H"; // tyre wanted at a requested stop
 }
 

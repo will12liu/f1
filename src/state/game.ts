@@ -5,7 +5,12 @@ import { readSave, writeSave, type SaveMeta } from "../db/db";
 import type { WorkerApi } from "../engine/worker";
 import type { Command } from "../engine/race/dials";
 import type { PreparedRound } from "../engine/season/season";
+import type * as Actions from "../engine/manager/actions";
 import type { World } from "../engine/types";
+
+/** Team-principal actions the UI can call: name + the arguments after `world`. */
+export type ActName = Exclude<keyof typeof Actions, "Answer" | "projectQuote" | "driverAsk" | "driverWilling">;
+type ActArgs<K extends ActName> = (typeof Actions)[K] extends (w: World, ...a: infer P) => unknown ? P : never;
 
 let worker: Comlink.Remote<WorkerApi> | null = null;
 const api = () => (worker ??= Comlink.wrap<WorkerApi>(new Worker(new URL("../engine/worker.ts", import.meta.url), { type: "module" })));
@@ -16,7 +21,9 @@ interface GameState {
   busy: string | null;
   error: string | null;
   open(id: string): Promise<boolean>;
-  create(name: string): Promise<string>;
+  create(name: string, manager?: { teamId: string; principal: string }): Promise<string>;
+  /** Run a team-principal action in the worker and save. */
+  act<K extends ActName>(name: K, ...args: ActArgs<K>): Promise<{ ok: boolean; msg: string }>;
   simRounds(n: number): Promise<number>;
   nextSeason(): Promise<void>;
   /** Qualifying and the race input for the next round, to drive it live. */
@@ -43,12 +50,22 @@ export const useGame = create<GameState>((set, get) => ({
     set({ meta: s.meta, world: s.world });
     return true;
   },
-  async create(name) {
+  async act(name, ...args) {
+    const { world, meta } = get();
+    if (!world || !meta) return { ok: false, msg: "No save open." };
+    const res = await api().act(world, name, args as unknown[]);
+    const m = await persist(meta, res.world);
+    set({ world: res.world, meta: m });
+    return res.answer;
+  },
+  async create(name, manager) {
     set({ busy: "Loading the 2026 grid…" });
     try {
       const res = await fetch("/data/world-2026.json");
-      const world = (await res.json()) as World;
+      let world = (await res.json()) as World;
       world.seed = Math.floor(Math.random() * 2 ** 31);
+      world.mode = "sandbox";
+      if (manager) world = await api().startManager(world, manager.teamId, manager.principal);
       const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       const meta: SaveMeta = { id, name, season: world.season, round: 0, createdAt: Date.now(), updatedAt: Date.now() };
       await writeSave(meta, world);

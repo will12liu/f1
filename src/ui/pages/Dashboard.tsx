@@ -3,6 +3,7 @@ import { circuitOf, driverStandings, nextRound, teamStandings } from "../../engi
 import { COUNTRY_FLAGS } from "../../lib/format";
 import { useGame } from "../../state/game";
 import { DriverLink, Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
+import { Hq } from "../manager/Hq";
 
 export function Dashboard() {
   const { id = "" } = useParams();
@@ -10,6 +11,7 @@ export function Dashboard() {
   const nav = useNavigate();
   const { world, busy, simRounds, nextSeason } = useGame();
   if (!world) return null;
+  if (world.manager) return <Hq />;
   const { drivers, team } = useMaps(world);
   const next = nextRound(world);
   const circuit = next ? circuitOf(world, next.circuitId) : null;
