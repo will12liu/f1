@@ -17,6 +17,8 @@ export interface Entry {
   reliability: number;
   r: DriverRatings;
   form?: number; // pace on the day, fraction of the lap (dayForms)
+  pit?: number; // pit crew 0-100 (team-principal mode; undefined = the standard AI crew)
+  strat?: number; // strategy department 0-100 (undefined = standard)
 }
 
 export interface RaceInput {
@@ -184,7 +186,8 @@ export function createRace(input: RaceInput): RaceRunner {
       maxStops,
     });
     if (want && !ps.length) return choosePlan(car, from, keep, maxStops);
-    const pick = ps.length > 1 && ps[1].cost - ps[0].cost < 4 && rng.chance(0.15) ? ps[1] : ps[0];
+    // a better strategy department picks the second-best plan less often (same draw either way)
+    const pick = ps.length > 1 && ps[1].cost - ps[0].cost < 4 && rng.chance(0.15 * (car.e.strat === undefined ? 1 : Math.max(0.1, (100 - car.e.strat) / 45))) ? ps[1] : ps[0];
     return pick;
   };
 
@@ -441,7 +444,8 @@ export function createRace(input: RaceInput): RaceRunner {
       if (pitting.has(car.idx)) {
         let loss = flag === "sc" ? pitLoss.sc : flag === "vsc" ? pitLoss.vsc : pitLoss.normal;
         loss += rng.normal(0, 0.4);
-        if (rng.chance(RACE.slowStop)) {
+        if (car.e.pit !== undefined) loss += (70 - car.e.pit) * 0.012; // a better crew is quicker
+        if (rng.chance(RACE.slowStop * (car.e.pit === undefined ? 1 : Math.max(0.3, 1.8 - car.e.pit / 60)))) {
           const extra = 2 + rng.next() * 7;
           loss += extra;
           ev({ lap: L, t: car.cum + t, kind: "slowstop", a: car.idx, info: extra.toFixed(1) });

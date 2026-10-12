@@ -19,8 +19,9 @@ const clampCar = (v: number) => Math.max(40, Math.min(99, v));
 
 /** After every round: each F1 team brings upgrades (dev rate, budget, harder near the top). */
 export function developCarsAfterRound(w: World, rng: Rng) {
+  const mine = w.manager && !w.manager.fired ? w.manager.teamId : null; // the player's team develops through R&D projects
   for (const t of w.teams) {
-    if (t.series !== "F1") continue;
+    if (t.series !== "F1" || t.id === mine) continue;
     const rate = (t.car.dev / 100) * DEV.perRound + (t.budget - 3) * DEV.budget;
     for (const a of AREAS) {
       const room = Math.max(0.15, 1 - (t.car[a] - 80) / 30);

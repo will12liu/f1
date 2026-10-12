@@ -7,6 +7,7 @@ import type { Command } from "../race/dials";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
+import { ensureSeats, managerAfterRound, raceBoost } from "../manager/manager";
 
 export const f1Teams = (w: World) => w.teams.filter((t) => t.series === "F1");
 export const driverMap = (w: World) => new Map(w.drivers.map((d) => [d.id, d]));
@@ -66,8 +67,11 @@ export function prepareNextRound(w: World): PreparedRound | null {
   if (!r) return null;
   const circuit = circuitOf(w, r.circuitId);
   const seed = roundSeed(w, r.round);
+  ensureSeats(w);
   const field = raceLineup(w, r.round);
-  const form = dayForms(seed, field.length);
+  // the player's people (engineers, simulator) help the team's pace a little; AI teams are unchanged
+  const boost = new Map(field.map(({ team }) => [team.id, raceBoost(w, team.id)]));
+  const form = dayForms(seed, field.length).map((f, i) => f + boost.get(field[i].team.id)!.form);
   const quali = qualify(
     seed,
     circuit,
@@ -83,6 +87,8 @@ export function prepareNextRound(w: World): PreparedRound | null {
       reliability: team.car.reliability,
       r: driver.ratings,
       form: form[i],
+      pit: boost.get(team.id)!.pit,
+      strat: boost.get(team.id)!.strat,
     }))
     .sort((a, b) => a.grid - b.grid);
   const standIns = field.filter((x) => x.standIn).map((x) => ({ driverId: x.driver.id, for: x.standIn! }));
@@ -158,6 +164,7 @@ export function simNextRound(w: World, commands?: Command[]): RaceSummary | null
   w.results.push(summary);
   w.replays[r.round] = replay;
   developCarsAfterRound(w, makeRng(seed ^ 0xdee));
+  managerAfterRound(w, summary);
   return summary;
 }
 

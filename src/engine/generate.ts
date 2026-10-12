@@ -58,6 +58,13 @@ export function genRatings(rng: Rng, level: number): DriverRatings {
   return r;
 }
 
+/** A name and nationality (staff, generated people). */
+export function personName(rng: Rng): { first: string; last: string; nat: string } {
+  const nat = pickNat(rng);
+  const pool = NAMES[nat] ?? NAMES.British;
+  return { first: rng.pick(pool.first), last: rng.pick(pool.last), nat };
+}
+
 let counter = 0;
 export function genDriver(rng: Rng, o: { series: Series; season: number; age: number; level: number; pot: number; idPrefix?: string }): Driver {
   const nat = pickNat(rng);

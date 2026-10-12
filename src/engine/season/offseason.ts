@@ -5,6 +5,7 @@ import { genDriver } from "../generate";
 import { hashString, makeRng, type Rng } from "../rng";
 import type { Driver, Series, Team, World } from "../types";
 import { ageOf, developDriver, winterCars } from "./development";
+import { managerMarket, managerSeasonEnd, managerWinter } from "../manager/manager";
 import { driverStandings, seasonOver, teamStandings } from "./season";
 
 export const MARKET = {
@@ -12,8 +13,10 @@ export const MARKET = {
   ageCliff: 33,
 };
 
+/** Market salary: about $1M for a rookie-level driver, $8M at 80, $25M at 88, $50M for the very best. */
 export function salaryFor(ovr: number): number {
-  return Math.round(Math.max(1, (ovr - 70) * 2.3) * 1e6);
+  const x = Math.max(0, (ovr - 70) / 25);
+  return Math.round((1 + 50 * Math.pow(x, 2.2)) * 10) * 1e5;
 }
 
 /** How much a team wants a driver (the market's single number). */
@@ -42,6 +45,7 @@ export function endSeason(w: World) {
     teamStandings: ts.map((r) => ({ teamId: r.teamId, points: r.points })),
   });
   const next = season + 1;
+  managerSeasonEnd(w);
 
   // Develop and age everyone (the season just ended counts as this age).
   for (const d of w.drivers) if (!d.retired) developDriver(d, season, rng);
@@ -59,6 +63,7 @@ export function endSeason(w: World) {
   }
 
   juniorLadder(w, rng, next);
+  managerMarket(w, next);
   driverMarket(w, rng, next);
   juniorSeats(w, rng, next);
   winterCars(w, rng, next);
@@ -71,6 +76,7 @@ export function endSeason(w: World) {
   w.results = [];
   w.replays = {};
   w.calendar = w.calendar.map((r) => ({ ...r, date: shiftYear(r.date) }));
+  managerWinter(w);
 }
 
 function retire(w: World, d: Driver, season: number) {
@@ -91,7 +97,9 @@ function driverMarket(w: World, rng: Rng, next: number) {
   const f1 = w.teams.filter((t) => t.series === "F1");
   const active = w.drivers.filter((d) => !d.retired);
   // expiring contracts
+  const mine = w.manager && !w.manager.fired ? w.manager.teamId : null; // the player runs his own seats
   for (const t of f1) {
+    if (t.id === mine) continue;
     for (const id of [...t.drivers]) {
       const d = active.find((x) => x.id === id);
       if (!d) continue;
@@ -112,7 +120,7 @@ function driverMarket(w: World, rng: Rng, next: number) {
   const strength = (t: Team) => t.car.power + t.car.aero + t.car.mech + t.budget * 3;
   for (let pass = 0; pass < 2; pass++)
     for (const t of [...f1].sort((a, b) => strength(b) - strength(a))) {
-      if (t.drivers.length >= 2) continue;
+      if (t.drivers.length >= 2 || t.id === mine) continue;
       const pool = active.filter((d) => !d.teamId || (d.series !== "F1" && d.teamId)).filter((d) => d.series === "F1" || d.series === "F2");
       const best = pool
         .map((d) => ({ d, v: driverValue(d, next, rng) }))
