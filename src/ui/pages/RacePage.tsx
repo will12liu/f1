@@ -43,7 +43,7 @@ export function RacePage() {
       {tab === "watch" && replay && <RaceViewer world={world} replay={replay} />}
 
       {tab === "result" && (
-        <Section title="Classification" right={<span className="text-xs text-slate-400">{res.overtakes} passes · {res.sc} SC · {res.vsc} VSC</span>}>
+        <Section title="Classification" right={<span className="text-xs text-slate-400">{res.overtakes} passes · {res.sc} SC · {res.vsc} VSC{res.red ? ` · ${res.red} red flag${res.red > 1 ? "s" : ""}` : ""}</span>}>
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>
@@ -57,6 +57,7 @@ export function RacePage() {
                   <th className="num">Stops</th>
                   <th className="num">Best lap</th>
                   <th className="num">Pts</th>
+                  <th>Stewards</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,6 +82,11 @@ export function RacePage() {
                       <td className="num">{r.pits}</td>
                       <td className={`num ${fl ? "text-fuchsia-400 font-semibold" : "text-slate-400"}`}>{lapTime(r.fastest)}</td>
                       <td className="num font-semibold">{r.points || ""}</td>
+                      <td className="text-xs text-amber-300">
+                        {(r.pens ?? []).join(", ")}
+                        {r.pp ? <span className="text-slate-400"> · {r.pp} licence pt{r.pp > 1 ? "s" : ""}</span> : null}
+                        {res.stand_ins?.some((x) => x.driverId === r.driverId) ? <span className="text-slate-400">Stand-in for {drivers.get(res.stand_ins.find((x) => x.driverId === r.driverId)!.for)?.last}</span> : null}
+                      </td>
                     </tr>
                   );
                 })}

@@ -28,9 +28,16 @@ export interface RaceInput {
   commands?: Command[]; // dial changes and pit calls, each applied at the start of its lap (replays a live race)
 }
 
-export type Flag = "green" | "sc" | "vsc";
+export type Flag = "green" | "sc" | "vsc" | "red";
 
-export type RaceEventKind = "pass" | "pit" | "dnf" | "sc" | "vsc" | "green" | "fastest" | "contact" | "penalty" | "mistake" | "slowstop";
+export type RaceEventKind =
+  | "pass" | "pit" | "dnf" | "sc" | "vsc" | "red" | "green" | "fastest" | "contact" | "penalty" | "mistake" | "slowstop"
+  | "limits" // track-limits strike (info = strike number)
+  | "bw" // black-and-white flag (last warning)
+  | "blue" // a = the lapped car shown blue flags, b = the car lapping him
+  | "yellow" // local yellow (info = sector 1-3)
+  | "served" // drive-through / stop-go served (x = seconds in the pit lane)
+  | "restart"; // standing restart after a red flag
 
 export interface RaceEvent {
   lap: number;
@@ -78,6 +85,12 @@ export interface CarState {
   box: "S" | "M" | "H" | "auto" | null; // requested stop at the end of this lap
   hold: boolean; // skip a planned stop this lap
   lift: boolean; // lifting and coasting this lap (tank short)
+  strikes: number; // track-limits strikes
+  prone: number; // how much this driver fights the track limits this weekend
+  blueIgnored: number;
+  owed: 0 | 1 | 2; // drive-through (1) or stop-go (2) still to serve
+  pp: number; // licence penalty points picked up this race
+  pens: string[]; // penalties given ("5s track limits", ...)
 }
 
 export interface RaceState {
@@ -88,10 +101,12 @@ export interface RaceState {
   flag: Flag;
   flagLaps: number; // laps of the current neutralisation left
   restart: boolean;
+  standing: boolean; // the next lap is a standing restart (after a red flag)
   events: RaceEvent[];
   lapEnd: number[][]; // [car][lap] race time at the end of each lap (lap 0 = start position)
   sc: number;
   vsc: number;
+  red: number;
   passes: number;
   fastest: { car: number; time: number; lap: number } | null;
   flagLog: { lap: number; flag: Flag }[]; // flag in force on each lap that wasn't green
@@ -125,13 +140,16 @@ export interface ResultRow {
   fastest: number;
   passes: number;
   stints: StintRecord[];
-  penalty: number;
+  penalty: number; // seconds added to the race time (penalties not served in the pits)
+  pens: string[];
+  pp: number; // licence penalty points
 }
 
 export interface RaceResult {
   rows: ResultRow[];
   sc: number;
   vsc: number;
+  red: number;
   passes: number;
   fastest: { idx: number; time: number; lap: number } | null;
   leadChanges: number;
@@ -200,6 +218,12 @@ export function createRace(input: RaceInput): RaceRunner {
     box: null,
     hold: false,
     lift: false,
+    strikes: 0,
+    prone: 1,
+    blueIgnored: 0,
+    owed: 0,
+    pp: 0,
+    pens: [],
   }));
 
   // Start: grid slots plus the launch (starts rating + luck).
@@ -221,10 +245,12 @@ export function createRace(input: RaceInput): RaceRunner {
     flag: "green",
     flagLaps: 0,
     restart: false,
+    standing: false,
     events: [],
     lapEnd: cars.map((x) => [(x.e.grid - 1) * RACE.gridGap]),
     sc: 0,
     vsc: 0,
+    red: 0,
     passes: 0,
     fastest: null,
     flagLog: [],
@@ -233,6 +259,9 @@ export function createRace(input: RaceInput): RaceRunner {
   const queue: Command[] = (input.commands ?? []).map((x) => ({ ...x }));
 
   const ev = (e: RaceEvent) => state.events.push(e);
+  for (const car of cars) car.prone = rng.chance(RACE.limitsProne) ? 8 : 0.45;
+  // jump starts (the transponder sees it; five seconds)
+  for (const car of cars) if (rng.chance(RACE.jumpStart * (0.5 + car.e.r.aggression / 100))) penalise(car, "5s", "jump start", 1, 0, 0);
 
   function retire(car: CarState, why: DnfReason, lap: number, t: number) {
     if (car.out) return;
@@ -247,10 +276,28 @@ export function createRace(input: RaceInput): RaceRunner {
   let leadChanges = 0;
   let lapExtra = new Map<number, number>(); // time lost in incidents this lap (added when the lap is committed)
   const lose = (car: CarState, s: number) => lapExtra.set(car.idx, (lapExtra.get(car.idx) ?? 0) + s);
+  const rank: Record<Flag, number> = { green: 0, vsc: 1, sc: 2, red: 3 };
   const callFlag = (f: Flag) => {
     if (state.lap >= laps - 1) return; // too late to matter
-    if (f === "sc" || !pendingFlag) pendingFlag = f;
+    if (!pendingFlag || rank[f] > rank[pendingFlag]) pendingFlag = f;
   };
+  /** After a crash or a car stopped on track: red flag (rare), safety car or VSC. */
+  const neutralise = (scChance: number, vscChance: number, red = 0) => {
+    if (red && rng.chance(red)) callFlag("red");
+    else if (rng.chance(clamp(scChance, 0, 0.95))) callFlag("sc");
+    else if (rng.chance(vscChance)) callFlag("vsc");
+  };
+
+  /** A penalty from the stewards: time ("5s"/"10s", served at a stop or added at the end), a drive-through
+   *  or a stop-go (served on a later lap), plus licence points. */
+  function penalise(car: CarState, what: "5s" | "10s" | "drive-through" | "stop-go", why: string, lap: number, t: number, pp: number) {
+    if (what === "5s") car.penalty += 5;
+    else if (what === "10s") car.penalty += 10;
+    else car.owed = what === "drive-through" ? 1 : 2;
+    car.pp += pp;
+    car.pens.push(`${what} ${why}`);
+    ev({ lap, t, kind: "penalty", a: car.idx, info: `${what}|${why}${pp ? `|${pp}` : ""}` });
+  }
 
   function contact(att: CarState, def: CarState, L: number, t: number) {
     ev({ lap: L, t, kind: "contact", a: att.idx, b: def.idx });
@@ -276,13 +323,21 @@ export function createRace(input: RaceInput): RaceRunner {
     } else {
       lose(att, 8); // spun, kept going
     }
-    if (!att.out && (def.out || x < 0.55) && rng.chance(0.45)) {
-      const pen = rng.chance(0.75) ? 5 : 10;
-      att.penalty += pen;
-      ev({ lap: L, t, kind: "penalty", a: att.idx, info: `${pen}s` });
+    if (!att.out && (def.out || x < 0.55) && rng.chance(0.6)) {
+      const y = rng.next();
+      const serious = def.out || x < 0.2;
+      if (y < 0.08 && laps - L > 3) penalise(att, "drive-through", "causing a collision", L, t, serious ? 3 : 2);
+      else if (y < 0.33) penalise(att, "10s", "causing a collision", L, t, serious ? 2 : 1);
+      else penalise(att, "5s", "causing a collision", L, t, serious && y < 0.6 ? 1 : 0);
     }
-    if (dnfs && rng.chance(clamp(RACE.scAfterCrash * (0.5 + c.sc), 0, 0.95))) callFlag("sc");
-    else if (dnfs && rng.chance(0.22)) callFlag("vsc");
+    if (dnfs) neutralise(RACE.scAfterCrash * (0.5 + c.sc), 0.22, RACE.redAfterCrash * c.sc * dnfs);
+    else yellow(att, L, t);
+  }
+
+  /** A local yellow where something happened (the viewer shows the sector). */
+  function yellow(car: CarState, L: number, t: number) {
+    const frac = clamp((t - car.cum) / base, 0, 0.999); // how far round the lap
+    ev({ lap: L, t, kind: "yellow", a: car.idx, info: String(1 + Math.floor(frac * 3)) });
   }
 
   function step() {
@@ -293,6 +348,8 @@ export function createRace(input: RaceInput): RaceRunner {
     const restart = state.restart;
     state.restart = false;
     if (flag !== "green") state.flagLog.push({ lap: L, flag });
+    const standing = state.standing;
+    state.standing = false;
     const running = state.order.map((i) => cars[i]).filter((x) => !x.out);
 
     // Commands for this lap (dials, pit calls).
@@ -315,7 +372,7 @@ export function createRace(input: RaceInput): RaceRunner {
     // Pit calls.
     const pitting = new Set<number>();
     for (const car of running) {
-      if (L >= laps) break;
+      if (L >= laps || flag === "red") break;
       const left = laps - L;
       let pit = car.forcePit || car.box !== null;
       if (!pit && car.plan.length > 1 && car.plan[0].until <= L && !car.hold) pit = true;
@@ -338,7 +395,7 @@ export function createRace(input: RaceInput): RaceRunner {
     for (const car of running) {
       const r = car.e.r;
       let t: number;
-      if (flag === "sc") t = base * RACE.scLapFactor + rng.normal(0, 0.1);
+      if (flag === "sc" || flag === "red") t = base * RACE.scLapFactor + rng.normal(0, 0.1);
       else if (flag === "vsc") t = base * RACE.vscLapFactor + rng.normal(0, 0.1);
       else {
         t = base * (1 + RACE.raceSpread * (RACE.carK * (100 - car.e.car) + RACE.drvK * (100 - r.pace)));
@@ -363,6 +420,24 @@ export function createRace(input: RaceInput): RaceRunner {
         }
       }
       if (L === 1) t += RACE.startLoss;
+      if (standing) t += RACE.startLoss + (car.e.r.starts - 75) * -0.012 + rng.normal(0, RACE.launchSd);
+      if (flag === "green" && L > 1) {
+        // track limits: three strikes and the black-and-white flag, then five seconds each
+        if (rng.chance(RACE.trackLimits * car.prone * (0.6 + r.aggression / 100) * (fxs.get(car.idx)?.risk ?? 1))) {
+          car.strikes++;
+          const at = car.cum + t * (0.2 + 0.6 * rng.next());
+          ev({ lap: L, t: at, kind: "limits", a: car.idx, info: String(car.strikes) });
+          if (car.strikes === 3) ev({ lap: L, t: at, kind: "bw", a: car.idx });
+          if (car.strikes >= 4) penalise(car, "5s", "track limits", L, at, 0);
+        }
+        // a drive-through / stop-go owed: served this lap
+        if (car.owed && !pitting.has(car.idx) && laps - L >= 1) {
+          const x = car.owed === 1 ? pitLoss.normal - 2 : pitLoss.normal + 9;
+          t += x;
+          ev({ lap: L, t: car.cum + t, kind: "served", a: car.idx, info: car.owed === 1 ? "drive-through" : "stop-go", x });
+          car.owed = 0;
+        }
+      }
       if (pitting.has(car.idx)) {
         let loss = flag === "sc" ? pitLoss.sc : flag === "vsc" ? pitLoss.vsc : pitLoss.normal;
         loss += rng.normal(0, 0.4);
@@ -379,6 +454,8 @@ export function createRace(input: RaceInput): RaceRunner {
           loss += car.penalty; // served at the stop
           car.penalty = 0;
         }
+        if (rng.chance(RACE.unsafeRelease)) penalise(car, "5s", "unsafe release", L, car.cum + t + loss, 0);
+        else if (rng.chance(RACE.pitSpeeding)) penalise(car, "5s", "speeding in the pit lane", L, car.cum + t + loss, 0);
         t += loss;
         pitTime.set(car.idx, loss);
       }
@@ -389,15 +466,16 @@ export function createRace(input: RaceInput): RaceRunner {
     const fin = new Map<number, number>();
     const list: CarState[] = [];
     const fights = new Map<number, number>();
-    if (flag === "sc") {
-      // the pack closes up behind the safety car; stops drop cars back
+    if (flag === "sc" || flag === "red") {
+      // the pack closes up behind the safety car (or into the pit lane under a red); stops drop cars back
       let prev = -Infinity;
       const stay = running.filter((x) => !pitting.has(x.idx));
       for (let k = 0; k < stay.length; k++) {
         const car = stay[k];
         const p = pot.get(car.idx)!;
         const gap = k === 0 ? 0 : car.cum - stay[k - 1].cum;
-        const f = k === 0 ? p : Math.max(prev + RACE.scGap, Math.min(p, prev + Math.max(RACE.scGap, gap * 0.35)));
+        // (a car laps down can't gain more than its own lap on the field: at least a base lap)
+        const f = k === 0 ? p : Math.max(car.cum + base, prev + RACE.scGap, Math.min(p, prev + Math.max(RACE.scGap, gap * 0.35)));
         fin.set(car.idx, f);
         prev = f;
         list.push(car);
@@ -476,6 +554,30 @@ export function createRace(input: RaceInput): RaceRunner {
       }
     }
 
+    // Blue flags: a car about to be lapped has to let the leaders by (both lose a little).
+    if (flag === "green" && L > 2) {
+      for (const x of list) {
+        if (x.out || pitting.has(x.idx)) continue;
+        const fx0 = fin.get(x.idx)!;
+        for (const y of list) {
+          if (y === x || y.out || pitting.has(y.idx)) continue;
+          const lapT = fin.get(y.idx)! - y.cum;
+          const g0 = y.cum - x.cum;
+          const g1 = fin.get(y.idx)! - fx0;
+          if (!(g0 > 0 && g0 < lapT && g1 >= lapT)) continue;
+          const tAt = x.cum + (fx0 - x.cum) * clamp((lapT - g0) / Math.max(0.1, g1 - g0), 0, 1);
+          ev({ lap: L, t: tAt, kind: "blue", a: y.idx, b: x.idx });
+          lose(y, RACE.blueLoss[0] * (0.5 + rng.next()));
+          lose(x, RACE.blueLoss[1] * rng.next());
+          if (rng.chance(RACE.blueIgnore * (0.5 + y.e.r.aggression / 100))) {
+            y.blueIgnored++;
+            lose(x, 0.6);
+            if (y.blueIgnored === 3) penalise(y, "5s", "ignoring blue flags", L, tAt, 1);
+          }
+        }
+      }
+    }
+
     // First-lap incident in the pack.
     if (L === 1 && list.length > 8 && rng.chance(RACE.lap1Contact * (0.6 + c.sc) * (1 + c.overtake / 5))) {
       const k = 3 + Math.floor(rng.next() * (list.length - 4));
@@ -491,8 +593,8 @@ export function createRace(input: RaceInput): RaceRunner {
       const tMid = car.cum + (f - car.cum) * rng.next();
       if (rng.chance((RACE.mech * (100 - car.e.reliability) / 100) * (fxs.get(car.idx)?.mech ?? 1))) {
         retire(car, "Mechanical", L, tMid);
-        if (rng.chance(RACE.scAfterMech * (0.5 + c.sc))) callFlag("sc");
-        else if (rng.chance(RACE.vscAfterMech)) callFlag("vsc");
+        neutralise(RACE.scAfterMech * (0.5 + c.sc), RACE.vscAfterMech);
+        yellow(car, L, tMid);
         continue;
       }
       if (flag !== "green") continue;
@@ -500,8 +602,8 @@ export function createRace(input: RaceInput): RaceRunner {
       const pCrash = RACE.crash * (1 + (100 - r.consistency) / 18) * (0.7 + r.aggression / 160) * (L === 1 ? 4 : 1) * (car.wear > 1 ? 2 : 1) * (fxs.get(car.idx)?.risk ?? 1);
       if (rng.chance(pCrash)) {
         retire(car, "Crash", L, tMid);
-        if (rng.chance(clamp(RACE.scAfterCrash * (0.5 + c.sc), 0, 0.95))) callFlag("sc");
-        else if (rng.chance(0.22)) callFlag("vsc");
+        yellow(car, L, tMid);
+        neutralise(RACE.scAfterCrash * (0.5 + c.sc), 0.22, RACE.redAfterCrash * c.sc);
       }
     }
     if (flag === "green" && rng.chance((RACE.debrisSc * c.sc) / laps)) callFlag(rng.chance(0.7) ? "sc" : "vsc");
@@ -545,6 +647,16 @@ export function createRace(input: RaceInput): RaceRunner {
         car.forcePit = false;
         car.damage = Math.max(0, car.damage - 0.5);
         ev({ lap: L, t: f, kind: "pit", a: car.idx, info: car.compound, x: pitTime.get(car.idx) });
+      } else if (flag === "red" && laps - L > 2) {
+        // red flag: everyone in the pit lane, a free change of tyres
+        car.stints[car.stints.length - 1].to = L;
+        const p = choosePlan(car, L, false);
+        car.plan = p.stints;
+        car.compound = p.stints[0].c;
+        if (!car.used.includes(car.compound)) car.used.push(car.compound);
+        car.stints.push({ c: car.compound, from: L + 1, to: laps });
+        car.wear = 0;
+        car.age = 0;
       } else if (car.plan.length > 1 && car.plan[0].until < L) {
         // missed the planned stop (neutralisation, etc.): re-plan from here
         car.plan = choosePlan(car, L, true).stints;
@@ -562,13 +674,15 @@ export function createRace(input: RaceInput): RaceRunner {
       state.flagLaps--;
       if (state.flagLaps <= 0) {
         state.flag = "green";
-        state.restart = flag === "sc";
-        ev({ lap: L, t: cars[state.order[0]]?.cum ?? 0, kind: "green", a: state.order[0] ?? 0 });
+        state.restart = flag === "sc" || flag === "red";
+        state.standing = flag === "red";
+        ev({ lap: L, t: cars[state.order[0]]?.cum ?? 0, kind: flag === "red" ? "restart" : "green", a: state.order[0] ?? 0 });
       }
     } else if (pendingFlag) {
       state.flag = pendingFlag;
-      state.flagLaps = pendingFlag === "sc" ? 3 + Math.floor(rng.next() * 3) : 2 + Math.floor(rng.next() * 2);
+      state.flagLaps = pendingFlag === "sc" ? 3 + Math.floor(rng.next() * 3) : pendingFlag === "red" ? 1 : 2 + Math.floor(rng.next() * 2);
       if (pendingFlag === "sc") state.sc++;
+      else if (pendingFlag === "red") state.red++;
       else state.vsc++;
       ev({ lap: L, t: cars[state.order[0]]?.cum ?? 0, kind: pendingFlag, a: state.order[0] ?? 0 });
     }
@@ -581,7 +695,9 @@ export function createRace(input: RaceInput): RaceRunner {
     const T = leader ? leader.cum : 0;
     type Row = Omit<ResultRow, "pos" | "points">;
     const rows: Row[] = cars.map((x) => {
-      const base = { idx: x.idx, driverId: x.e.driverId, teamId: x.e.teamId, grid: x.e.grid, pits: x.pits, fastest: x.best, passes: x.passes, stints: x.stints, penalty: x.penalty };
+      // a drive-through or stop-go not served in time becomes 20 / 30 seconds
+      const owed = x.owed === 1 ? 20 : x.owed === 2 ? 30 : 0;
+      const base = { idx: x.idx, driverId: x.e.driverId, teamId: x.e.teamId, grid: x.e.grid, pits: x.pits, fastest: x.best, passes: x.passes, stints: x.stints, penalty: x.penalty + owed, pens: x.pens, pp: x.pp };
       if (x.out) return { ...base, laps: x.outLap - 1, time: x.outT, gap: 0, status: x.out };
       // the lap on which he crossed the line after the leader finished
       const ends = state.lapEnd[x.idx];
@@ -591,7 +707,7 @@ export function createRace(input: RaceInput): RaceRunner {
           l = k;
           break;
         }
-      const time = ends[l] + x.penalty;
+      const time = ends[l] + x.penalty + owed;
       return { ...base, laps: l, time, gap: l === laps ? time - T : 0, status: l === laps ? "Finished" : "Lapped" };
     });
     const ranked = rows.sort((a, b) => {
@@ -610,6 +726,7 @@ export function createRace(input: RaceInput): RaceRunner {
       rows: out,
       sc: state.sc,
       vsc: state.vsc,
+      red: state.red,
       passes: state.passes,
       fastest: state.fastest ? { idx: state.fastest.car, time: state.fastest.time, lap: state.fastest.lap } : null,
       leadChanges,

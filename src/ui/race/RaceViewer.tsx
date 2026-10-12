@@ -61,7 +61,7 @@ export function RaceViewer({ world, replay, live, side, follow0 = null }: { worl
   }, [t, ix.end]);
 
   const view = viewAt(ix, Math.max(0, t));
-  const feed = useMemo(() => replay.events.filter((e) => e.t <= t && e.kind !== "mistake").slice(-7).reverse(), [replay.events, t]);
+  const feed = useMemo(() => replay.events.filter((e) => e.t <= t && e.kind !== "mistake" && e.kind !== "blue" && !(e.kind === "limits" && e.info !== "3")).slice(-7).reverse(), [replay.events, t]);
   const jumpLap = (dl: number) => {
     const lead = view.cars[0]?.idx ?? 0;
     const ends = replay.lapEnd[lead];
@@ -145,6 +145,9 @@ export function RaceViewer({ world, replay, live, side, follow0 = null }: { worl
                   <span className="w-5 text-right font-mono text-xs text-slate-400">{c.pos}</span>
                   <span className="w-1 h-4 rounded-sm" style={{ background: info.color }} />
                   <span className="font-semibold w-10">{info.code}</span>
+                  {c.pen > 0 && !c.out && <span className="rounded-sm bg-amber-400 px-1 text-[10px] font-bold text-black">+{c.pen}</span>}
+                  {c.bw && !c.out && <span className="h-3 w-3 border border-slate-500" style={{ background: "linear-gradient(135deg,#fff 50%,#000 50%)" }} title="Black-and-white flag" />}
+                  {c.blue && !c.out && <span className="h-3 w-1.5 bg-blue-500" title="Blue flags" />}
                   <span className="ml-auto font-mono text-xs text-slate-300">{right}</span>
                   <span className="w-4 h-4 rounded-full border-2 text-[8px] grid place-items-center font-bold" style={{ borderColor: COMPOUNDS[c.compound as keyof typeof COMPOUNDS]?.color ?? "#999" }} title={COMPOUNDS[c.compound as keyof typeof COMPOUNDS]?.name}>
                     {c.compound}
@@ -180,17 +183,33 @@ function describe(e: Replay["events"][number], cars: { code: string }[]): string
     case "dnf":
       return `${a} retires (${e.info})`;
     case "sc":
-      return "🟡 Safety car deployed";
+      return "Safety car deployed";
     case "vsc":
-      return "🟡 Virtual safety car";
+      return "Virtual safety car";
+    case "red":
+      return "Red flag. The race is suspended";
+    case "restart":
+      return "Standing restart";
     case "green":
-      return "🟢 Green flag, racing resumes";
+      return "Green flag, racing resumes";
     case "fastest":
-      return `🟣 ${a} fastest lap ${lapTime(Number(e.info))}`;
+      return `${a} fastest lap ${lapTime(Number(e.info))}`;
     case "contact":
-      return `💥 Contact: ${a} and ${b}`;
-    case "penalty":
-      return `⚖️ ${a} gets a ${e.info} penalty`;
+      return `Contact: ${a} and ${b}, under investigation`;
+    case "penalty": {
+      const [what, why, pp] = (e.info ?? "").split("|");
+      return `${a}: ${what} penalty, ${why}${pp ? ` (${pp} licence point${pp === "1" ? "" : "s"})` : ""}`;
+    }
+    case "limits":
+      return `${a} track limits, strike ${e.info}`;
+    case "bw":
+      return `Black-and-white flag for ${a}`;
+    case "blue":
+      return `Blue flags for ${a}, ${b} coming through`;
+    case "yellow":
+      return `Yellow flag in sector ${e.info}`;
+    case "served":
+      return `${a} serves a ${e.info}`;
     case "slowstop":
       return `${a} slow stop (+${e.info}s)`;
     default:
@@ -202,11 +221,52 @@ function FlagBadge({ flag }: { flag: RaceView["flag"] }) {
   if (flag === "green") return null;
   const map = {
     sc: ["SAFETY CAR", "bg-amber-400 text-black"],
-    vsc: ["VIRTUAL SAFETY CAR", "bg-amber-400/80 text-black"],
-    chequered: ["🏁 CHEQUERED FLAG", "bg-white text-black"],
+    vsc: ["VIRTUAL SAFETY CAR", "bg-amber-400 text-black"],
+    red: ["RED FLAG", "bg-red-600 text-white"],
+    chequered: ["CHEQUERED FLAG", "bg-white text-black"],
   } as const;
   const [label, cls] = map[flag];
   return <span className={`chip !ring-0 !text-xs !px-2 ${cls}`}>{label}</span>;
+}
+
+/** A top-down F1 car pointing along `ang`: tyres, floor, tapered body in the team colour, wings in the second colour. */
+function drawCar(g: CanvasRenderingContext2D, x: number, y: number, ang: number, scale: number, body: string, accent: string, outline: boolean) {
+  g.save();
+  g.translate(x, y);
+  g.rotate(ang);
+  g.scale(scale, scale);
+  g.fillStyle = "#0a0b0d";
+  g.fillRect(-9, -5.4, 4.6, 2.4); // rear tyres
+  g.fillRect(-9, 3, 4.6, 2.4);
+  g.fillRect(4.2, -5, 3.8, 2.1); // front tyres
+  g.fillRect(4.2, 2.9, 3.8, 2.1);
+  g.fillStyle = "#1c1f24";
+  g.fillRect(-8, -3.4, 13, 6.8); // floor
+  g.fillStyle = body;
+  g.beginPath();
+  g.moveTo(-10, -2.2);
+  g.lineTo(-3, -3.6);
+  g.lineTo(2.5, -2.6);
+  g.lineTo(11.5, -0.8);
+  g.lineTo(11.5, 0.8);
+  g.lineTo(2.5, 2.6);
+  g.lineTo(-3, 3.6);
+  g.lineTo(-10, 2.2);
+  g.closePath();
+  g.fill();
+  if (outline) {
+    g.strokeStyle = "#ffffff";
+    g.lineWidth = 1.4;
+    g.stroke();
+  }
+  g.fillStyle = accent;
+  g.fillRect(-12.2, -4.2, 2.4, 8.4); // rear wing
+  g.fillRect(10.6, -4.8, 1.9, 9.6); // front wing
+  g.fillStyle = "#0a0b0d";
+  g.beginPath();
+  g.ellipse(-1, 0, 2, 1.25, 0, 0, Math.PI * 2); // cockpit and halo
+  g.fill();
+  g.restore();
 }
 
 function TrackCanvas({ track, view, cars, follow }: { track: TrackFile | null; view: RaceView; cars: { code: string; color: string; color2: string }[]; follow: number | null }) {
@@ -315,6 +375,39 @@ function TrackCanvas({ track, view, cars, follow }: { track: TrackFile | null; v
       g.fillText(String(c.n), x, y);
     }
 
+    // local yellows (and the whole lap under a red flag)
+    const paint = (f0: number, f1: number, color: string) => {
+      g.beginPath();
+      for (let f = f0; f <= f1 + 1e-9; f += 0.004) {
+        const [x, y] = P(trackPoint(pts, f));
+        if (f === f0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      }
+      g.strokeStyle = color;
+      g.lineWidth = 3;
+      g.stroke();
+    };
+    if (view.flag === "red") paint(0, 1, "#ef4444");
+    else for (const sct of view.yellows) paint((sct - 1) / 3, sct / 3, "#facc15");
+
+    const heading = (frac: number, by: number) => {
+      const a = offset(frac, by);
+      const b = offset(frac + 0.003, by);
+      return Math.atan2(b[1] - a[1], b[0] - a[0]);
+    };
+    const carScale = Math.max(0.75, Math.min(1.35, size.w / 620));
+
+    // safety car ahead of the leader
+    if (view.flag === "sc" && view.cars[0]) {
+      const f = view.cars[0].frac + 0.012;
+      const [x, y] = offset(f, 0);
+      drawCar(g, x, y, heading(f, 0), carScale, "#d4d4d8", "#facc15", false);
+      g.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      g.fillStyle = "#facc15";
+      g.textAlign = "left";
+      g.fillText("SC", x + 10, y - 8);
+    }
+
     // cars, back to front so the leader draws on top
     const drawn: { f: number }[] = [];
     const list = view.cars.slice().reverse();
@@ -325,18 +418,14 @@ function TrackCanvas({ track, view, cars, follow }: { track: TrackFile | null; v
       const near = drawn.filter((d) => Math.abs(d.f - c.frac) < 0.0035).length;
       if (near) lateral = (near % 2 ? 1 : -1) * Math.ceil(near / 2) * 9;
       drawn.push({ f: c.frac });
-      const [x, y] = c.pit ? offset(c.frac, 26) : offset(c.frac, lateral);
-      const r = follow === c.idx ? 8 : 6.5;
+      const by = c.pit ? 26 : lateral;
+      const [x, y] = offset(c.frac, by);
+      const mine = follow === c.idx;
       g.globalAlpha = c.out ? 0.35 : 1;
-      g.beginPath();
-      g.arc(x, y, r, 0, Math.PI * 2);
-      g.fillStyle = info.color;
-      g.fill();
-      g.lineWidth = 2;
-      g.strokeStyle = follow === c.idx ? "#ffffff" : info.color2;
-      g.stroke();
+      drawCar(g, x, y, heading(c.frac, by), carScale * (mine ? 1.2 : 1), c.out ? "#52525b" : info.color, c.out ? "#3f3f46" : info.color2, mine);
       if (c.out) {
         g.strokeStyle = "#f87171";
+        g.lineWidth = 2;
         g.beginPath();
         g.moveTo(x - 4, y - 4);
         g.lineTo(x + 4, y + 4);
@@ -344,11 +433,15 @@ function TrackCanvas({ track, view, cars, follow }: { track: TrackFile | null; v
         g.lineTo(x - 4, y + 4);
         g.stroke();
       }
-      if (c.pos <= 3 || follow === c.idx || c.pit) {
-        g.font = "700 11px Inter, sans-serif";
-        g.fillStyle = "#e2e8f0";
+      if (c.blue && !c.out) {
+        g.fillStyle = "#3b82f6";
+        g.fillRect(x - 3, y - 14, 6, 4);
+      }
+      if (c.pos <= 3 || mine || c.pit) {
+        g.font = "700 11px ui-sans-serif, system-ui, sans-serif";
+        g.fillStyle = mine ? "#ffffff" : "#e2e8f0";
         g.textAlign = "left";
-        g.fillText(`${c.pos} ${info.code}`, x + r + 3, y - r);
+        g.fillText(`${c.pos} ${info.code}`, x + 11, y - 7);
       }
       g.globalAlpha = 1;
     }

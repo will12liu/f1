@@ -16,13 +16,17 @@ export interface CarView {
   lapsDown: number;
   compound: string;
   pits: number;
+  pen: number; // time penalty seconds given so far (not drive-throughs)
+  bw: boolean; // shown the black-and-white flag
+  blue: boolean; // being shown blue flags right now
 }
 
 export interface RaceView {
   t: number;
   lap: number; // leader's current lap (1-based, capped at laps)
-  flag: "green" | "sc" | "vsc" | "chequered";
+  flag: "green" | "sc" | "vsc" | "red" | "chequered";
   cars: CarView[]; // in timing order
+  yellows: number[]; // sectors (1-3) under a local yellow right now
 }
 
 const PIT_FRAC = 0.985; // the pit lane runs along the last bit of the lap and the line
@@ -41,7 +45,7 @@ export function indexReplay(r: Replay, live = false): ReplayIndex {
   const pitLoss = new Map<string, number>();
   const outAt = new Map<number, { t: number; lap: number }>();
   for (const e of r.events) {
-    if (e.kind === "pit") pitLoss.set(`${e.a}:${e.lap}`, e.x ?? 20);
+    if (e.kind === "pit" || e.kind === "served") pitLoss.set(`${e.a}:${e.lap}`, e.x ?? 20);
     if (e.kind === "dnf") outAt.set(e.a, { t: e.t, lap: e.lap });
   }
   const leaderEnds = r.lapEnd.filter((a) => a.length === r.laps + 1).map((a) => a[r.laps]);
@@ -110,8 +114,18 @@ export function viewAt(ix: ReplayIndex, t: number): RaceView {
     const crossed = done ? finalLap : Math.min(lap, ends.length - 1);
     const crossT = ends[crossed];
     const stint = r.stints[k].find((s) => lap + 1 >= s.from && lap + 1 <= s.to) ?? r.stints[k][r.stints[k].length - 1];
-    const pits = r.events.filter((e) => e.kind === "pit" && e.a === k && e.t <= t).length;
-    return { idx: k, lap, frac, pit, out: !!out && t >= out.t, done, crossed, crossT, compound: stint?.c ?? "M", pits };
+    let pits = 0;
+    let pen = 0;
+    let bw = false;
+    let blue = false;
+    for (const e of r.events) {
+      if (e.a !== k || e.t > t) continue;
+      if (e.kind === "pit") pits++;
+      else if (e.kind === "penalty") pen += e.info?.startsWith("10s") ? 10 : e.info?.startsWith("5s") ? 5 : 0;
+      else if (e.kind === "bw") bw = true;
+      else if (e.kind === "blue" && t - e.t < 6) blue = true;
+    }
+    return { idx: k, lap, frac, pit, out: !!out && t >= out.t, done, crossed, crossT, compound: stint?.c ?? "M", pits, pen, bw, blue };
   });
   const order = rows.slice().sort((a, b) => {
     if (a.out !== b.out) return a.out ? 1 : -1;
@@ -136,12 +150,14 @@ export function viewAt(ix: ReplayIndex, t: number): RaceView {
       const aheadT = r.lapEnd[ahead.idx][x.crossed];
       interval = aheadT !== undefined && x.crossT - aheadT < (le[x.crossed] - le[x.crossed - 1] || 90) ? x.crossT - aheadT : null;
     }
-    return { idx: x.idx, lap: x.lap, frac: x.frac, pit: x.pit, out: x.out, done: x.done, pos: i + 1, gap, interval, lapsDown, compound: x.compound, pits: x.pits };
+    return { idx: x.idx, lap: x.lap, frac: x.frac, pit: x.pit, out: x.out, done: x.done, pos: i + 1, gap, interval, lapsDown, compound: x.compound, pits: x.pits, pen: x.pen, bw: x.bw, blue: x.blue };
   });
   const leadLap = Math.min(r.laps, leader.crossed + 1);
   const flagRec = r.flags.find((f) => f.lap === leadLap);
   const flag = t >= ix.finishT ? "chequered" : flagRec ? flagRec.flag : "green";
-  return { t, lap: leadLap, flag, cars };
+  // a local yellow stays out for about 25 seconds after an incident
+  const yellows = [...new Set(r.events.filter((e) => e.kind === "yellow" && e.t <= t && t - e.t < 25).map((e) => Number(e.info)))];
+  return { t, lap: leadLap, flag, cars, yellows };
 }
 
 /** Index into the evenly spaced track polyline for a fraction of the lap (wraps). */

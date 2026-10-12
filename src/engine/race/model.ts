@@ -32,8 +32,18 @@ export const RACE = {
   debrisSc: 0.04, // chance per race of a safety car without a retirement, scaled by track sc
   scAfterCrash: 0.45, // x track sc factor
   scAfterMech: 0.12,
-  vscAfterMech: 0.18,
+  vscAfterMech: 0.22,
   pitLossDefault: { normal: 21, sc: 13, vsc: 15 },
+  // stewards and flags
+  trackLimits: 0.0036, // chance of a track-limits strike per car per green lap (x aggression, x push)
+  jumpStart: 0.003,
+  limitsProne: 0.12, // share of drivers who fight the track limits all weekend (x8 strikes; the rest x0.45)
+  unsafeRelease: 0.011, // per stop
+  pitSpeeding: 0.006,
+  blueLoss: [0.55, 0.18], // seconds the lapped car / the car lapping lose
+  blueIgnore: 0.012, // chance a lapped car holds up a leader
+  redAfterCrash: 0.17, // x track sc factor, per car out
+
 };
 
 export const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];

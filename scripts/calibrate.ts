@@ -18,6 +18,9 @@ const { all: targets, y2026 } = JSON.parse(readFileSync(join(ROOT, "data/generat
 const HAND: Record<string, { value: number; note: string }> = {
   passesPerRace: { value: 45, note: "on-track passes after lap 1, excl. pit cycles (2023-25 seasons ~40-50)" },
   pitsPerFinisher: { value: 1.6, note: "stops per finisher in a dry race (OpenF1's pit list also counts drive-throughs and red-flag entries)" },
+  redPerRace: { value: 0.09, note: "red flags per race (hand: about 2 a season in 2023-25)" },
+  penaltiesPerRace: { value: 2.2, note: "in-race penalties per race (hand: time penalties, drive-throughs; 2023-25 ~2)" },
+  limitsPerRace: { value: 6, note: "track-limits strikes noted per race (hand; varies a lot by track)" },
 };
 
 const n = Number(process.argv[2] ?? 460);
@@ -54,6 +57,9 @@ for (let i = 0; i < n; i++) {
   push("leadChanges", result.leadChanges);
   const stops = fin.map((r) => r.pits);
   push("oneStopShare", stops.filter((s) => s === 1).length / stops.length);
+  push("redPerRace", result.red);
+  push("penaltiesPerRace", state.events.filter((e) => e.kind === "penalty").length);
+  push("limitsPerRace", state.events.filter((e) => e.kind === "limits").length);
 }
 
 function rankCorr(a: number[], b: number[]) {

@@ -55,6 +55,8 @@ export interface Driver {
   contract: Contract | null;
   retired?: number; // season he retired
   real?: boolean; // from real data (vs generated)
+  licence?: { season: number; round: number; pts: number; spent?: boolean }[]; // penalty points (12 in 12 months = a race ban)
+  bannedFor?: { season: number; round: number }; // sits out this round
 }
 
 /** The car: most of the result in F1. 0-100 scale; reliability is a separate risk number. */
@@ -95,6 +97,8 @@ export interface Classified {
   pits: number;
   fastest: number; // best lap
   passes: number; // on-track passes made
+  pens?: string[]; // penalties given ("5s track limits", ...)
+  pp?: number; // licence penalty points
 }
 
 export interface RaceSummary {
@@ -108,7 +112,9 @@ export interface RaceSummary {
   classification: Classified[];
   sc: number; // safety-car periods
   vsc: number;
+  red?: number;
   overtakes: number;
+  stand_ins?: { driverId: string; for: string }[]; // reserves racing for a banned driver
 }
 
 /** Everything the 2D viewer needs to replay a race. */
@@ -121,7 +127,7 @@ export interface Replay {
   grid: string[]; // driver ids in grid order
   lapEnd: number[][];
   events: { lap: number; t: number; kind: string; a: number; b?: number; info?: string; x?: number }[];
-  flags: { lap: number; flag: "sc" | "vsc" }[];
+  flags: { lap: number; flag: "sc" | "vsc" | "red" }[];
   stints: { c: Compound; from: number; to: number }[][];
 }
 

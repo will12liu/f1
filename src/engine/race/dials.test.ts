@@ -31,10 +31,10 @@ const runFor = (seed: number, laps: number, cmd?: Omit<Command, "lap">) => {
 };
 
 describe("dials", () => {
-  it("leave untouched races exactly as before Phase 5", () => {
+  it("leave untouched races exactly as the pinned engine (catches accidental changes; update on purpose)", () => {
     const h = createHash("sha1");
     for (const id of ["silverstone", "monaco", "monza", "spa"]) for (let s = 0; s < 15; s++) h.update(fingerprint(s * 7 + 1, id));
-    expect(h.digest("hex")).toBe("986a5864e5a7a7cff25e1dcce60e2a18e454fdfa"); // hash of the same 60 races before dials existed
+    expect(h.digest("hex")).toBe("732c2090a86a8b9f9b271a08c85c986da240ee10"); // 60 races, engine as of the stewards/flags update
   }, 60_000);
 
   it("neutral dials set by hand change nothing", () => {
@@ -46,9 +46,19 @@ describe("dials", () => {
     }
   });
 
+  /** A seed where both runs stay green and clean for car 0 over the first 8 laps (so only the dial differs). */
+  const cleanPair = (cmd: Omit<Command, "lap">) => {
+    for (let seed = 1; seed < 200; seed++) {
+      const a = runFor(seed, 8);
+      const b = runFor(seed, 8, cmd);
+      const clean = (r: typeof a) => !r.state.flagLog.length && !r.state.cars[0].pens.length && !r.state.cars[0].out && !r.state.events.some((e) => e.a === 0 && (e.kind === "contact" || e.kind === "mistake" || e.kind === "pit"));
+      if (clean(a) && clean(b)) return [a, b] as const;
+    }
+    throw new Error("no clean seed");
+  };
+
   it("pushing is faster now and costs tyres and fuel", () => {
-    const base = runFor(1, 8);
-    const push = runFor(1, 8, { car: 0, dials: { pace: 5 } });
+    const [base, push] = cleanPair({ car: 0, dials: { pace: 5 } });
     const a = base.state.cars[0];
     const b = push.state.cars[0];
     expect(b.cum).toBeLessThan(a.cum - 1.5);
@@ -59,8 +69,7 @@ describe("dials", () => {
   });
 
   it("tyre care is slower now and saves the tyres", () => {
-    const base = runFor(2, 8);
-    const care = runFor(2, 8, { car: 0, dials: { tyres: 5 } });
+    const [base, care] = cleanPair({ car: 0, dials: { tyres: 5 } });
     expect(care.state.cars[0].cum).toBeGreaterThan(base.state.cars[0].cum + 1);
     expect(care.state.cars[0].wear).toBeLessThan(base.state.cars[0].wear * 0.9); // 0.8x, plus some dirty air from being slower
   });

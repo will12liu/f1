@@ -20,6 +20,29 @@ export const circuitOf = (w: World, id: string): Circuit => {
 export const nextRound = (w: World) => w.calendar.find((r) => !w.results.some((x) => x.round === r.round)) ?? null;
 export const seasonOver = (w: World) => nextRound(w) === null;
 
+export const BAN_POINTS = 12;
+
+/** Licence points from the last 12 months (this season, plus last season's later rounds), not yet spent on a ban. */
+export function licencePoints(d: Driver, season: number, round: number): number {
+  return (d.licence ?? []).filter((x) => !x.spent && (x.season === season || (x.season === season - 1 && x.round > round))).reduce((s, x) => s + x.pts, 0);
+}
+
+/** Who races this round: banned drivers are replaced by the team's reserve, or the best driver without an F1 seat. */
+export function raceLineup(w: World, round: number): { team: Team; driver: Driver; standIn?: string }[] {
+  const dm = driverMap(w);
+  const taken = new Set(lineup(w).map((x) => x.driver.id));
+  return lineup(w).map((x) => {
+    const b = x.driver.bannedFor;
+    if (!b || b.season !== w.season || b.round !== round) return x;
+    let sub = x.team.reserve ? dm.get(x.team.reserve) : undefined;
+    if (!sub || sub.retired || taken.has(sub.id))
+      sub = w.drivers.filter((d) => !d.retired && !taken.has(d.id) && d.series !== "F3").sort((a, b2) => b2.ovr - a.ovr)[0];
+    if (!sub) return x;
+    taken.add(sub.id);
+    return { team: x.team, driver: sub, standIn: x.driver.id };
+  });
+}
+
 /** The two race drivers of every F1 team (skipping any missing id). */
 export function lineup(w: World): { team: Team; driver: Driver }[] {
   const dm = driverMap(w);
@@ -34,6 +57,7 @@ export interface PreparedRound {
   round: number;
   quali: ReturnType<typeof qualify>;
   input: RaceInput; // the race, ready for createRace (live) or simRace
+  standIns: { driverId: string; for: string }[];
 }
 
 /** Qualifying for the next round and the race input. Doesn't change the world. */
@@ -42,7 +66,7 @@ export function prepareNextRound(w: World): PreparedRound | null {
   if (!r) return null;
   const circuit = circuitOf(w, r.circuitId);
   const seed = roundSeed(w, r.round);
-  const field = lineup(w);
+  const field = raceLineup(w, r.round);
   const form = dayForms(seed, field.length);
   const quali = qualify(
     seed,
@@ -61,7 +85,8 @@ export function prepareNextRound(w: World): PreparedRound | null {
       form: form[i],
     }))
     .sort((a, b) => a.grid - b.grid);
-  return { round: r.round, quali, input: { seed, circuit, pitLoss: circuit.pitLoss, entries } };
+  const standIns = field.filter((x) => x.standIn).map((x) => ({ driverId: x.driver.id, for: x.standIn! }));
+  return { round: r.round, quali, input: { seed, circuit, pitLoss: circuit.pitLoss, entries }, standIns };
 }
 
 /** Qualifying + race for the next round. Records the summary and the replay on the world.
@@ -97,9 +122,13 @@ export function simNextRound(w: World, commands?: Command[]): RaceSummary | null
       pits: x.pits,
       fastest: x.fastest,
       passes: x.passes,
+      pens: x.pens.length ? x.pens : undefined,
+      pp: x.pp || undefined,
     })),
     sc: result.sc,
     vsc: result.vsc,
+    red: result.red || undefined,
+    stand_ins: prep.standIns.length ? prep.standIns : undefined,
     overtakes: result.passes,
   };
   const replay: Replay = {
@@ -114,6 +143,18 @@ export function simNextRound(w: World, commands?: Command[]): RaceSummary | null
     flags: state.flagLog.filter((f) => f.flag !== "green") as Replay["flags"],
     stints: state.cars.map((c) => c.stints),
   };
+  // licence points; 12 in 12 months = a ban from the next round
+  const dm = driverMap(w);
+  for (const x of result.rows) {
+    if (!x.pp) continue;
+    const d = dm.get(x.driverId);
+    if (!d) continue;
+    (d.licence ??= []).push({ season: w.season, round: r.round, pts: x.pp });
+    if (licencePoints(d, w.season, r.round) >= BAN_POINTS) {
+      for (const e of d.licence) e.spent = true;
+      d.bannedFor = { season: w.season, round: r.round + 1 };
+    }
+  }
   w.results.push(summary);
   w.replays[r.round] = replay;
   developCarsAfterRound(w, makeRng(seed ^ 0xdee));
