@@ -36,7 +36,7 @@ body {
 @utility num { @apply text-right font-mono tabular-nums; }
 
 @utility panel { @apply bg-ink-900 border border-ink-800 rounded-xl; }
-@utility btn { @apply inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-40; }
+@utility btn { @apply inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold disabled:opacity-40; }
 @utility btn-primary { @apply btn bg-race text-white hover:bg-red-500; }
 @utility btn-ghost { @apply btn bg-ink-800 text-slate-200 hover:bg-ink-700; }
 @utility input { @apply rounded-lg bg-ink-850 border border-ink-700 px-3 py-2 text-sm outline-none focus:border-race/70; }

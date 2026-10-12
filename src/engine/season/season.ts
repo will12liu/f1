@@ -3,7 +3,8 @@ import { hashString, makeRng } from "../rng";
 import { carPace } from "../ratings";
 import { dayForms } from "../race/model";
 import { qualify } from "../race/qualifying";
-import { simRace, type Entry } from "../race/race";
+import type { Command } from "../race/dials";
+import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
 
@@ -29,8 +30,14 @@ export function roundSeed(w: World, round: number) {
   return hashString(`${w.seed}:${w.season}:${round}`);
 }
 
-/** Qualifying + race for the next round. Records the summary and the replay on the world. */
-export function simNextRound(w: World): RaceSummary | null {
+export interface PreparedRound {
+  round: number;
+  quali: ReturnType<typeof qualify>;
+  input: RaceInput; // the race, ready for createRace (live) or simRace
+}
+
+/** Qualifying for the next round and the race input. Doesn't change the world. */
+export function prepareNextRound(w: World): PreparedRound | null {
   const r = nextRound(w);
   if (!r) return null;
   const circuit = circuitOf(w, r.circuitId);
@@ -54,7 +61,20 @@ export function simNextRound(w: World): RaceSummary | null {
       form: form[i],
     }))
     .sort((a, b) => a.grid - b.grid);
-  const { result, state } = simRace({ seed, circuit, pitLoss: circuit.pitLoss, entries });
+  return { round: r.round, quali, input: { seed, circuit, pitLoss: circuit.pitLoss, entries } };
+}
+
+/** Qualifying + race for the next round. Records the summary and the replay on the world.
+ *  `commands` replays a race the player drove live (same input + same commands = same race). */
+export function simNextRound(w: World, commands?: Command[]): RaceSummary | null {
+  const prep = prepareNextRound(w);
+  if (!prep) return null;
+  const { quali, input } = prep;
+  const r = { round: prep.round };
+  const circuit = circuitOf(w, input.circuit.id);
+  const seed = input.seed;
+  const entries = input.entries;
+  const { result, state } = simRace({ ...input, commands });
 
   const summary: RaceSummary = {
     round: r.round,

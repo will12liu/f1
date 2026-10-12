@@ -13,8 +13,9 @@ _Last updated 2026-10-12. Everything below the line "Original brief" is the orig
 | 2 Headless race engine | Done, calibrated (500 races, all 13 metrics within 20%) | `src/engine/race/{model,strategy,race,qualifying}.ts`, `scripts/calibrate.ts` |
 | 3 Season engine | Done | `src/engine/season/{season,development,offseason}.ts`, `scripts/season-check.ts` |
 | 4 2D race view | Done, checked in the browser (desktop + phone width) | `src/engine/race/replay.ts`, `src/ui/race/RaceViewer.tsx`, pages in `src/ui/pages/` |
+| 5 Dials | Done: dials, ERS battery, fuel, engine modes, commands + replay, forecasts, engineer calls, live race page with the pit wall. Checked in the browser: live result = saved result | `src/engine/race/{dials,engineer}.ts`, `race.ts`, `src/ui/race/PitWall.tsx`, `src/ui/pages/LiveRace.tsx` |
 
-Tests: 12 passing (`src/engine/world.test.ts`, `race/race.test.ts`, `season/season.test.ts`). Typecheck and `npm run build` pass. Two local commits on `main`.
+Tests: 20 passing (Phase 5 added `race/dials.test.ts`, including a hash of 60 races from before the dials). Earlier: 12 passing (`src/engine/world.test.ts`, `race/race.test.ts`, `season/season.test.ts`). Typecheck and `npm run build` pass. Two local commits on `main`.
 
 ## Open questions from section 10: what was picked (change any of them)
 1. Data scope: real F1 grid only; F2 (22) and F3 (30) are generated drivers on real junior team names.
@@ -40,7 +41,10 @@ DNF/race 3.5 (real 2.6 all years, 4.2 in 2026) · stops/finisher 1.65 (1.6) · S
 - **Cloudflare Pages:** connect the repo, build `npm run build`, output `dist`.
 - The preview tool in the old session started nba-gm's dev server (it read nba-gm's launch config). Run the F1 server on its own port: `npx vite --port 5174` (or the `f1-career` entry in `.claude/launch.json`).
 
-## Next: Phase 5 (dials), then 6 (duels)
+## Next: Phase 6 (duels)
+Phase 5 is done (see the table). Open points from it: AI cars always run neutral dials; the trust stub always accepts; the live race needs a driver picked each time (no career yet).
+
+## Phase 5 plan (done, kept for reference)
 Phase 5 plan, following section 5a:
 1. Add `dials` to `CarState` (pace 1-5, tyre care 1-5, fuel mix, ERS deploy mode + battery charge, engine mode) with 3 = today's behaviour so calibration doesn't move. AI teams stay neutral (maybe vary late in races).
 2. Effects in `race.ts` lap time / wear / fuel / reliability: push = faster now, more wear and fuel; tyre care = slower, less wear; ERS = a battery that drains in overtake/defend mode and refills when harvesting (adds to pass chance in `passT`/skill); engine high = power + mech DNF risk.

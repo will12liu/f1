@@ -1,6 +1,6 @@
 # Paddock (F1 career sim)
 
-Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Coding/nba-gm`: read it for reference, never edit it). The plan and phases are in docs/HANDOFF.md. Built so far: Phases 0-4 (scaffold, data + types, headless race engine + calibration, season engine, 2D race view).
+Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Coding/nba-gm`: read it for reference, never edit it). The plan and phases are in docs/HANDOFF.md. Built so far: Phases 0-5 (scaffold, data + types, headless race engine + calibration, season engine, 2D race view, resource dials + live race).
 
 ## Commands
 - `npm run dev`: app at localhost:5173 · `npm test`: vitest · `npm run typecheck`
@@ -15,7 +15,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 
 ## Layout
 - `src/engine/`: pure TS, no React; runs in a Web Worker (`worker.ts`, Comlink). Everything random uses `rng.ts` (seeded mulberry32).
-- `src/engine/race/`: `model.ts` (constants, tyres), `strategy.ts` (pit plans from the tyre model), `race.ts` (lap-by-lap runner), `qualifying.ts`, `replay.ts` (positions/timing at any time from a Replay).
+- `src/engine/race/`: `model.ts` (constants, tyres), `strategy.ts` (pit plans from the tyre model), `race.ts` (lap-by-lap runner), `dials.ts` (dial effects, commands, forecast type), `engineer.ts` (engineer calls), `qualifying.ts`, `replay.ts` (positions/timing at any time from a Replay).
 - `src/engine/season/`: `season.ts` (next round, standings), `development.ts` (car upgrades, winter reshuffle, driver aging), `offseason.ts` (champions, retirements, driver market, junior ladder).
 - `src/ui/` (pages, `race/RaceViewer.tsx` canvas), `src/state/game.ts` (zustand), `src/db/db.ts` (Dexie saves).
 - `scripts/`: data pipeline. `data/manual/`: hand inputs (circuits, teams, hand driver ratings). `data/generated/`: written by scripts.
@@ -37,6 +37,15 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 ## Season (src/engine/season)
 - `simNextRound`: knockout qualifying (Q1/Q2/Q3) → race → `RaceSummary` + `Replay` stored on the world (`world.replays`, current season only), then in-season car development (dev rate, budget, harder near the top).
 - `endSeason`: history record, drivers develop/age (peak 26-30, decline after), retirements, F1 market (expiring deals re-sign or walk; best car picks first from F1 free agents and F2), F3→F2 promotions and new F3 rookies, junior seats, winter car reshuffle (bigger in regulation years: 2030, 2035...), next calendar. Generated drivers who retire without an F1 start are dropped.
+
+## Dials and the live race (Phase 5)
+- `Dials` per car: pace 1-5, tyre care 1-5, fuel lean/std/rich, ERS harvest/balanced/attack/defend (battery 0-1, starts 0.6), engine low/std/high. Effects in `dialFx` (`DIAL` knobs): lap time, wear, burn, mistake/crash odds, mechanical odds, pass advantage. An empty battery can't attack or defend. A tank that can't make the lap lifts and coasts.
+- Neutral = the AI. Cars nobody touched skip the dial maths (`car.ctl`), and dials never draw random numbers. Test `dials.test.ts` pins a hash of 60 races from before Phase 5: keep it passing.
+- `runner.command({car, dials | pit: "box"|"stay", compound})` applies at the start of the next lap and is logged in `state.commands`. `RaceInput.commands` replays them: same input + commands = same race. `runner.forecast(idx)`: tyre laps left, battery empty lap, fuel margin, next stop.
+- Live race (`/g/:id/live`, `LiveRace.tsx`): the worker's `prepareRound` gives qualifying + the input; the main thread runs `createRace` one lap ahead of the screen (`LiveSource.advance`); `commitRound(world, commands)` re-sims it in the worker and saves. `PitWall.tsx` is the panel. Trust is stubbed (`engineerAccepts`).
+
+## UI rules
+- No gradients, glass, emoji in headings, badge-above-headline, three-icon rows, fade-on-hover or fade-in-on-scroll, buzzword copy. Solid colours, high contrast, one spacing scale, plain labels.
 
 ## 2D race view (src/ui/race/RaceViewer.tsx)
 - Tracks: evenly resampled polylines (index 0 = start/finish), corners as lap fractions. Positions come from each car's lap-end times (`lapEnd`) interpolated; pit laps spend their pit time in the pit lane at the end of the lap; retirements stop where they happened.

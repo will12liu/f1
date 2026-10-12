@@ -1,6 +1,6 @@
 // The 2D race: a canvas track with every car, a timing tower and an event feed, replayed from a
 // Replay at a chosen speed. The engine already decided everything; this only asks `viewAt(t)`.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { COMPOUNDS } from "../../engine/race/model";
 import { indexReplay, trackPoint, viewAt, type RaceView } from "../../engine/race/replay";
 import type { Replay, World } from "../../engine/types";
@@ -10,9 +10,15 @@ import { useMaps, useTrack, type TrackFile } from "../components/bits";
 const SPEEDS = [1, 2, 4, 8, 16];
 const BASE_RATE = 6; // race seconds per real second at 1x
 
-export function RaceViewer({ world, replay }: { world: World; replay: Replay }) {
+/** A race still being run: the viewer asks it to run far enough to show time `t`. */
+export interface LiveSource {
+  advance(t: number): number; // runs laps as needed, returns the latest time that can be shown
+  finish(): void; // run to the flag at the current dials
+}
+
+export function RaceViewer({ world, replay, live, side, follow0 = null }: { world: World; replay: Replay; live?: LiveSource; side?: ReactNode; follow0?: number | null }) {
   const track = useTrack(replay.circuitId);
-  const ix = useMemo(() => indexReplay(replay), [replay]);
+  const ix = useMemo(() => indexReplay(replay, !!live), [replay, live]);
   const { drivers, teams } = useMaps(world);
   const cars = useMemo(
     () =>
@@ -27,7 +33,7 @@ export function RaceViewer({ world, replay }: { world: World; replay: Replay }) 
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(4);
   const [showInterval, setShowInterval] = useState(false);
-  const [follow, setFollow] = useState<number | null>(null);
+  const [follow, setFollow] = useState<number | null>(follow0);
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -41,14 +47,18 @@ export function RaceViewer({ world, replay }: { world: World; replay: Replay }) 
       last = now;
       const v = viewAt(ix, Math.max(0, tRef.current));
       const slow = v.lap >= replay.laps - 1 && v.flag !== "chequered" ? 0.6 : 1; // the last laps play slower
-      const next = Math.min(ix.end, tRef.current + dt * BASE_RATE * speed * slow);
+      let next = Math.min(ix.end, tRef.current + dt * BASE_RATE * speed * slow);
+      if (live) next = Math.min(next, live.advance(next));
       setT(next);
       if (next >= ix.end) setPlaying(false);
       else raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [playing, speed, ix, replay.laps]);
+  }, [playing, speed, ix, replay.laps, live]);
+  useEffect(() => {
+    if (t > ix.end) setT(ix.end); // a live race that just ran to the flag
+  }, [t, ix.end]);
 
   const view = viewAt(ix, Math.max(0, t));
   const feed = useMemo(() => replay.events.filter((e) => e.t <= t && e.kind !== "mistake").slice(-7).reverse(), [replay.events, t]);
@@ -56,6 +66,11 @@ export function RaceViewer({ world, replay }: { world: World; replay: Replay }) 
     const lead = view.cars[0]?.idx ?? 0;
     const ends = replay.lapEnd[lead];
     const target = Math.max(1, Math.min(replay.laps, view.lap + dl - 1));
+    if (live) {
+      const want = (ends[target - 1] ?? t + (ends[1] ?? 90)) + 0.01;
+      setT(Math.min(want, live.advance(want)));
+      return;
+    }
     setT(Math.min(ix.end, (ends[target - 1] ?? ix.finishT) + 0.01));
   };
 
@@ -80,13 +95,13 @@ export function RaceViewer({ world, replay }: { world: World; replay: Replay }) 
             <button className="btn-ghost !px-2 !py-1" onClick={() => jumpLap(1)} title="Next lap">
               +1 lap
             </button>
-            <button className="btn-ghost !px-2 !py-1" onClick={() => { setT(ix.end); setPlaying(false); }} title="Skip to the flag">
+            <button className="btn-ghost !px-2 !py-1" onClick={() => { if (live) { live.finish(); setT(Infinity); } else setT(ix.end); setPlaying(false); }} title={live ? "Sim the rest at the current dials" : "Skip to the flag"}>
               ⏭
             </button>
           </div>
         </div>
         <TrackCanvas track={track} view={view} cars={cars} follow={follow} />
-        <div className="px-3 py-2 border-t border-ink-800">
+        {!live && <div className="px-3 py-2 border-t border-ink-800">
           <input
             type="range"
             min={0}
@@ -97,10 +112,11 @@ export function RaceViewer({ world, replay }: { world: World; replay: Replay }) 
             className="w-full accent-red-600"
             aria-label="Race time"
           />
-        </div>
+        </div>}
       </div>
 
       <div className="grid gap-3 content-start">
+        {side}
         <div className="panel overflow-hidden">
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink-800 text-[11px] uppercase tracking-wider text-slate-400">
             <span>Timing</span>

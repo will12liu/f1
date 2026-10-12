@@ -5,6 +5,7 @@
 // The replay (race/replay.ts) rebuilds positions from `lapEnd` and `events`.
 import { makeRng, type Rng } from "../rng";
 import type { CircuitDef, Compound, DnfReason, DriverRatings, PitLoss } from "../types";
+import { DIAL, dialFx, NEUTRAL, type Command, type DialFx, type Dials, type Forecast } from "./dials";
 import { POINTS, RACE, tyreCost, tyreLife } from "./model";
 import { plans, type Stint, type WearRate } from "./strategy";
 
@@ -24,6 +25,7 @@ export interface RaceInput {
   pitLoss?: PitLoss;
   entries: Entry[];
   laps?: number; // override (tests)
+  commands?: Command[]; // dial changes and pit calls, each applied at the start of its lap (replays a live race)
 }
 
 export type Flag = "green" | "sc" | "vsc";
@@ -70,6 +72,12 @@ export interface CarState {
   passes: number;
   dirty: boolean; // within a second of the car ahead at the start of this lap
   lastPit: number;
+  dials: Dials;
+  ctl: boolean; // someone has touched this car's dials or pit calls (untouched cars skip the dial maths)
+  battery: number; // ERS charge 0-1
+  box: "S" | "M" | "H" | "auto" | null; // requested stop at the end of this lap
+  hold: boolean; // skip a planned stop this lap
+  lift: boolean; // lifting and coasting this lap (tank short)
 }
 
 export interface RaceState {
@@ -87,6 +95,7 @@ export interface RaceState {
   passes: number;
   fastest: { car: number; time: number; lap: number } | null;
   flagLog: { lap: number; flag: Flag }[]; // flag in force on each lap that wasn't green
+  commands: Command[]; // every command applied so far (feed back as input.commands to replay the race)
 }
 
 export interface RaceRunner {
@@ -95,6 +104,10 @@ export interface RaceRunner {
   step(): void; // one lap
   done(): boolean;
   result(): RaceResult;
+  /** Queue a change for a car from the next lap. */
+  command(cmd: Omit<Command, "lap">): void;
+  /** What the car's current dials lead to: tyres, battery, fuel, next stop. */
+  forecast(idx: number): Forecast;
 }
 
 export interface ResultRow {
@@ -141,7 +154,7 @@ export function createRace(input: RaceInput): RaceRunner {
   };
 
   // Strategy: the cheapest plan, sometimes the second (teams differ), from the same tyre model.
-  const choosePlan = (car: CarState, from: number, keep: boolean, maxStops = laps - from > 36 ? 2 : 1) => {
+  const choosePlan = (car: CarState, from: number, keep: boolean, maxStops = laps - from > 36 ? 2 : 1, want?: Compound) => {
     const ps = plans({
       from,
       laps,
@@ -149,9 +162,10 @@ export function createRace(input: RaceInput): RaceRunner {
       base,
       pitLoss: pitLoss.normal,
       used: car.used,
-      first: keep ? { c: car.compound, age: car.age } : undefined,
+      first: keep ? { c: car.compound, age: car.age } : want ? { c: want, age: 0 } : undefined,
       maxStops,
     });
+    if (want && !ps.length) return choosePlan(car, from, keep, maxStops);
     const pick = ps.length > 1 && ps[1].cost - ps[0].cost < 4 && rng.chance(0.15) ? ps[1] : ps[0];
     return pick;
   };
@@ -180,6 +194,12 @@ export function createRace(input: RaceInput): RaceRunner {
     passes: 0,
     dirty: false,
     lastPit: -99,
+    dials: { ...NEUTRAL },
+    ctl: false,
+    battery: DIAL.battery0,
+    box: null,
+    hold: false,
+    lift: false,
   }));
 
   // Start: grid slots plus the launch (starts rating + luck).
@@ -208,7 +228,9 @@ export function createRace(input: RaceInput): RaceRunner {
     passes: 0,
     fastest: null,
     flagLog: [],
+    commands: [],
   };
+  const queue: Command[] = (input.commands ?? []).map((x) => ({ ...x }));
 
   const ev = (e: RaceEvent) => state.events.push(e);
 
@@ -273,6 +295,20 @@ export function createRace(input: RaceInput): RaceRunner {
     if (flag !== "green") state.flagLog.push({ lap: L, flag });
     const running = state.order.map((i) => cars[i]).filter((x) => !x.out);
 
+    // Commands for this lap (dials, pit calls).
+    for (const cmd of queue.filter((x) => x.lap === L)) {
+      const car = cars[cmd.car];
+      state.commands.push(cmd);
+      if (!car || car.out) continue;
+      car.ctl = true;
+      if (cmd.dials) car.dials = { ...car.dials, ...cmd.dials };
+      if (cmd.pit === "box") car.box = cmd.compound ?? "auto";
+      if (cmd.pit === "stay") car.hold = true;
+    }
+    // what each touched car's dials do this lap
+    const fxs = new Map<number, DialFx>();
+    for (const car of running) if (car.ctl) fxs.set(car.idx, dialFx(car.dials, car.battery));
+
     // Dirty air from the gaps at the start of the lap.
     for (let k = 0; k < running.length; k++) running[k].dirty = k > 0 && running[k].cum - running[k - 1].cum < 1.0;
 
@@ -281,10 +317,10 @@ export function createRace(input: RaceInput): RaceRunner {
     for (const car of running) {
       if (L >= laps) break;
       const left = laps - L;
-      let pit = car.forcePit;
-      if (!pit && car.plan.length > 1 && car.plan[0].until <= L) pit = true;
-      if (!pit && car.wear > 1.04 && left > 2) pit = true;
-      if (!pit && flag !== "green" && L - car.lastPit > 4 && left > 3) {
+      let pit = car.forcePit || car.box !== null;
+      if (!pit && car.plan.length > 1 && car.plan[0].until <= L && !car.hold) pit = true;
+      if (!pit && car.wear > 1.04 && left > 2 && !car.hold) pit = true;
+      if (!pit && flag !== "green" && L - car.lastPit > 4 && left > 3 && !car.hold) {
         // a cheap stop under a safety car: compare staying out with a new set now
         const loss = flag === "sc" ? pitLoss.sc : pitLoss.vsc;
         const maxStops = left > 36 ? 2 : 1;
@@ -309,10 +345,18 @@ export function createRace(input: RaceInput): RaceRunner {
         t += tyreCost(car.compound, car.wear + wearRate(r)[car.compound] / 2, base);
         t += car.fuel * RACE.fuelSecPerKg + (car.e.form ?? 0) * base;
         t += car.damage;
+        const fx = fxs.get(car.idx);
+        if (fx) {
+          t += (fx.sec * base) / 90;
+          // a tank that can't make the lap: lift and coast
+          const burn = RACE.fuelPerLapKg * fx.burn;
+          car.lift = car.fuel < burn - 0.05;
+          if (car.lift) t += ((DIAL.liftSec * base) / 90) * (1 + (3 * Math.max(0, burn * 0.75 - car.fuel)) / burn);
+        }
         if (car.dirty) t += RACE.dirtyAir;
         if (car.age === 0 && L > 1) t += 0.4; // tyres coming in
         t += rng.normal(0, RACE.noise + (100 - r.consistency) * RACE.noisePerPoint);
-        if (rng.chance(RACE.mistake * (1 + (100 - r.consistency) / 25))) {
+        if (rng.chance(RACE.mistake * (1 + (100 - r.consistency) / 25) * (fx?.risk ?? 1))) {
           const lost = 0.6 + rng.next() * 2.6;
           t += lost;
           ev({ lap: L, t: car.cum + t * 0.6, kind: "mistake", a: car.idx, info: lost.toFixed(1) });
@@ -389,7 +433,8 @@ export function createRace(input: RaceInput): RaceRunner {
           let ok = false;
           if (canFight) {
             fights.set(x.idx, n + 1);
-            const adv = fy + RACE.minGap - f;
+            let adv = fy + RACE.minGap - f;
+            if (fxs.size) adv += (fxs.get(x.idx)?.attack ?? 0) - (fxs.get(y.idx)?.defend ?? 0); // ERS overtake / defend mode
             let T = RACE.passT[otIdx];
             if (L === 1 || restart) T *= 0.7;
             const late = laps - L < 8 ? 1 : 0;
@@ -444,7 +489,7 @@ export function createRace(input: RaceInput): RaceRunner {
       if (car.out) continue;
       const f = fin.get(car.idx)!;
       const tMid = car.cum + (f - car.cum) * rng.next();
-      if (rng.chance(RACE.mech * (100 - car.e.reliability) / 100)) {
+      if (rng.chance((RACE.mech * (100 - car.e.reliability) / 100) * (fxs.get(car.idx)?.mech ?? 1))) {
         retire(car, "Mechanical", L, tMid);
         if (rng.chance(RACE.scAfterMech * (0.5 + c.sc))) callFlag("sc");
         else if (rng.chance(RACE.vscAfterMech)) callFlag("vsc");
@@ -452,7 +497,7 @@ export function createRace(input: RaceInput): RaceRunner {
       }
       if (flag !== "green") continue;
       const r = car.e.r;
-      const pCrash = RACE.crash * (1 + (100 - r.consistency) / 18) * (0.7 + r.aggression / 160) * (L === 1 ? 4 : 1) * (car.wear > 1 ? 2 : 1);
+      const pCrash = RACE.crash * (1 + (100 - r.consistency) / 18) * (0.7 + r.aggression / 160) * (L === 1 ? 4 : 1) * (car.wear > 1 ? 2 : 1) * (fxs.get(car.idx)?.risk ?? 1);
       if (rng.chance(pCrash)) {
         retire(car, "Crash", L, tMid);
         if (rng.chance(clamp(RACE.scAfterCrash * (0.5 + c.sc), 0, 0.95))) callFlag("sc");
@@ -470,9 +515,13 @@ export function createRace(input: RaceInput): RaceRunner {
       car.last = f - car.cum;
       const r = car.e.r;
       const neutral = flag !== "green";
-      car.wear += wearRate(r)[car.compound] * (neutral ? 0.3 : 1) * (car.dirty ? RACE.dirtyWear : 1) * (1 + (0.08 * car.fuel) / (laps * RACE.fuelPerLapKg));
+      const fx = fxs.get(car.idx);
+      car.wear += wearRate(r)[car.compound] * (neutral ? 0.3 : 1) * (car.dirty ? RACE.dirtyWear : 1) * (1 + (0.08 * car.fuel) / (laps * RACE.fuelPerLapKg)) * (fx && !neutral ? fx.wear : 1);
       car.age++;
-      car.fuel = Math.max(0, car.fuel - RACE.fuelPerLapKg * (neutral ? 0.55 : 1));
+      car.fuel = Math.max(0, car.fuel - RACE.fuelPerLapKg * (neutral ? 0.55 : 1) * (fx && !neutral ? fx.burn * (car.lift ? 0.75 : 1) : 1));
+      if (fx) car.battery = clamp(car.battery + (neutral ? 0.06 : fx.flow), 0, 1); // the battery refills behind the safety car
+      car.hold = false;
+      car.lift = false;
       if (!neutral && !pitting.has(car.idx) && L > 1 && car.last < car.best) {
         car.best = car.last;
         if (!state.fastest || car.last < state.fastest.time) {
@@ -482,7 +531,9 @@ export function createRace(input: RaceInput): RaceRunner {
       }
       if (pitting.has(car.idx)) {
         car.stints[car.stints.length - 1].to = L;
-        const p = choosePlan(car, L, false);
+        const want = car.box && car.box !== "auto" ? car.box : undefined;
+        car.box = null;
+        const p = choosePlan(car, L, false, undefined, want);
         car.plan = p.stints;
         car.compound = p.stints[0].c;
         if (!car.used.includes(car.compound)) car.used.push(car.compound);
@@ -565,7 +616,31 @@ export function createRace(input: RaceInput): RaceRunner {
     };
   }
 
-  return { state, input, step, done: () => state.lap >= laps, result };
+  function command(cmd: Omit<Command, "lap">) {
+    queue.push({ ...cmd, lap: state.lap + 1 });
+  }
+
+  function forecast(idx: number): Forecast {
+    const car = cars[idx];
+    const fx = dialFx(car.dials, car.battery);
+    const left = laps - state.lap;
+    const wpl = wearRate(car.e.r)[car.compound] * fx.wear;
+    const burn = RACE.fuelPerLapKg * fx.burn;
+    const margin = car.fuel - burn * left;
+    return {
+      tyreLapsLeft: Math.max(0, (1 - car.wear) / wpl),
+      tyreWear: car.wear,
+      battery: car.battery,
+      batteryEmptyLap: fx.flow < 0 && car.battery > 0 ? state.lap + Math.ceil(car.battery / -fx.flow) : null,
+      fuel: car.fuel,
+      fuelMargin: margin,
+      fuelShortLap: margin < -0.05 ? state.lap + Math.floor(car.fuel / burn) + 1 : null,
+      lapDelta: (fx.sec * base) / 90,
+      nextStop: car.box ? { lap: state.lap + 1, compound: car.box === "auto" ? "?" : car.box } : car.plan.length > 1 ? { lap: car.plan[0].until, compound: car.plan[1].c } : null,
+    };
+  }
+
+  return { state, input, step, done: () => state.lap >= laps, result, command, forecast };
 }
 
 export function simRace(input: RaceInput): { result: RaceResult; state: RaceState } {

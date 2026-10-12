@@ -9,6 +9,7 @@ import { Drivers } from "./ui/pages/Drivers";
 import { DriverPage } from "./ui/pages/DriverPage";
 import { RacePage } from "./ui/pages/RacePage";
 import { History } from "./ui/pages/History";
+import { LiveRace } from "./ui/pages/LiveRace";
 
 export function App() {
   return (
@@ -24,6 +25,7 @@ export function App() {
           <Route path="driver/:did" element={<DriverPage />} />
           <Route path="race/:round" element={<RacePage />} />
           <Route path="history" element={<History />} />
+          <Route path="live" element={<LiveRace />} />
         </Route>
       </Routes>
     </BrowserRouter>

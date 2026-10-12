@@ -3,6 +3,8 @@ import * as Comlink from "comlink";
 import { create } from "zustand";
 import { readSave, writeSave, type SaveMeta } from "../db/db";
 import type { WorkerApi } from "../engine/worker";
+import type { Command } from "../engine/race/dials";
+import type { PreparedRound } from "../engine/season/season";
 import type { World } from "../engine/types";
 
 let worker: Comlink.Remote<WorkerApi> | null = null;
@@ -17,6 +19,10 @@ interface GameState {
   create(name: string): Promise<string>;
   simRounds(n: number): Promise<number>;
   nextSeason(): Promise<void>;
+  /** Qualifying and the race input for the next round, to drive it live. */
+  prepareLive(): Promise<PreparedRound | null>;
+  /** Saves the live race (replayed from its commands, so it comes out the same). */
+  commitLive(commands: Command[]): Promise<number | null>;
 }
 
 async function persist(meta: SaveMeta, world: World) {
@@ -61,6 +67,20 @@ export const useGame = create<GameState>((set, get) => ({
     const m = await persist(meta, res.world);
     set({ world: res.world, meta: m, busy: null });
     return res.done;
+  },
+  async prepareLive() {
+    const { world } = get();
+    if (!world) return null;
+    return api().prepareRound(world);
+  },
+  async commitLive(commands) {
+    const { world, meta } = get();
+    if (!world || !meta) return null;
+    set({ busy: "Saving the race…" });
+    const res = await api().commitRound(world, commands);
+    const m = await persist(meta, res.world);
+    set({ world: res.world, meta: m, busy: null });
+    return res.summary?.round ?? null;
   },
   async nextSeason() {
     const { world, meta } = get();

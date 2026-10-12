@@ -36,7 +36,8 @@ export interface ReplayIndex {
   end: number; // the replay can stop here
 }
 
-export function indexReplay(r: Replay): ReplayIndex {
+/** `live`: the race is still being run (the replay grows lap by lap), so no flag until the leader finishes. */
+export function indexReplay(r: Replay, live = false): ReplayIndex {
   const pitLoss = new Map<string, number>();
   const outAt = new Map<number, { t: number; lap: number }>();
   for (const e of r.events) {
@@ -44,13 +45,13 @@ export function indexReplay(r: Replay): ReplayIndex {
     if (e.kind === "dnf") outAt.set(e.a, { t: e.t, lap: e.lap });
   }
   const leaderEnds = r.lapEnd.filter((a) => a.length === r.laps + 1).map((a) => a[r.laps]);
-  const finishT = leaderEnds.length ? Math.min(...leaderEnds) : Math.max(...r.lapEnd.map((a) => a[a.length - 1]));
+  const finishT = leaderEnds.length ? Math.min(...leaderEnds) : live ? Infinity : Math.max(...r.lapEnd.map((a) => a[a.length - 1]));
   const finalLap = r.lapEnd.map((a, k) => {
     if (outAt.has(k)) return Infinity;
     for (let l = 1; l < a.length; l++) if (a[l] >= finishT - 1e-9) return l;
     return Infinity;
   });
-  const end = Math.max(...r.lapEnd.map((a, k) => (finalLap[k] < Infinity ? a[finalLap[k]] : 0)), finishT) + 4;
+  const end = finishT === Infinity ? Infinity : Math.max(...r.lapEnd.map((a, k) => (finalLap[k] < Infinity ? a[finalLap[k]] : 0)), finishT) + 4;
   return { r, finishT, pitLoss, outAt, finalLap, end };
 }
 

@@ -1,7 +1,8 @@
 // Runs the simulation off the main thread so the UI stays responsive.
 import * as Comlink from "comlink";
 import { endSeason } from "./season/offseason";
-import { seasonOver, simNextRound } from "./season/season";
+import type { Command } from "./race/dials";
+import { prepareNextRound, seasonOver, simNextRound } from "./season/season";
 import type { World } from "./types";
 
 const api = {
@@ -13,6 +14,15 @@ const api = {
       done++;
     }
     return { world, done };
+  },
+  /** Qualifying and the race input for the next round, to drive it live. */
+  prepareRound(world: World) {
+    return prepareNextRound(world);
+  },
+  /** Records the next round as driven live: the same race replayed with the player's commands. */
+  commitRound(world: World, commands: Command[]) {
+    const summary = simNextRound(world, commands);
+    return { world, summary };
   },
   /** Winter: champions recorded, drivers develop, market, juniors, cars reshuffle, new calendar. */
   nextSeason(world: World) {

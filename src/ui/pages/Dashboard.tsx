@@ -34,15 +34,18 @@ export function Dashboard() {
                 {circuit.name} · {circuit.laps} laps · {(circuit.laps * circuit.km).toFixed(1)} km · overtaking {["easy", "fair", "average", "hard", "very hard"][circuit.overtake - 1]}
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
+                <Link className="btn-primary" to={`${base}/live`}>
+                  Drive it live
+                </Link>
                 <button
-                  className="btn-primary"
+                  className="btn-ghost"
                   disabled={!!busy}
                   onClick={async () => {
                     await simRounds(1);
                     nav(`${base}/race/${next.round}?watch=1`);
                   }}
                 >
-                  ▶ Watch the race
+                  Watch the race
                 </button>
                 <button className="btn-ghost" disabled={!!busy} onClick={() => simRounds(1)}>
                   Sim race
