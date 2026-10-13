@@ -240,7 +240,7 @@ export function NewCareer() {
         </Link>
       </header>
       <div className="grid flex-1 lg:grid-cols-[minmax(340px,40%)_1fr]">
-        <aside className="relative flex flex-col items-center justify-center overflow-hidden border-ink-800 px-6 py-8 max-lg:border-b lg:border-r">
+        <aside className="relative flex flex-col items-center justify-center overflow-hidden border-ink-800 px-6 py-8 max-lg:border-b lg:sticky lg:top-0 lg:h-screen lg:self-start lg:border-r">
           <div className="pointer-events-none absolute inset-x-0 top-6 select-none text-center font-display text-[13rem] font-black leading-none text-transparent sm:text-[17rem]" style={{ WebkitTextStroke: `3px ${drv.helmet}55` }}>
             {drv.num}
           </div>
