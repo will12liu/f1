@@ -63,7 +63,12 @@ export function CareerHq() {
     <div className="grid gap-8">
       {c.event && (
         <section className="grid gap-4 rounded-lg border border-ink-600 bg-ink-850 p-6 md:p-8">
-          <div className="kicker text-sky-300">This week · answer before the next race</div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="kicker text-sky-300">Text from {c.event.from ?? "the paddock"} · answer before the next race</div>
+            <Link to={`${base}/life?app=messages`} className="font-display text-lg font-bold uppercase text-sky-300 hover:text-white">
+              Open phone ›
+            </Link>
+          </div>
           <h2 className="headline text-4xl sm:text-5xl">{c.event.title}</h2>
           <p className="max-w-3xl text-lg text-slate-300">{c.event.text}</p>
           <div className="grid gap-3 sm:grid-cols-3">

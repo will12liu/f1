@@ -12,6 +12,7 @@ import { driverStandings, f1Teams } from "../season/season";
 import type { Driver, DriverRatings, RatingKey, Series, Team, World } from "../types";
 import { drawEvent } from "./events";
 import { shopAfterRound } from "./shop";
+import { lifeAfterRound, type LifeState } from "./life";
 
 // ───────────── who you are ─────────────
 
@@ -120,13 +121,14 @@ export interface CareerState {
   rel?: Record<string, number>; // engineer, boss, agent, mate, family, press: 0-100
   rival?: string; // driver id
   battles?: Record<string, number>; // close finishes against each driver
-  event?: { id: string; title: string; text: string; opts: { label: string; sub: string }[] };
+  event?: { id: string; from?: string; title: string; text: string; opts: { label: string; sub: string }[] };
   lastEvents?: Record<string, number>;
   lastBeatMate?: boolean;
   owned?: string[]; // shop items
   sims?: Record<string, string>; // simulator sessions done: kind -> "season:round" (once per weekend)
   simBest?: Record<string, number>; // best score per kind (0-1)
   clauses?: { release?: boolean; lead?: boolean }; // in the current contract
+  life?: LifeState; // the phone: money, homes, cars, people (life.ts)
 }
 
 /** Pace from morale for the player's car (fraction of a lap; negative = quicker). */
@@ -415,6 +417,7 @@ export function careerAfterRound(w: World) {
     c.trust = Math.min(100, c.trust + 3);
   }
   shopAfterRound(w);
+  lifeAfterRound(w);
   if (round === R) seasonEndOffers(w, c, d);
   else drawEvent(w);
 }

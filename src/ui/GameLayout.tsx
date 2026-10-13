@@ -17,7 +17,7 @@ const CAREER_NAV = [
   ["", "My career"],
   ["training", "Training"],
   ["deals", "Deals"],
-  ["life", "Life"],
+  ["life", "Phone"],
   ["juniors", "Juniors"],
   ["calendar", "Calendar"],
   ["standings", "Standings"],
@@ -85,6 +85,7 @@ export function GameLayout() {
                 }
               >
                 {label}
+                {to === "life" && world.careerState?.event ? <span className="ml-1.5 rounded-sm bg-race px-1.5 text-sm font-bold leading-snug text-white">1</span> : null}
                 {to === "inbox" && world.manager && world.manager.inbox.some((x) => !x.read) ? <span className="ml-1.5 rounded-sm bg-race px-1.5 text-sm font-bold leading-snug text-white">{world.manager.inbox.filter((x) => !x.read).length}</span> : null}
               </NavLink>
             ))}

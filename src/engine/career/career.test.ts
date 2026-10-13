@@ -85,3 +85,40 @@ describe("career money", () => {
     expect(c.owned).toContain("rig");
   }, 60_000);
 });
+
+import { ensureLife, lifeBuy, lifeHome, lifeMeet, lifePerson, lifeSell, lifeTrade, netWorth, priceOf } from "./life";
+describe("the phone", () => {
+  it("markets move each weekend, homes rent and sell, people respond, and it's the same from the same seed", () => {
+    const run = () => {
+      const w = loadWorld(53);
+      startCareer(w, { first: "Pat", last: "Phone", nat: "British", archetype: "racer", tier: "self", start: "F2", difficulty: "pro" });
+      const c = careerOf(w)!;
+      c.cash = 5e6;
+      const L = ensureLife(w)!;
+      expect(L.people.some((p) => p.role === "mum")).toBe(true);
+      const p0 = priceOf(L, "P100");
+      expect(lifeTrade(w, "P100", 100_000).ok).toBe(true);
+      expect(lifeTrade(w, "DRS", 50_000).ok).toBe(true);
+      expect(lifeBuy(w, "home", "flat").ok).toBe(true);
+      expect(lifeBuy(w, "car", "hatch").ok).toBe(true);
+      expect(lifeBuy(w, "biz", "kart").ok).toBe(true);
+      const home = L.homes[0];
+      expect(lifeHome(w, home.id, "rent").ok).toBe(true);
+      expect(lifePerson(w, "mum", "talk").ok).toBe(true);
+      expect(lifePerson(w, "mum", "talk").ok).toBe(false); // once a weekend
+      lifeMeet(w);
+      for (let i = 0; i < 4; i++) simNextRound(w);
+      expect(priceOf(L, "P100")).not.toBe(p0);
+      expect(L.ledger.some(([k]) => k.startsWith("Rent"))).toBe(true);
+      expect(L.feed.length).toBeGreaterThan(0);
+      const cash = c.cash;
+      expect(lifeSell(w, "home", home.id).ok).toBe(true);
+      expect(c.cash).toBeGreaterThan(cash);
+      expect(lifeTrade(w, "P100", -1e15).ok).toBe(true);
+      expect(L.hold.P100).toBeUndefined();
+      expect(netWorth(c).total).toBeGreaterThan(0);
+      return JSON.stringify([L.prices, L.homes, L.cars, L.people.map((p) => p.rel)]);
+    };
+    expect(run()).toBe(run());
+  }, 60_000);
+});

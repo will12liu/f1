@@ -4,8 +4,9 @@
 import { hashString, makeRng } from "../rng";
 import type { World } from "../types";
 import { careerOf, meOf, note, type CareerState } from "./career";
+import { lifeLogEvent } from "./life";
 
-export type Rel = "engineer" | "boss" | "agent" | "mate" | "family" | "press";
+export type Rel = "engineer" | "boss" | "agent" | "mate" | "family" | "press" | "partner" | "friend";
 export interface Fx {
   fame?: number;
   trust?: number;
@@ -14,6 +15,7 @@ export interface Fx {
   xp?: number;
   rel?: Partial<Record<Rel, number>>;
   rival?: "add" | "end";
+  rentVal?: number; // fraction lost from the rented home's value
 }
 export interface EvOption {
   label: string;
@@ -44,10 +46,15 @@ export interface Ctx {
   rounds: number;
   age: number;
   deals: number;
+  partner: string | null;
+  sibling: string;
+  friend: string | null;
+  rental: string | null;
 }
 interface EvDef {
   id: string;
   gap: number; // rounds before it can come again
+  from?: string; // who texts it (the phone's Messages)
   w: (c: Ctx) => number;
   title: string;
   text: string;
@@ -59,7 +66,7 @@ const ev = (d: EvDef) => defs.push(d);
 
 // ── after a result ──
 ev({
-  id: "win-press", gap: 3, w: (c) => (c.lastPos === 1 ? 8 : 0),
+  id: "win-press", from: "Press officer", gap: 3, w: (c) => (c.lastPos === 1 ? 8 : 0),
   title: "Winner's press conference", text: "Microphones everywhere after your win. A journalist asks if you're ready for the next step.",
   opts: [
     { label: "Humble: thank the team", sub: "The team likes it", fx: { trust: 3, fame: 1, rel: { boss: 3, engineer: 2 } } },
@@ -67,7 +74,7 @@ ev({
   ],
 });
 ev({
-  id: "dnf-blame", gap: 4, w: (c) => (c.lastDnf ? 6 : 0),
+  id: "dnf-blame", from: "{engineer}", gap: 4, w: (c) => (c.lastDnf ? 6 : 0),
   title: "A retirement", text: "You didn't see the flag. {engineer} wants to go through what happened before the debrief.",
   opts: [
     { label: "Own it", sub: "Morale takes a hit, the team respects it", fx: { morale: -3, trust: 2, rel: { engineer: 3 } } },
@@ -76,7 +83,7 @@ ev({
   ],
 });
 ev({
-  id: "beaten-mate", gap: 4, w: (c) => (c.beatMate === false ? 5 : 0),
+  id: "beaten-mate", from: "{engineer}", gap: 4, w: (c) => (c.beatMate === false ? 5 : 0),
   title: "{mate} beat you", text: "{mate} finished ahead again. The data shows you lost time in the slow corners.",
   opts: [
     { label: "Study {mate}'s data", sub: "Learn, and swallow your pride", fx: { xp: 30, morale: -2, rel: { mate: 1, engineer: 2 } } },
@@ -84,7 +91,7 @@ ev({
   ],
 });
 ev({
-  id: "beat-mate", gap: 4, w: (c) => (c.beatMate === true ? 3 : 0),
+  id: "beat-mate", from: "{boss}", gap: 4, w: (c) => (c.beatMate === true ? 3 : 0),
   title: "Team-mate tension", text: "{mate} is cold with you after you beat him again. The team asks you to keep it professional.",
   opts: [
     { label: "Offer to share data", sub: "The team loves it", fx: { trust: 3, rel: { mate: 4, boss: 2 } } },
@@ -92,7 +99,7 @@ ev({
   ],
 });
 ev({
-  id: "big-gain", gap: 4, w: (c) => (c.lastPos !== null && c.lastGrid !== null && c.lastGrid - c.lastPos >= 6 ? 6 : 0),
+  id: "big-gain", from: "Media team", gap: 4, w: (c) => (c.lastPos !== null && c.lastGrid !== null && c.lastGrid - c.lastPos >= 6 ? 6 : 0),
   title: "The overtake everyone's talking about", text: "Your move into the last chicane is all over social media.",
   opts: [
     { label: "Post the onboard", sub: "Fame", fx: { fame: 3, rel: { press: 1 } } },
@@ -101,7 +108,7 @@ ev({
 });
 // ── rivals ──
 ev({
-  id: "rival-words", gap: 5, w: (c) => (c.rival ? 5 : 0),
+  id: "rival-words", from: "Press officer", gap: 5, w: (c) => (c.rival ? 5 : 0),
   title: "{rival} has something to say", text: "In the paddock, {rival} tells reporters you're dangerous in the braking zones.",
   opts: [
     { label: "Fire back", sub: "The rivalry heats up", fx: { fame: 2, morale: 2, rel: { press: 2 } } },
@@ -111,7 +118,7 @@ ev({
 });
 // ── team ──
 ev({
-  id: "boss-meeting", gap: 6, w: (c) => (c.trust < 35 ? 6 : 1),
+  id: "boss-meeting", from: "{boss}", gap: 6, w: (c) => (c.trust < 35 ? 6 : 1),
   title: "{boss} wants a word", text: "{boss} calls you into the motorhome. \"We need more from you.\"",
   opts: [
     { label: "Promise results", sub: "Pressure on", fx: { trust: 3, morale: -2 } },
@@ -119,7 +126,7 @@ ev({
   ],
 });
 ev({
-  id: "sim-day", gap: 3, w: () => 3,
+  id: "sim-day", from: "{engineer}", gap: 3, w: () => 3,
   title: "Simulator day", text: "The factory has a free simulator slot this week.",
   opts: [
     { label: "Take it", sub: "XP, a tired week", fx: { xp: 35, morale: -1, rel: { engineer: 1 } } },
@@ -127,7 +134,7 @@ ev({
   ],
 });
 ev({
-  id: "engineer-bond", gap: 6, w: (c) => (c.rel("engineer") > 60 ? 2 : 1),
+  id: "engineer-bond", from: "{engineer}", gap: 6, w: (c) => (c.rel("engineer") > 60 ? 2 : 1),
   title: "Dinner with {engineer}", text: "{engineer} invites you to dinner with the race engineers.",
   opts: [
     { label: "Go", sub: "A better relationship", fx: { rel: { engineer: 4 }, morale: 2 } },
@@ -135,7 +142,7 @@ ev({
   ],
 });
 ev({
-  id: "setup-dispute", gap: 5, w: () => 2,
+  id: "setup-dispute", from: "{engineer}", gap: 5, w: () => 2,
   title: "A setup argument", text: "You want more front wing for the next race. {engineer} disagrees.",
   opts: [
     { label: "Insist", sub: "Your car, your call", p: () => 0.5, fx: { morale: 3, xp: 10 }, miss: { rel: { engineer: -3 }, morale: -2 }, ok: "You were right. The car feels great.", bad: "It didn't work. {engineer} is not impressed." },
@@ -143,7 +150,7 @@ ev({
   ],
 });
 ev({
-  id: "team-event", gap: 6, w: () => 2,
+  id: "team-event", from: "{boss}", gap: 6, w: () => 2,
   title: "Factory visit", text: "The team asks you to visit the factory and thank the staff.",
   opts: [
     { label: "Spend the whole day there", sub: "They love it", fx: { trust: 3, rel: { boss: 2, engineer: 2 }, morale: -1 } },
@@ -152,7 +159,7 @@ ev({
 });
 // ── agent, money, fame ──
 ev({
-  id: "agent-plan", gap: 8, w: (c) => (c.round > 4 ? 2 : 0),
+  id: "agent-plan", from: "{agent}", gap: 8, w: (c) => (c.round > 4 ? 2 : 0),
   title: "{agent} has a plan", text: "Your manager {agent} wants to talk about the next two years.",
   opts: [
     { label: "Push for a bigger team", sub: "Fame, the team hears about it", fx: { fame: 1, trust: -2, rel: { agent: 3 } } },
@@ -160,7 +167,7 @@ ev({
   ],
 });
 ev({
-  id: "social", gap: 4, w: (c) => (c.fame > 10 ? 3 : 1),
+  id: "social", from: "Media team", gap: 4, w: (c) => (c.fame > 10 ? 3 : 1),
   title: "Social media", text: "A video of you karting as a kid is going viral.",
   opts: [
     { label: "Share it", sub: "Fame", fx: { fame: 2 } },
@@ -168,7 +175,7 @@ ev({
   ],
 });
 ev({
-  id: "fan-event", gap: 5, w: (c) => (c.fame > 15 ? 3 : 0),
+  id: "fan-event", from: "Fan club", gap: 5, w: (c) => (c.fame > 15 ? 3 : 0),
   title: "Fan event", text: "Hundreds of fans in your colours want autographs. It eats your preparation time.",
   opts: [
     { label: "Sign everything", sub: "Fame, a tired evening", fx: { fame: 2, morale: -1 } },
@@ -176,7 +183,7 @@ ev({
   ],
 });
 ev({
-  id: "charity", gap: 10, w: (c) => (c.fame > 20 ? 2 : 0),
+  id: "charity", from: "{agent}", gap: 10, w: (c) => (c.fame > 20 ? 2 : 0),
   title: "Charity karting race", text: "A charity asks you to drive in their karting event.",
   opts: [
     { label: "Do it and donate", sub: "Good for everyone", fx: { fame: 2, cash: -20_000, morale: 3 } },
@@ -184,7 +191,7 @@ ev({
   ],
 });
 ev({
-  id: "interview", gap: 4, w: (c) => (c.fame > 8 ? 3 : 1),
+  id: "interview", from: "{agent}", gap: 4, w: (c) => (c.fame > 8 ? 3 : 1),
   title: "Big interview", text: "A magazine wants an in-depth interview. They'll ask about your future.",
   opts: [
     { label: "Open up", sub: "Fame, press likes you", fx: { fame: 2, rel: { press: 3 } } },
@@ -193,7 +200,7 @@ ev({
   ],
 });
 ev({
-  id: "money-trouble", gap: 8, w: (c) => (c.cash < 100_000 && c.series !== "F1" ? 4 : 0),
+  id: "money-trouble", from: "{agent}", gap: 8, w: (c) => (c.cash < 100_000 && c.series !== "F1" ? 4 : 0),
   title: "Money is tight", text: "Your savings are running low. Racing in the juniors is expensive.",
   opts: [
     { label: "Ask {agent} for a personal sponsor", sub: "Might work", p: (c) => 0.35 + c.fame / 100, fx: { cash: 150_000, rel: { agent: 2 } }, miss: { morale: -3 }, ok: "{agent} found a local backer.", bad: "Nobody bit." },
@@ -202,7 +209,7 @@ ev({
 });
 // ── personal ──
 ev({
-  id: "family", gap: 6, w: () => 2,
+  id: "family", from: "Mum", gap: 6, w: () => 2,
   title: "Home", text: "Your family wants you home for a weekend. You haven't seen them in months.",
   opts: [
     { label: "Go home", sub: "Recharge", fx: { morale: 5, rel: { family: 4 } } },
@@ -210,7 +217,7 @@ ev({
   ],
 });
 ev({
-  id: "fitness", gap: 5, w: () => 2,
+  id: "fitness", from: "Trainer", gap: 5, w: () => 2,
   title: "Fitness camp", text: "Your trainer wants a week of altitude training.",
   opts: [
     { label: "Do it", sub: "Fitness and XP", fx: { xp: 25, morale: -1 } },
@@ -218,7 +225,7 @@ ev({
   ],
 });
 ev({
-  id: "nerves", gap: 6, w: (c) => (c.morale < 40 ? 5 : 0),
+  id: "nerves", from: "Trainer", gap: 6, w: (c) => (c.morale < 40 ? 5 : 0),
   title: "Doubts", text: "You can't sleep before races. It's getting into your head.",
   opts: [
     { label: "Talk to a sports psychologist", sub: "Costs money, helps", fx: { cash: -15_000, morale: 8 } },
@@ -226,7 +233,7 @@ ev({
   ],
 });
 ev({
-  id: "mentor", gap: 12, w: (c) => (c.age < 21 ? 2 : 0),
+  id: "mentor", from: "Unknown number", gap: 12, w: (c) => (c.age < 21 ? 2 : 0),
   title: "A former champion calls", text: "A retired champion offers to coach you for a few weekends.",
   opts: [
     { label: "Yes, absolutely", sub: "XP and morale", fx: { xp: 40, morale: 3 } },
@@ -234,11 +241,62 @@ ev({
   ],
 });
 ev({
-  id: "rumour", gap: 6, w: (c) => (c.fame > 12 ? 2 : 0),
+  id: "rumour", from: "{agent}", gap: 6, w: (c) => (c.fame > 12 ? 2 : 0),
   title: "Paddock rumour", text: "A rumour says another team wants you next year. {boss} has heard it too.",
   opts: [
     { label: "Deny it", sub: "Keep the team happy", fx: { trust: 2 } },
     { label: "\"I'm focused on now\"", sub: "Keeps your options open", fx: { fame: 1, trust: -1, rel: { agent: 2 } } },
+  ],
+});
+
+// ── people off the track (the phone) ──
+ev({
+  id: "partner-race", from: "{partner}", gap: 6, w: (c) => (c.partner ? 3 : 0),
+  title: "Can I come?", text: "Can I come to the next race? I've never seen you do it up close.",
+  opts: [
+    { label: "Of course, I'll sort a pass", sub: "Happier, a little distracted", fx: { morale: 3, xp: -5, rel: { partner: 8 } } },
+    { label: "Not this one, it's a big weekend", sub: "Focus", fx: { rel: { partner: -5 } } },
+  ],
+});
+ev({
+  id: "partner-away", from: "{partner}", gap: 5, w: (c) => (c.partner && c.rel("partner") < 45 ? 5 : 0),
+  title: "We never see each other", text: "We never see each other. Are we doing this or not?",
+  opts: [
+    { label: "Fly home between races", sub: "Tired, but worth it", fx: { cash: -6_000, morale: -1, rel: { partner: 14 } } },
+    { label: "After the season, I promise", sub: "It might not wait", fx: { rel: { partner: -8 }, xp: 10 } },
+  ],
+});
+ev({
+  id: "sibling-course", from: "{sibling}", gap: 10, w: () => 1.5,
+  title: "A favour", text: "Don't laugh. I got into a design course but it's $20K. Could you help?",
+  opts: [
+    { label: "Pay for it", sub: "Family first", fx: { cash: -20_000, morale: 2, rel: { family: 8 } } },
+    { label: "Help with half", sub: "Fair", fx: { cash: -10_000, rel: { family: 3 } } },
+    { label: "Not right now", sub: "Racing is expensive", fx: { rel: { family: -6 } } },
+  ],
+});
+ev({
+  id: "mum-race", from: "Mum", gap: 8, w: () => 1.5,
+  title: "Mum wants to come", text: "Your dad and I want to watch a race from the grandstand this year. Which one is best?",
+  opts: [
+    { label: "Get them paddock passes", sub: "They'll love it", fx: { cash: -4_000, morale: 3, rel: { family: 8 } } },
+    { label: "Watch at home, it's better on TV", sub: "True, and a bit cold", fx: { rel: { family: -4 } } },
+  ],
+});
+ev({
+  id: "tenant", from: "Letting agent", gap: 6, w: (c) => (c.rental ? 3 : 0),
+  title: "Problem at the {rental}", text: "The tenants at the {rental} say the boiler's gone. Do we fix it properly?",
+  opts: [
+    { label: "Fix it properly", sub: "$9K", fx: { cash: -9_000 } },
+    { label: "Patch it", sub: "Cheaper; the place suffers", fx: { cash: -1_500, rentVal: 0.04 } },
+  ],
+});
+ev({
+  id: "friend-sim", from: "{friend}", gap: 5, w: (c) => (c.friend ? 2 : 0),
+  title: "Simulator night", text: "Coming over for a sim battle tonight? Loser buys dinner.",
+  opts: [
+    { label: "You're on", sub: "XP and a good night", fx: { xp: 15, morale: 2, rel: { friend: 6 } } },
+    { label: "Early night for me", sub: "Rest", fx: { morale: 1 } },
   ],
 });
 
@@ -256,7 +314,7 @@ export function drawEvent(w: World): void {
   let r = rng.next() * fits.reduce((s, f) => s + f.wt, 0);
   const pick = fits.find((f) => (r -= f.wt) <= 0) ?? fits[fits.length - 1];
   (c.lastEvents ??= {})[pick.e.id] = w.season * 100 + x.round;
-  c.event = { id: pick.e.id, title: fillText(pick.e.title, x), text: fillText(pick.e.text, x), opts: pick.e.opts.map((o) => ({ label: fillText(o.label, x), sub: o.sub })) };
+  c.event = { id: pick.e.id, from: cap(fillText(pick.e.from ?? "Paddock", x)), title: fillText(pick.e.title, x), text: fillText(pick.e.text, x), opts: pick.e.opts.map((o) => ({ label: fillText(o.label, x), sub: o.sub })) };
 }
 
 export function answerEvent(w: World, i: number): { ok: boolean; msg: string } {
@@ -271,6 +329,7 @@ export function answerEvent(w: World, i: number): { ok: boolean; msg: string } {
   apply(c, works ? o.fx : (o.miss ?? {}));
   const msg = works ? (o.ok ? fillText(o.ok, x) : "Done.") : fillText(o.bad ?? "It didn't work out.", x);
   note(w, c, "Life", c.event.title, `${o.label}. ${msg}`);
+  lifeLogEvent(w, c.event.from ?? "Paddock", c.event.text, fillText(o.label, x), works ? (o.ok ? fillText(o.ok, x) : "") : msg);
   c.event = undefined;
   return { ok: works, msg };
 }
@@ -288,7 +347,16 @@ function apply(c: CareerState, fx: Fx) {
       c.points++;
     }
   }
-  for (const [k, v] of Object.entries(fx.rel ?? {})) (c.rel ??= {})[k] = clamp((c.rel[k] ?? 50) + (v ?? 0));
+  for (const [k, v] of Object.entries(fx.rel ?? {})) {
+    (c.rel ??= {})[k] = clamp((c.rel[k] ?? 50) + (v ?? 0));
+    // the phone's people: family, partner, paddock friends
+    const roles = k === "family" ? ["mum", "dad", "sibling"] : k === "partner" ? ["partner"] : k === "friend" ? ["friend"] : [];
+    for (const p of c.life?.people ?? []) if (roles.includes(p.role)) p.rel = clamp(p.rel + (v ?? 0));
+  }
+  if (fx.rentVal) {
+    const h = c.life?.homes.find((x) => x.rented);
+    if (h) h.value *= 1 - fx.rentVal;
+  }
   if (fx.rival === "end") c.rival = undefined;
 }
 
@@ -316,11 +384,18 @@ function ctxOf(w: World, c: CareerState): Ctx {
     boss: team ? `the ${team.name} boss` : "the team boss",
     engineer: names[r.int(0, 9)],
     agentName: names[(r.int(0, 9) + 3) % 10],
-    rel: (k) => c.rel?.[k] ?? 50,
+    rel: (k) => (k === "partner" ? (c.life?.people.find((p) => p.role === "partner")?.rel ?? 50) : (c.rel?.[k] ?? 50)),
     round: w.results.length,
     rounds: w.calendar.length,
     age: w.season - d.born,
     deals: c.deals.length,
+    partner: c.life?.people.find((p) => p.role === "partner")?.name.split(" ")[0] ?? null,
+    sibling: c.life?.people.find((p) => p.role === "sibling")?.name.split(" ")[0] ?? "your sibling",
+    friend: c.life?.people.find((p) => p.role === "friend")?.name ?? null,
+    rental: (() => {
+      const h = c.life?.homes.find((x) => x.rented);
+      return h ? h.key.replace("flat", "flat").replace("town", "townhouse").replace("lake", "lake house").replace("monaco", "Monaco flat").replace("villa", "villa") : null;
+    })(),
   };
 }
 
@@ -331,5 +406,7 @@ function fillText(t: string, x: Ctx) {
     return typeof v === "string" || typeof v === "number" ? String(v) : "";
   });
 }
+
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 export const EVENT_COUNT = () => defs.length;
