@@ -9,6 +9,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - `npm run calibrate [races]`: sim races on the 2026 calendar with the real grid, compare with real averages (tuning knobs: `RACE` in `src/engine/race/model.ts`)
 - `npm run check:season [seed] [seasons]`: sim seasons + winters headlessly (champions, car order, grid changes, development by age)
 - `npm run check:career [seasons] [seed]`: driver careers for each background and start (auto training, best seat each winter): series, standing, overall, licence, first F1 seat
+- `npm run events [--list]`: check `data/manual/events.csv` (life events) and update the game's copy
 - `npm run check:manager [team] [seasons] [seed]`: team-principal seasons with an automatic principal (position, cap spend, profit, car rank, board)
 
 ## Workflow
@@ -76,6 +77,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - Live: `prepareJunior` (worker) races your F2/F3 feature race; `commitRound(..., junior)` replays it inside `simJuniorRound`.
 - Contract talks (`negotiateSeat`): money, years and a clause (release if a top team calls / number-one driver); acceptance from how much they want you, fame, agent; two rounds, then final; pushing too hard can lose the offer. Paddock life shop (`career/shop.ts`): items with a price, yearly upkeep and per-weekend perks (XP, morale, fame), some gated by fame.
 - The phone (`career/life.ts`, `ui/career/Phone.tsx`, the Life page at `/life`, nav "Phone"): a big handset with apps. Messages (life events arrive as texts from a sender, `EvDef.from`; replies and people's texts go to `life.msgs`), Contacts (family, partner with dating/move in/propose/marry, paddock friends; once per weekend each), Bank (net worth, last weekend's ledger), Stocks and Crypto (invented tickers, prices once a weekend), Homes (buy, live in for perks or rent out, renovate x3, party, sell), Garage, Business, Team (the old shop), Social (fan feed). `lifeAfterRound` runs from `careerAfterRound` with its own RNG (`seed:life:...`); the start is seeded from the save seed. F1 stays the main game: perks are small.
+- Event sheet: the life events live in `data/manual/events.csv` (one row per reply; columns id, from, title, message, when, weight, otherwise, gap, reply, hint, effects, chance, if_it_fails, worked_text, failed_text; little languages in `career/sheet.ts`). `npm run events [--list]` checks it and writes `career/eventSheet.ts` (generated: the CSV as a string); the Vite plugin does it on start and on save; a test fails if the copy is stale or a row has a mistake.
 - Life layer (`career/events.ts`): about one weekend in three draws an event (`EvDef`: weight over a context, options with `Fx`: fame, trust, morale, cash, XP, relationships, rival; some options are chances). It waits on the career page until answered. Morale moves race pace a little (`moraleForm`); a rival forms after 3 close finishes against the same driver.
 
 ## UI rules

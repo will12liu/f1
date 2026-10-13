@@ -15,7 +15,8 @@
     "calibrate": "tsx scripts/calibrate.ts",
     "check:season": "tsx scripts/season-check.ts",
     "check:manager": "tsx scripts/manager-check.ts",
-    "check:career": "tsx scripts/career-check.ts"
+    "check:career": "tsx scripts/career-check.ts",
+    "events": "tsx scripts/events.ts"
   },
   "dependencies": {
     "comlink": "^4.4.2",

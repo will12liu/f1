@@ -2,13 +2,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ARCHETYPES, DIFFICULTY, TIERS, type NewDriver } from "../../engine/career/career";
-import { personName } from "../../engine/generate";
+import { NATIONALITIES, personName } from "../../engine/generate";
 import { RATING_LABELS } from "../../engine/ratings";
 import { makeRng } from "../../engine/rng";
 import { useGame } from "../../state/game";
 import { Helmet, HELMET_COLORS } from "../components/Helmet";
 
-const NATS = ["British", "Italian", "French", "German", "Dutch", "Spanish", "Brazilian", "Japanese", "Australian", "American", "Chinese", "Indian", "Swedish", "Argentine", "Mexican", "Belgian", "Danish", "Polish", "Estonian", "New Zealander", "Canadian", "Finnish", "Monegasque", "Thai"];
+const NATS = NATIONALITIES;
 const STEPS = ["Name", "Helmet", "Style", "Background", "Start", "Difficulty", "Review"] as const;
 const DIFF_TEXT: Record<keyof typeof DIFFICULTY, string> = {
   rookie: "More XP, and your moves in duels work more often. Learn the game.",

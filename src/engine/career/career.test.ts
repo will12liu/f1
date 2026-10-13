@@ -122,3 +122,23 @@ describe("the phone", () => {
     expect(run()).toBe(run());
   }, 60_000);
 });
+
+import { readFileSync } from "node:fs";
+import { parseSheet } from "./sheet";
+import { sheetModule } from "../../../scripts/eventSheetFile";
+import { EVENT_SHEET } from "./eventSheet";
+describe("the events sheet", () => {
+  it("data/manual/events.csv reads cleanly and the game has the latest copy", () => {
+    const csv = readFileSync("data/manual/events.csv", "utf8");
+    expect(parseSheet(csv).errors).toEqual([]);
+    expect(EVENT_SHEET).toBe(csv); // run `npm run events` after editing the sheet
+    expect(sheetModule(csv)).toContain("EVENT_SHEET");
+  });
+  it("mistakes are reported by row and that event is skipped", () => {
+    const bad = 'id,title,message,when,reply,effects\nok,Hi,Hello,fame>5,Yes,"fame +1"\nx,T,M,fmae>5,Yes,"fame +1"\ny,T,M,,Yes,"fame plus one"\n';
+    const r = parseSheet(bad);
+    expect(r.defs.map((d) => d.id)).toEqual(["ok"]);
+    expect(r.errors.join("\n")).toMatch(/Row 3 \(x\).*fmae/);
+    expect(r.errors.join("\n")).toMatch(/Row 4 \(y\)/);
+  });
+});

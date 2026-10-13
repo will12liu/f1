@@ -47,6 +47,7 @@ export const FLAGS: Record<string, string> = {
   Dutch: "🇳🇱", British: "🇬🇧", Australian: "🇦🇺", Monegasque: "🇲🇨", Italian: "🇮🇹", Spanish: "🇪🇸", Thai: "🇹🇭", French: "🇫🇷",
   "New Zealander": "🇳🇿", Argentine: "🇦🇷", German: "🇩🇪", Brazilian: "🇧🇷", Canadian: "🇨🇦", Mexican: "🇲🇽", Finnish: "🇫🇮",
   Japanese: "🇯🇵", American: "🇺🇸", Chinese: "🇨🇳", Indian: "🇮🇳", Swedish: "🇸🇪", Belgian: "🇧🇪", Danish: "🇩🇰", Polish: "🇵🇱", Estonian: "🇪🇪",
+  Taiwanese: "🇹🇼", "South Korean": "🇰🇷", "Hong Konger": "🇭🇰", Singaporean: "🇸🇬", Malaysian: "🇲🇾", Indonesian: "🇮🇩", Filipino: "🇵🇭", Vietnamese: "🇻🇳", Emirati: "🇦🇪", Saudi: "🇸🇦", Israeli: "🇮🇱", Turkish: "🇹🇷", Russian: "🇷🇺", Ukrainian: "🇺🇦", Czech: "🇨🇿", Austrian: "🇦🇹", Swiss: "🇨🇭", Portuguese: "🇵🇹", Irish: "🇮🇪", Norwegian: "🇳🇴", Hungarian: "🇭🇺", Romanian: "🇷🇴", Greek: "🇬🇷", Colombian: "🇨🇴", Chilean: "🇨🇱", Venezuelan: "🇻🇪", Uruguayan: "🇺🇾", Peruvian: "🇵🇪", "South African": "🇿🇦", Moroccan: "🇲🇦", Egyptian: "🇪🇬", Nigerian: "🇳🇬",
 };
 export const COUNTRY_FLAGS: Record<string, string> = {
   Australia: "🇦🇺", China: "🇨🇳", Japan: "🇯🇵", Bahrain: "🇧🇭", "Saudi Arabia": "🇸🇦", USA: "🇺🇸", Italy: "🇮🇹", Canada: "🇨🇦", Monaco: "🇲🇨",
