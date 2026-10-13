@@ -2,16 +2,16 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Negotiate } from "./Negotiate";
-import { archOf, careerOf, meOf, TIERS, XP_PER_POINT } from "../../engine/career/career";
+import { archOf, careerOf, meOf, TIERS } from "../../engine/career/career";
 import { fmtM } from "../../engine/manager/state";
 import { ageOf } from "../../engine/season/development";
 import { hasLicence, isJuniorRound, juniorStandings, licencePointsSL } from "../../engine/season/juniors";
 import { circuitOf, driverStandings, nextRound } from "../../engine/season/season";
 import { useGame } from "../../state/game";
-import { Section, TeamBar, useMaps } from "../components/bits";
+import { Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
 import { Helmet } from "../components/Helmet";
-import { BigStat, HubButton, NextRace, Tile, TileGroup } from "../components/hub";
-import { Answer, Meter, useAct } from "../manager/kit";
+import { BigStat, HubButton, NextRace } from "../components/hub";
+import { Answer, useAct } from "../manager/kit";
 
 export function CareerHq() {
   const { id = "" } = useParams();
@@ -38,8 +38,6 @@ export function CareerHq() {
   const role = d.teamId ? `${d.series} · ${t?.name}` : t ? `${t.name} reserve driver` : "No seat";
 
   const color = t?.color ?? "#475569";
-  const pointsBadge = c.points || undefined;
-  const offersBadge = c.seatOffers.length + c.dealOffers.length || undefined;
   const raceButtons = next && (
     <>
       {racesHere && !c.event && (
@@ -177,74 +175,25 @@ export function CareerHq() {
         )}
         <Answer a={answer} />
 
-      <TileGroup title="Your career" cols={4}>
-        <Tile
-          to={`${base}/training`}
-          title="Training"
-          badge={pointsBadge}
-          sub={
-            <span className="grid gap-2">
-              <Meter value={c.xp / XP_PER_POINT} color="#38bdf8" />
-              {c.points ? `${c.points} point${c.points === 1 ? "" : "s"} to spend` : `${c.xp}/${XP_PER_POINT} XP to the next point`}
-            </span>
-          }
-        />
-        <Tile to={`${base}/deals`} title="Deals" badge={offersBadge} sub={`${c.deals.length} endorsement${c.deals.length === 1 ? "" : "s"} · ${fmtM(c.deals.reduce((s, x) => s + x.pay, 0))} a season`} />
-        <Tile to={`${base}/life`} title="Life" sub={`Morale ${Math.round(c.morale ?? 60)} · the shop and your people`} />
-        <Tile onClick={() => document.getElementById("messages")?.scrollIntoView({ block: "start" })} title="Messages" badge={unread || undefined} sub={c.inbox[0]?.subject ?? "Nothing yet"} />
-      </TileGroup>
-      <TileGroup title="The paddock" cols={5}>
-        <Tile to={`${base}/calendar`} title="Calendar" sub={`${world.results.length} of ${world.calendar.length} rounds run`} />
-        <Tile to={`${base}/${junior ? "juniors" : "standings"}`} title="Standings" sub={pos ? `You're P${pos} in ${d.series}` : `${d.series} tables`} />
-        <Tile to={`${base}/juniors`} title="Juniors" sub="F2 and F3" />
-        <Tile to={`${base}/drivers`} title="Drivers" sub="Every driver, every rating" />
-        <Tile to={`${base}/teams`} title="Teams" sub="Cars and line-ups" />
-      </TileGroup>
-
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <div className="grid content-start gap-6">
-        <Section title="Races">
-          <div className="overflow-x-auto">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Season</th>
-                  <th>Race</th>
-                  <th className="num">Grid</th>
-                  <th className="num">Finish</th>
-                  <th className="num">Rating</th>
-                  <th className="num">XP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...c.log].reverse().slice(0, 12).map((r, i) => (
-                  <tr key={i}>
-                    <td className="text-slate-400">
-                      {r.season} {r.series}
-                    </td>
-                    <td>
-                      {circuitOf(world, r.circuitId).gp}
-                      {r.dotd && <span className="ml-2 text-[10px] font-bold text-amber-300">DRIVER OF THE DAY</span>}
-                    </td>
-                    <td className="num">{r.grid}</td>
-                    <td className="num">{r.status === "Finished" || r.status === "Lapped" ? r.pos : r.status}</td>
-                    <td className={`num font-semibold ${r.rating >= 8 ? "text-emerald-300" : r.rating < 5 ? "text-rose-300" : ""}`}>{r.rating.toFixed(1)}</td>
-                    <td className="num text-slate-400">{r.xp}</td>
-                  </tr>
-                ))}
-                {!c.log.length && (
-                  <tr>
-                    <td colSpan={6} className="text-slate-500">
-                      No races yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <Section title="Coming up" right={<Link to={`${base}/calendar`} className="text-sm font-semibold text-slate-300 hover:text-white">Calendar ›</Link>}>
+          <div className="grid grid-cols-2 gap-px bg-ink-800 sm:grid-cols-4">
+            {world.calendar.slice(world.results.length, world.results.length + 4).map((r) => {
+              const here = junior ? isJuniorRound(world, d.series as "F2" | "F3", r.round) : d.series === "F1";
+              return (
+                <Link key={r.round} to={`${base}/calendar`} className="bg-ink-900 p-4 hover:bg-ink-800">
+                  <div className="flex justify-between text-sm text-slate-400">
+                    <span className="font-display font-bold uppercase">R{r.round}</span>
+                    <span>{new Date(r.date + "T12:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}</span>
+                  </div>
+                  <TrackOutline id={r.circuitId} className="my-2 h-16 w-full" />
+                  <div className="truncate font-display text-xl font-extrabold uppercase text-white">{circuitOf(world, r.circuitId).gp.replace(" GP", "")}</div>
+                  <div className={`text-sm ${here ? "text-emerald-300" : "text-slate-500"}`}>{here ? `${d.series} races` : "No race for you"}</div>
+                </Link>
+              );
+            })}
           </div>
         </Section>
-      </div>
-
       <div className="grid gap-6 content-start" id="messages">
         <Section title={`Messages${unread ? ` (${unread})` : ""}`} right={unread ? <button className="text-xs text-slate-400 hover:text-white" onClick={() => run("markCareerRead")}>Mark read</button> : undefined}>
           <div className="divide-y divide-ink-800 max-h-[520px] overflow-y-auto">
@@ -258,28 +207,6 @@ export function CareerHq() {
                 <p className="mt-1 text-sm text-slate-400">{x.body}</p>
               </div>
             ))}
-          </div>
-        </Section>
-        <Section title="Contract and deals" right={<Link to={`${base}/deals`} className="text-xs text-slate-400 hover:text-white">Deals</Link>}>
-          <div className="p-5 grid gap-1.5 text-base">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Contract</span>
-              <span>{d.contract ? `${team(d.contract.teamId)?.name} until ${d.contract.until}` : "none"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Salary</span>
-              <span>{fmtM(d.contract?.salary ?? 0)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Endorsements</span>
-              <span>
-                {c.deals.length} · {fmtM(c.deals.reduce((s, x) => s + x.pay, 0))} a season
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Offers waiting</span>
-              <span>{c.dealOffers.length}</span>
-            </div>
           </div>
         </Section>
       </div>
