@@ -97,7 +97,7 @@ export function GameLayout() {
         </div>
       )}
       {!loc.pathname.endsWith("/live") && <Ceremonies world={world} saveId={meta.id} />}
-      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+      <main className={`mx-auto px-4 py-6 sm:px-6 ${loc.pathname.endsWith("/live") || loc.search.includes("watch") ? "max-w-[2200px]" : "max-w-[1600px]"}`}>
         <Outlet />
       </main>
     </div>

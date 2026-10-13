@@ -92,7 +92,7 @@ export function RaceViewer({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+    <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
       <div className="panel overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-ink-800">
           <div className="font-display text-3xl font-black tracking-wide">
@@ -117,10 +117,45 @@ export function RaceViewer({
             </button>
           </div>
         </div>
+        {follow !== null && (() => {
+          const me = view.cars.find((c) => c.idx === follow);
+          if (!me) return null;
+          const ahead = view.cars.find((c) => c.pos === me.pos - 1);
+          const behind = view.cars.find((c) => c.pos === me.pos + 1);
+          const info = cars[me.idx];
+          const cell = "border-ink-800 px-4 py-2 sm:border-l";
+          return (
+            <div className="flex flex-wrap items-stretch border-b border-ink-800 bg-ink-850">
+              <div className="flex items-center gap-3 px-4 py-2">
+                <span className="h-10 w-2 rounded-sm" style={{ background: info.color }} />
+                <span className="font-display text-5xl font-black leading-none text-white">{me.out ? "OUT" : `P${me.pos}`}</span>
+                <span className="font-display text-2xl font-bold text-slate-300">{info.code}</span>
+              </div>
+              <div className={cell}>
+                <div className="kicker">Ahead</div>
+                <div className="font-mono text-xl text-white">{ahead && me.interval !== null ? `${cars[ahead.idx].code} ${fmtGap(me.interval)}` : me.pos === 1 ? "Leading" : "-"}</div>
+              </div>
+              <div className={cell}>
+                <div className="kicker">Behind</div>
+                <div className="font-mono text-xl text-white">{behind && behind.interval !== null ? `${cars[behind.idx].code} ${fmtGap(behind.interval)}` : "-"}</div>
+              </div>
+              <div className={cell}>
+                <div className="kicker">Tyre</div>
+                <div className="font-display text-xl font-bold" style={{ color: COMPOUNDS[me.compound as keyof typeof COMPOUNDS]?.color ?? "#fff" }}>
+                  {COMPOUNDS[me.compound as keyof typeof COMPOUNDS]?.name ?? me.compound}
+                </div>
+              </div>
+              <div className={cell}>
+                <div className="kicker">Stops</div>
+                <div className="font-display text-xl font-bold text-white">{me.pits}</div>
+              </div>
+            </div>
+          );
+        })()}
         <div className="relative">
           <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} />
+          {overlay && <div className="absolute inset-x-0 bottom-0 max-h-full overflow-y-auto p-3 sm:p-4">{overlay}</div>}
         </div>
-        {overlay && <div className="border-t border-ink-800 p-3">{overlay}</div>}
         {!live && <div className="px-3 py-2 border-t border-ink-800">
           <input
             type="range"
@@ -319,7 +354,8 @@ function TrackCanvas({
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth;
-      setSize({ w, h: Math.round(Math.min(620, Math.max(300, w * 0.62))) });
+      const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+      setSize({ w, h: Math.round(Math.max(340, Math.min(vh - 230, w * 0.72, 980))) });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -334,7 +370,7 @@ function TrackCanvas({
     const g = cv.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, size.w, size.h);
-    const pad = 28;
+    const pad = 34;
     const s = Math.min((size.w - pad * 2) / track.w, (size.h - pad * 2) / track.h);
     const ox = (size.w - track.w * s) / 2;
     const oy = (size.h - track.h * s) / 2;
@@ -373,7 +409,7 @@ function TrackCanvas({
     });
     g.closePath();
     g.strokeStyle = "#2a303b";
-    g.lineWidth = Math.max(9, 16 * s * 1.6);
+    g.lineWidth = Math.max(12, 16 * s * 2.1);
     g.stroke();
     g.strokeStyle = "#3a4250";
     g.lineWidth = 1.5;
@@ -435,7 +471,7 @@ function TrackCanvas({
       const b = offset(frac + 0.003, by);
       return Math.atan2(b[1] - a[1], b[0] - a[0]);
     };
-    const carScale = Math.max(0.75, Math.min(1.35, size.w / 620));
+    const carScale = Math.max(0.9, Math.min(2, size.w / 520));
 
     // safety car ahead of the leader
     if (view.flag === "sc" && view.cars[0]) {
@@ -456,7 +492,7 @@ function TrackCanvas({
       let lateral = 0;
       // side by side: nudge cars that sit on top of each other
       const near = drawn.filter((d) => Math.abs(d.f - c.frac) < 0.0035).length;
-      if (near) lateral = (near % 2 ? 1 : -1) * Math.ceil(near / 2) * 9;
+      if (near) lateral = (near % 2 ? 1 : -1) * Math.ceil(near / 2) * 9 * carScale;
       drawn.push({ f: c.frac });
       const by = c.pit ? 26 : lateral;
       const [x, y] = offset(c.frac, by);
@@ -478,10 +514,10 @@ function TrackCanvas({
         g.fillRect(x - 3, y - 14, 6, 4);
       }
       if (c.pos <= 3 || mine || c.pit) {
-        g.font = "700 14px ui-sans-serif, system-ui, sans-serif";
+        g.font = `700 ${Math.round(13 * Math.min(1.5, carScale))}px ui-sans-serif, system-ui, sans-serif`;
         g.fillStyle = mine ? "#ffffff" : "#e2e8f0";
         g.textAlign = "left";
-        g.fillText(`${c.pos} ${info.code}`, x + 11, y - 7);
+        g.fillText(`${c.pos} ${info.code}`, x + 11 * carScale, y - 7 * carScale);
       }
       g.globalAlpha = 1;
     }
