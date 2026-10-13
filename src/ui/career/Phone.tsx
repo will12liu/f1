@@ -1,8 +1,8 @@
 // The phone: your life off the track. A big handset with apps (Messages, Contacts, Bank, Stocks, Crypto, Homes,
 // Garage, Business, Team, Social). Life events arrive in Messages as texts you reply to.
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { careerOf, meOf, type CareerState } from "../../engine/career/career";
-import { BIZ, bizIncome, CARS, doneThisWeek, followers, homePerks, homePrice, HOMES, money, netWorth, priceOf, rentOf, TICKERS, type LifeState, type Market, type Person } from "../../engine/career/life";
+import { BIZ, bizIncome, POST_KINDS, unread, CARS, doneThisWeek, followers, homePerks, homePrice, HOMES, money, netWorth, priceOf, rentOf, TICKERS, type LifeState, type Market, type Person } from "../../engine/career/life";
 import { ITEMS } from "../../engine/career/shop";
 import type { World } from "../../engine/types";
 import { useAct } from "../manager/kit";
@@ -49,7 +49,7 @@ export function Phone({ world, app, setApp }: { world: World; app: AppId; setApp
   const act = useAct();
   const team = world.teams.find((t) => t.id === d.teamId);
   const next = world.calendar[world.results.length];
-  const badge: Partial<Record<AppId, number>> = { messages: c.event ? 1 : 0, contacts: L?.date ? 1 : 0 };
+  const badge: Partial<Record<AppId, number>> = { messages: (c.event ? 1 : 0) + unread(L), contacts: L?.date ? 1 : 0 };
   const title = APPS.find((a) => a.id === app)?.label;
 
   return (
@@ -102,7 +102,7 @@ export function Phone({ world, app, setApp }: { world: World; app: AppId; setApp
           ) : app === "team" ? (
             <Team c={c} act={act} />
           ) : (
-            <Social c={c} L={L} handle={d.last.toLowerCase()} name={`${d.first} ${d.last}`} />
+            <Social world={world} c={c} L={L} handle={d.last.toLowerCase()} name={`${d.first} ${d.last}`} act={act} />
           )}
         </div>
 
@@ -173,6 +173,11 @@ const compact = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3
 
 // ───────── Messages ─────────
 function Messages({ c, L, me, act }: { c: CareerState; L: LifeState; me: string; act: Act }) {
+  const n = unread(L);
+  useEffect(() => {
+    if (n > 0) void act.run("lifeRead");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n]);
   const [open, setOpen] = useState<string | null>(c.event ? (c.event.from ?? "Paddock") : null);
   const threads = new Map<string, { last: string; t: number }>();
   for (const m of L.msgs) threads.set(m.from, { last: m.me ? `You: ${m.text}` : m.text, t: m.t });
@@ -757,7 +762,8 @@ function Team({ c, act }: { c: CareerState; act: Act }) {
 }
 
 // ───────── Social ─────────
-function Social({ c, L, handle, name }: { c: CareerState; L: LifeState; handle: string; name: string }) {
+function Social({ world, c, L, handle, name, act }: { world: World; c: CareerState; L: LifeState; handle: string; name: string; act: Act }) {
+  const posted = doneThisWeek(world, "post");
   return (
     <div>
       <div className="flex items-center gap-4 border-b border-ink-800 px-5 py-5">
@@ -770,6 +776,14 @@ function Social({ c, L, handle, name }: { c: CareerState; L: LifeState; handle: 
           <div className="font-display text-3xl font-black text-white">{compact(followers(c.fame))}</div>
           <div className="text-sm text-slate-400">followers</div>
         </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 border-b border-ink-800 p-4">
+        {POST_KINDS.map((k, i) => (
+          <button key={k} disabled={act.busy || posted} onClick={() => act.run("lifePost", i)} className="rounded-xl bg-pink-800 px-3 py-2.5 text-left font-display text-lg font-bold uppercase text-white hover:bg-pink-700 disabled:opacity-35">
+            Post: {k}
+          </button>
+        ))}
+        {posted && <div className="col-span-2 text-sm text-slate-500">One post a weekend.</div>}
       </div>
       <div className="divide-y divide-ink-800">
         {L.feed.map((p, i) => (

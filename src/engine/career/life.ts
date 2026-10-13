@@ -130,6 +130,7 @@ export interface LifeState {
   feed: Post[];
   ledger: [string, number][]; // last weekend's money in/out
   seq: number;
+  read?: number; // messages read (count of incoming ones)
 }
 
 const wk = (w: World) => w.season * 100 + w.results.length;
@@ -620,6 +621,38 @@ export const money = (x: number) => {
   const s = a >= 1e6 ? `${trim((a / 1e6).toFixed(2))}M` : a >= 1e3 ? `${trim((a / 1e3).toFixed(a >= 1e5 ? 0 : 1))}K` : `${Math.round(a)}`;
   return `${x < 0 ? "-" : ""}$${s}`;
 };
+
+export const unread = (L: LifeState | undefined | null) => (L ? Math.max(0, L.msgs.filter((m) => !m.me).length - (L.read ?? 0)) : 0);
+export function lifeRead(w: World): Ans {
+  const L = ensureLife(w);
+  if (L) L.read = L.msgs.filter((m) => !m.me).length;
+  return { ok: true, msg: "" };
+}
+
+const POSTS: [string, string][] = [
+  ["Training photo", "Leg day. Again."],
+  ["Behind the scenes", "Seat fitting this morning. Feels like home"],
+  ["Thank the team", "Proud of this team. Every single one of them"],
+  ["Hype the next race", "Next one. Let's go"],
+];
+export const POST_KINDS = POSTS.map((p) => p[0]);
+/** Post on social (once a weekend): a little fame; now and then it lands badly. */
+export function lifePost(w: World, kind: number): Ans {
+  const c = careerOf(w);
+  const d = meOf(w);
+  const L = ensureLife(w);
+  if (!c || !d || !L || !POSTS[kind]) return no("");
+  if (doneThisWeek(w, "post")) return no("You've posted this weekend.");
+  const t = wk(w);
+  L.done.post = t;
+  const r = lrng(w, `post:${kind}`);
+  const flop = r.chance(0.12);
+  c.fame = clamp(c.fame + (flop ? -0.5 : 0.6 + r.next() * 0.6));
+  if (kind === 2) c.trust = clamp(c.trust + 1);
+  post(L, `@${d.last.toLowerCase()}`, POSTS[kind][1], t, followers(c.fame) * (flop ? 0.002 : 0.006 + r.next() * 0.01));
+  if (flop) post(L, `@${r.pick(["grumpyfan", "realracingonly", "boxboxbox"])}${r.int(1, 99)}`, `Maybe less posting and more driving, ${d.first}`, t, followers(c.fame) * 0.004);
+  return flop ? no("That one didn't land. A few fans told you to focus on driving.") : { ok: true, msg: "Posted. The fans liked it." };
+}
 
 /** Record an answered life event in the phone's message thread. */
 export function lifeLogEvent(w: World, from: string, text: string, reply: string, outcome: string) {

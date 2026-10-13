@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Ceremonies } from "./components/Ceremony";
 import { useGame } from "../state/game";
+import { unread } from "../engine/career/life";
 
 const NAV = [
   ["", "Home"],
@@ -100,17 +101,17 @@ export function GameLayout() {
       {!loc.pathname.endsWith("/live") && <Ceremonies world={world} saveId={meta.id} />}
       {world.careerState && !loc.pathname.endsWith("/live") && !loc.pathname.endsWith("/life") && (
         <NavLink
-          to={`${base}/life${world.careerState.event ? "?app=messages" : ""}`}
+          to={`${base}/life${world.careerState.event || unread(world.careerState.life) ? "?app=messages" : ""}`}
           className="fixed bottom-5 right-5 z-30 flex items-center gap-3 rounded-[1.4rem] border-2 border-ink-600 bg-black py-2 pl-2 pr-5 hover:border-slate-400"
           title="Your phone"
         >
           <span className="relative grid h-14 w-9 place-items-center rounded-lg border-2 border-slate-500 bg-ink-900">
             <span className="absolute top-1 h-1 w-3 rounded-full bg-slate-500" />
-            {world.careerState.event && <span className="absolute -right-2.5 -top-2.5 grid h-6 w-6 place-items-center rounded-full bg-race text-sm font-bold text-white">1</span>}
+            {(world.careerState.event ? 1 : 0) + unread(world.careerState.life) > 0 && <span className="absolute -right-2.5 -top-2.5 grid h-6 min-w-6 place-items-center rounded-full bg-race px-1 text-sm font-bold text-white">{(world.careerState.event ? 1 : 0) + unread(world.careerState.life)}</span>}
           </span>
           <span className="max-w-56">
             <span className="block font-display text-xl font-black uppercase leading-none text-white">Phone</span>
-            <span className="block truncate text-sm text-slate-400">{world.careerState.event ? `${world.careerState.event.from ?? "New message"}: ${world.careerState.event.text}` : "Money, homes, people"}</span>
+            <span className="block truncate text-sm text-slate-400">{world.careerState.event ? `${world.careerState.event.from ?? "New message"}: ${world.careerState.event.text}` : unread(world.careerState.life) ? `${unread(world.careerState.life)} new message${unread(world.careerState.life) > 1 ? "s" : ""}` : "Money, homes, people"}</span>
           </span>
         </NavLink>
       )}
