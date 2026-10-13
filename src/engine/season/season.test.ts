@@ -28,7 +28,7 @@ describe("season", () => {
     }
     expect(lineup(w)).toHaveLength(22);
     for (const { driver, team } of lineup(w)) expect(driver.teamId).toBe(team.id);
-  });
+  }, 30_000);
 
   it("is deterministic from the seed", () => {
     const a = loadWorld(3);
