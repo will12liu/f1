@@ -87,7 +87,7 @@ export function prepareNextRound(w: World, plan?: WeekendPlan): PreparedRound | 
       car: carPace(team.car, circuit),
       r: fx[i] ? fx[i]!.quali(driver.ratings) : driver.ratings,
       form: form[i],
-      plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late } : undefined,
+      plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late, laps: plan[driver.id].laps } : undefined,
     })),
   );
   const gridPos = new Map(quali.map((q) => [q.driverId, q.pos]));

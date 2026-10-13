@@ -52,7 +52,7 @@ export function juniorInput(w: World, series: Junior, round: number, circuit: Ci
       car: car(team),
       r: fx(driver.id)?.quali(driver.ratings) ?? driver.ratings,
       form: (moraleForm(w, driver.id) || 0) + (fx(driver.id)?.form ?? 0) || undefined,
-      plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late } : undefined,
+      plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late, laps: plan[driver.id].laps } : undefined,
     })),
   );
   const grid = new Map(q.map((x) => [x.driverId, x.pos]));

@@ -16,6 +16,7 @@ export interface CarPlan {
   setup: number; // 0 = low downforce, 1 = high
   risk: [number, number, number]; // per session: 1 = safe, 2 = normal, 3 = all in
   late: [boolean, boolean, boolean]; // go out at the end of the session
+  laps?: (number | null)[]; // the qualifying-lap mini-game per session (0-1; null = not driven)
 }
 export type WeekendPlan = Record<string, CarPlan>; // by driver id
 

@@ -10,7 +10,7 @@ export interface QualiEntry {
   car: number;
   r: DriverRatings;
   form?: number;
-  plan?: { risk: number[]; late: boolean[] }; // the player's qualifying calls (AI: none)
+  plan?: { risk: number[]; late: boolean[]; laps?: (number | null)[] }; // the player's qualifying calls (AI: none); laps: the lap mini-game per session (0-1)
 }
 
 export interface QualiRow {
@@ -28,6 +28,7 @@ export const QUALI = {
   scrappy: 0.035,
   noTime: 0.006, // crash / track limits deleted lap in a session
   tow: 0.08, // luck of the tow / traffic
+  lapSkill: 0.5, // the lap mini-game: seconds per point of score around 0.55 (perfect -0.23s, a mess +0.28s)
 };
 
 export function qualify(seed: number, circuit: CircuitDef, entries: QualiEntry[]): QualiRow[] {
@@ -46,7 +47,10 @@ export function qualify(seed: number, circuit: CircuitDef, entries: QualiEntry[]
     if (e.plan) t += (2 - risk) * 0.13 - (late ? 0.12 : 0);
     t += rng.normal(0, QUALI.sd + (100 - e.r.consistency) * QUALI.sdPerPoint);
     t += rng.normal(0, QUALI.tow);
-    if (rng.chance(QUALI.scrappy * (1 + (100 - e.r.consistency) / 25) * riskMult)) t += 0.3 + rng.next() * 1.2;
+    const lq = e.plan?.laps?.[s];
+    if (lq !== undefined && lq !== null) t -= (Math.max(0, Math.min(1, lq)) - 0.55) * QUALI.lapSkill;
+    const lapMult = lq === undefined || lq === null ? 1 : lq >= 0.85 ? 0.4 : lq < 0.3 ? 2 : 1;
+    if (rng.chance(QUALI.scrappy * (1 + (100 - e.r.consistency) / 25) * riskMult * lapMult)) t += 0.3 + rng.next() * 1.2;
     return t;
   };
   const rows: QualiRow[] = entries.map((e) => ({ driverId: e.driverId, teamId: e.teamId, pos: 0, q: [null, null, null], out: 1 }));

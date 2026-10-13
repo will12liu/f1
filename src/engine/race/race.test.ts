@@ -86,6 +86,17 @@ describe("race engine", () => {
     expect(q.slice(16).every((x) => x.out === 1)).toBe(true);
   });
 
+  it("the qualifying-lap mini-game moves only that driver's laps", () => {
+    const entries = (laps?: number[]) =>
+      field.map(({ team, driver }, i) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings, ...(i === 12 && laps ? { plan: { risk: [2, 2, 2], late: [false, false, false], laps } } : {}) }));
+    const good = qualify(9, circuit, entries([1, 1, 1]));
+    const bad = qualify(9, circuit, entries([0, 0, 0]));
+    const id = field[12].driver.id;
+    const q1 = (rows: typeof good, d: string) => rows.find((x) => x.driverId === d)!.q[0];
+    expect(q1(good, id)!).toBeLessThan(q1(bad, id)! - 0.4);
+    expect(q1(good, field[3].driver.id)).toBe(q1(bad, field[3].driver.id));
+  });
+
   it("the replay's final timing order matches the classification", () => {
     const { result, state } = simRace(input(77));
     const replay: Replay = {

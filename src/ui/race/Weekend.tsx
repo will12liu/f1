@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { PROGRAMS, setupEstimate, type CarPlan, type Program } from "../../engine/race/weekend";
 import type { CircuitDef } from "../../engine/types";
+import { QualiLap } from "./QualiLap";
 
 const SESSIONS = ["Q1", "Q2", "Q3"];
 const RISK: [string, string][] = [
@@ -28,11 +29,23 @@ export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { se
   const [setup, setSetup] = useState(0.5);
   const [risk, setRisk] = useState<[number, number, number]>([2, 2, 2]);
   const [late, setLate] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const [laps, setLaps] = useState<(number | null)[]>([null, null, null]);
+  const [driving, setDriving] = useState<number | null>(null); // the lap mini-game for this session
   const est = program ? setupEstimate(seed, circuit, driverId, program, engineer) : null;
   const pct = (x: number) => Math.round(x * 100);
 
   return (
     <div className="grid gap-6">
+      {driving !== null && (
+        <QualiLap
+          session={SESSIONS[driving]}
+          onQuit={() => setDriving(null)}
+          onDone={(q) => {
+            setLaps((x) => x.map((v, k) => (k === driving ? q : v)));
+            setDriving(null);
+          }}
+        />
+      )}
       <Step n={1} title="Practice" done={!!program}>
         <p className="text-lg text-slate-400">What do you work on in the practice sessions?</p>
         <div className="grid gap-3 md:grid-cols-3">
@@ -77,7 +90,7 @@ export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { se
         <Step n={3} title="Qualifying" done>
           <div className="grid gap-3">
             {SESSIONS.map((s, i) => (
-              <div key={s} className="grid grid-cols-[56px_1fr] items-stretch gap-3 sm:grid-cols-[56px_1fr_150px]">
+              <div key={s} className="grid grid-cols-[56px_1fr] items-stretch gap-3 sm:grid-cols-[56px_1fr_150px_170px]">
                 <span className="flex items-center font-display text-3xl font-black text-slate-400">{s}</span>
                 <div className="grid grid-cols-3 gap-2">
                   {RISK.map(([label, sub], r) => (
@@ -98,6 +111,10 @@ export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { se
                   <div className="font-display text-xl font-bold uppercase leading-tight">{late[i] ? "Late run" : "Early run"}</div>
                   <div className={`text-sm ${late[i] ? "text-ink-700" : "text-slate-500"}`}>{late[i] ? "Fast track, traffic" : "Clear track"}</div>
                 </button>
+                <button onClick={() => laps[i] === null && setDriving(i)} disabled={laps[i] !== null} className={`rounded-lg px-4 py-3 text-left max-sm:col-start-2 ${laps[i] !== null ? "bg-emerald-400 text-ink-950" : "border-2 border-race bg-ink-900 text-white hover:bg-ink-800"}`}>
+                  <div className="font-display text-xl font-bold uppercase leading-tight">{laps[i] !== null ? `Lap ${Math.round(laps[i]! * 100)}%` : "Drive the lap"}</div>
+                  <div className={`text-sm ${laps[i] !== null ? "text-ink-800" : "text-slate-400"}`}>{laps[i] !== null ? "Driven: one try per session" : "Or leave it to instinct"}</div>
+                </button>
               </div>
             ))}
           </div>
@@ -106,7 +123,7 @@ export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { se
       )}
 
       <div>
-        <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={!est || busy} onClick={() => onRun({ program: program!, setup, risk, late })}>
+        <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={!est || busy} onClick={() => onRun({ program: program!, setup, risk, late, laps })}>
           Run qualifying ›
         </button>
       </div>
