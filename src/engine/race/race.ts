@@ -38,6 +38,7 @@ export interface RaceInput {
   choices?: MomentChoice[]; // answers to moments (replay); when set, the race never waits for an answer
   reads?: Reads; // what the player knows of other drivers' habits
   duelEdge?: number; // difficulty: log-odds added to the player's side in duels
+  launch?: Record<number, number>; // the player's start (reaction mini-game) by car index: 0-1, below 0 = jumped the start
 }
 
 export type Flag = "green" | "sc" | "vsc" | "red";
@@ -254,7 +255,9 @@ export function createRace(input: RaceInput): RaceRunner {
     car.compound = p.stints[0].c;
     car.used = [car.compound];
     car.stints = [{ c: car.compound, from: 1, to: laps }];
-    const launch = (car.e.r.starts - 75) * 0.012 + rng.normal(0, RACE.launchSd);
+    let launch = (car.e.r.starts - 75) * 0.012 + rng.normal(0, RACE.launchSd);
+    const lq = input.launch?.[car.idx];
+    if (lq !== undefined) launch += lq < 0 ? 0.15 : (Math.min(1, lq) - 0.5) * RACE.launchSkill; // same draws, so the AI's starts don't move
     car.cum = (car.e.grid - 1) * RACE.gridGap - launch;
   }
 
@@ -285,7 +288,10 @@ export function createRace(input: RaceInput): RaceRunner {
   const ev = (e: RaceEvent) => state.events.push(e);
   for (const car of cars) car.prone = rng.chance(RACE.limitsProne) ? 8 : 0.45;
   // jump starts (the transponder sees it; five seconds)
-  for (const car of cars) if (rng.chance(RACE.jumpStart * (0.5 + car.e.r.aggression / 100))) penalise(car, "5s", "jump start", 1, 0, 0);
+  for (const car of cars) {
+    const jumped = rng.chance(RACE.jumpStart * (0.5 + car.e.r.aggression / 100));
+    if (jumped || (input.launch?.[car.idx] ?? 0) < 0) penalise(car, "5s", "jump start", 1, 0, 0);
+  }
 
   function retire(car: CarState, why: DnfReason, lap: number, t: number) {
     if (car.out) return;

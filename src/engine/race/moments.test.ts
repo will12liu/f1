@@ -62,6 +62,15 @@ describe("key moments", () => {
     expect(rate(1)).toBeGreaterThan(rate(0) + 0.1);
   }, 30_000);
 
+  it("the start mini-game: a jump start is penalised, a good launch beats a slow one, and only that car's launch moves", () => {
+    const jump = simRace(input(24, { launch: { 9: -1 } }));
+    expect(jump.result.rows.find((r) => r.idx === 9)!.pens.join(" ")).toContain("jump");
+    const good = createRace(input(24, { launch: { 9: 1 } }));
+    const slow = createRace(input(24, { launch: { 9: 0 } }));
+    expect(good.state.cars[9].cum).toBeLessThan(slow.state.cars[9].cum);
+    expect(good.state.cars[3].cum).toBe(slow.state.cars[3].cum);
+  });
+
   it("answering every moment with instinct gives exactly the race nobody played", () => {
     const { r } = play(22, [5], () => "auto");
     const plain = simRace(input(22));

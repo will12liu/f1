@@ -53,7 +53,10 @@ Also done on 2026-10-13: Phase 7 (practice programmes, setup vs a hidden ideal, 
 
 Also on 2026-10-13 (UI pass): full-screen start menu with a panel per mode, full-screen new-game page, bigger type everywhere, hub home screens (next-race banner, stat strip, big tiles) for career, team principal and sandbox. Inner pages (training, R&D, people, standings...) still use the older, denser layout.
 
+Later on 2026-10-13: NBA-style career creator (helmet, number, step by step), team creator in steps, big race weekend, big inner pages (training, deals, life, calendar cards, standings, drivers, teams, history, results, manager pages, driver page), bigger race viewer, race debrief and season-end screens. Mini-games: duel moves executed through a braking-zone bar, a lights-out reaction start for your car, and simulator sessions in Training (hot lap, reaction test). Fixed: the difficulty duel edge wasn't passed to the saved replay.
+
 ## Next
+- More mini-games if wanted: qualifying lap (sector-by-sector braking), pit-stop timing for the principal, tyre-saving hold-the-needle.
 - Big-menu pass over the inner pages (Training, Deals, Life, R&D, People, Finance, Standings), and the live race pre-race screen.
 - Phase 12 optional layers (investing, property, relationships, casino) if wanted.
 - Phase 13: tutorial hints for dials/duels/weekend, a phone-width pass over the new pages, accessibility.

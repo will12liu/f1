@@ -4,9 +4,8 @@ import { create } from "zustand";
 import { readSave, writeSave, type SaveMeta } from "../db/db";
 import type { WorkerApi } from "../engine/worker";
 import type { Command } from "../engine/race/dials";
-import type { MomentChoice } from "../engine/race/moments";
 import type { WeekendPlan } from "../engine/race/weekend";
-import type { PreparedRound } from "../engine/season/season";
+import type { LiveAnswers, PreparedRound } from "../engine/season/season";
 import type * as Actions from "../engine/manager/actions";
 import type * as Academy from "../engine/manager/academy";
 import type * as Career from "../engine/career/career";
@@ -39,7 +38,7 @@ interface GameState {
   /** Qualifying and the race input for the next round, to drive it live. */
   prepareLive(plan?: WeekendPlan): Promise<PreparedRound | null>;
   /** Saves the live race (replayed from its commands, so it comes out the same). */
-  commitLive(commands: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: import("../engine/season/juniors").JuniorLive, plan?: WeekendPlan): Promise<number | null>;
+  commitLive(commands: Command[], live?: LiveAnswers, junior?: import("../engine/season/juniors").JuniorLive, plan?: WeekendPlan): Promise<number | null>;
 }
 
 async function persist(meta: SaveMeta, world: World) {

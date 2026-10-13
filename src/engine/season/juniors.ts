@@ -81,6 +81,8 @@ export interface JuniorLive {
   focus: number[];
   moments: "off" | "key" | "all";
   plan?: WeekendPlan;
+  duelEdge?: number;
+  launch?: Record<number, number>;
 }
 
 /** Run this round's junior races (if any). `live` replays the one the player drove. */
@@ -91,7 +93,7 @@ export function simJuniorRound(w: World, round: number, circuit: Circuit, live?:
     const input = juniorInput(w, series, round, circuit, live?.series === series ? live.plan : undefined);
     if (input.entries.length < 6) continue;
     const l = live?.series === series ? live : undefined;
-    const { result, state } = simRace(l ? { ...input, commands: l.commands, choices: l.choices, focus: l.focus, moments: l.moments, reads: w.reads } : input);
+    const { result, state } = simRace(l ? { ...input, commands: l.commands, choices: l.choices, focus: l.focus, moments: l.moments, reads: w.reads, duelEdge: l.duelEdge, launch: l.launch } : input);
     for (const x of state.seen) {
       const r = ((w.reads ??= {})[x.driverId] ??= { def: {}, att: {} });
       r[x.role][x.move] = (r[x.role][x.move] ?? 0) + 1;

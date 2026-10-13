@@ -111,7 +111,16 @@ export function prepareNextRound(w: World, plan?: WeekendPlan): PreparedRound | 
 
 /** Qualifying + race for the next round. Records the summary and the replay on the world.
  *  `commands` replays a race the player drove live (same input + same commands = same race). */
-export function simNextRound(w: World, commands?: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: JuniorLive, plan?: WeekendPlan): RaceSummary | null {
+/** What the player did in a live race, to replay it exactly: moment answers, focus cars, difficulty edge, start. */
+export interface LiveAnswers {
+  choices: MomentChoice[];
+  focus: number[];
+  moments: "off" | "key" | "all";
+  duelEdge?: number;
+  launch?: Record<number, number>;
+}
+
+export function simNextRound(w: World, commands?: Command[], live?: LiveAnswers, junior?: JuniorLive, plan?: WeekendPlan): RaceSummary | null {
   const prep = prepareNextRound(w, plan);
   if (!prep) return null;
   const { quali, input } = prep;
@@ -119,7 +128,7 @@ export function simNextRound(w: World, commands?: Command[], live?: { choices: M
   const circuit = circuitOf(w, input.circuit.id);
   const seed = input.seed;
   const entries = input.entries;
-  const { result, state } = simRace({ ...input, commands, ...(live ? { choices: live.choices, focus: live.focus, moments: live.moments, reads: w.reads } : {}) });
+  const { result, state } = simRace({ ...input, commands, ...(live ? { choices: live.choices, focus: live.focus, moments: live.moments, reads: w.reads, duelEdge: live.duelEdge, launch: live.launch } : {}) });
   // what the player learned of other drivers' habits
   for (const x of state.seen) {
     const r = ((w.reads ??= {})[x.driverId] ??= { def: {}, att: {} });

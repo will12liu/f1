@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BrakeBar, verdict, verdictColor, type BrakeZone } from "../race/BrakeBar";
 
-function Shell({ title, onQuit, children }: { title: string; onQuit: () => void; children: ReactNode }) {
+function Shell({ title, onQuit, children, kicker = "Simulator" }: { title: string; onQuit: () => void; children: ReactNode; kicker?: string }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink-950">
       <div className="mx-auto flex min-h-full max-w-4xl flex-col px-6 py-8 sm:px-10">
         <div className="flex items-center justify-between">
-          <div className="kicker">Simulator</div>
+          <div className="kicker">{kicker}</div>
           <button className="text-lg text-slate-400 hover:text-white" onClick={onQuit}>
             Quit
           </button>
@@ -73,7 +73,7 @@ export function HotLap({ onDone, onQuit }: { onDone: (score: number) => void; on
 /** Reaction: five red lights come on one by one, then go out after a random wait. Go before = jump start. */
 export const reactionScore = (ms: number) => Math.max(0, Math.min(1, (420 - ms) / 240));
 
-export function Reaction({ onDone, onQuit }: { onDone: (score: number) => void; onQuit: () => void }) {
+export function Reaction({ onDone, onQuit, kicker, cta = "Save the session ›", intro }: { onDone: (score: number, jumped: boolean) => void; onQuit: () => void; kicker?: string; cta?: string; intro?: string }) {
   const [lit, setLit] = useState(0);
   const [phase, setPhase] = useState<"ready" | "lights" | "out" | "done" | "jump">("ready");
   const [ms, setMs] = useState(0);
@@ -118,7 +118,7 @@ export function Reaction({ onDone, onQuit }: { onDone: (score: number) => void; 
   });
   const score = phase === "done" ? reactionScore(ms) : 0;
   return (
-    <Shell title="Lights out" onQuit={onQuit}>
+    <Shell title="Lights out" onQuit={onQuit} kicker={kicker}>
       <div className="select-none" onPointerDown={phase === "lights" || phase === "out" ? go : undefined} style={{ touchAction: "manipulation" }}>
         <div className="grid grid-cols-5 gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
           {[1, 2, 3, 4, 5].map((k) => (
@@ -132,7 +132,7 @@ export function Reaction({ onDone, onQuit }: { onDone: (score: number) => void; 
         <div className="mt-8 min-h-40">
           {phase === "ready" && (
             <>
-              <p className="text-xl text-slate-300">Five red lights. When they all go out, go: Space or tap. Go early and it's a jump start.</p>
+              <p className="text-xl text-slate-300">{intro ?? "Five red lights. When they all go out, go: Space or tap. Go early and it's a jump start."}</p>
               <button autoFocus className="btn-xl mt-6 bg-race text-white hover:bg-red-500" onClick={start}>
                 Start ›
               </button>
@@ -142,10 +142,10 @@ export function Reaction({ onDone, onQuit }: { onDone: (score: number) => void; 
           {phase === "jump" && (
             <>
               <div className="font-display text-7xl font-black uppercase text-rose-400">Jump start</div>
-              <p className="mt-3 text-lg text-slate-400">No time this week. The minimum XP still counts.</p>
+              {!intro && <p className="mt-3 text-lg text-slate-400">No time this week. The minimum XP still counts.</p>}
               <div className="mt-6">
-                <button autoFocus className="btn-xl bg-ink-800 text-white hover:bg-ink-700" onClick={() => onDone(0)}>
-                  Save the session ›
+                <button autoFocus className="btn-xl bg-ink-800 text-white hover:bg-ink-700" onClick={() => onDone(0, true)}>
+                  {cta}
                 </button>
               </div>
             </>
@@ -158,8 +158,8 @@ export function Reaction({ onDone, onQuit }: { onDone: (score: number) => void; 
                 <span className="text-4xl"> ms</span>
               </div>
               <div className="mt-6">
-                <button autoFocus className="btn-xl bg-race text-white hover:bg-red-500" onClick={() => onDone(score)}>
-                  Save the session ›
+                <button autoFocus className="btn-xl bg-race text-white hover:bg-red-500" onClick={() => onDone(score, false)}>
+                  {cta}
                 </button>
               </div>
             </>

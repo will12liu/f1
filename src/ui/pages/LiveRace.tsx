@@ -18,6 +18,7 @@ import type { Replay } from "../../engine/types";
 import { useGame } from "../../state/game";
 import { PitWall } from "../race/PitWall";
 import { MomentCard } from "../race/MomentCard";
+import { Reaction } from "../career/SimGames";
 import type { PendingMoment } from "../../engine/race/moments";
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
 import { TeamBar, TrackOutline, useMaps } from "../components/bits";
@@ -108,14 +109,15 @@ export function LiveRace() {
   const chosen = career ? entries.findIndex((e) => e.driverId === meId) : myTeamId ? (mine[0] ?? -1) : entries.findIndex((e) => e.driverId === pick);
   const season = world?.season ?? 0;
 
-  const start = () => {
+  const [startGame, setStartGame] = useState(false);
+  const start = (launch?: Record<number, number>) => {
     if (!prep || chosen < 0) return;
     try {
       localStorage.setItem(MOMENTS_KEY, mode);
     } catch {
       /* private mode */
     }
-    const r = createRace({ ...prep.input, focus, moments: mode, reads: world?.reads, duelEdge: career ? DIFFICULTY[career.difficulty].duel : undefined });
+    const r = createRace({ ...prep.input, focus, moments: mode, reads: world?.reads, duelEdge: career ? DIFFICULTY[career.difficulty].duel : undefined, launch });
     runnerRef.current = r;
     setRunner(r);
     setReplay(snapshot(r, prep, season));
@@ -249,7 +251,16 @@ export function LiveRace() {
           </div>
         </div>
         <div>
-          <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={chosen < 0} onClick={start}>
+          {startGame && (
+            <Reaction
+              kicker={`${circuit.gp} · the start`}
+              cta="Race ›"
+              intro="Five red lights. When they go out, launch: Space or tap. A great start gains places; jump it and it's five seconds."
+              onQuit={() => (setStartGame(false), start())}
+              onDone={(q, jumped) => (setStartGame(false), start({ [chosen]: jumped ? -1 : q }))}
+            />
+          )}
+          <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={chosen < 0} onClick={() => (career ? setStartGame(true) : start())}>
             Lights out{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""} ›
           </button>
         </div>
@@ -292,7 +303,7 @@ export function LiveRace() {
               className="btn-xl bg-race !py-3 !text-xl text-white hover:bg-red-500"
               disabled={!!busy}
               onClick={async () => {
-                const live = { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off" };
+                const live = { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off", duelEdge: runner.input.duelEdge, launch: runner.input.launch };
                 if (prep.series) {
                   await commitLive([], undefined, { series: prep.series, commands: runner.state.commands, ...live, plan: plan ?? undefined });
                   nav(base);

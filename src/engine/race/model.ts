@@ -25,6 +25,7 @@ export const RACE = {
   startLoss: 2.6, // standing start
   gridGap: 0.22, // grid slot spacing at the start
   launchSd: 0.2,
+  launchSkill: 0.5, // the player's reaction start: a perfect launch gains 0.25s, a slow one loses 0.25s
   slowStop: 0.035,
   scLapFactor: 1.38,
   vscLapFactor: 1.3,
