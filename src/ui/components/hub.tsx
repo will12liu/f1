@@ -87,3 +87,47 @@ export function HubButton({ children, onClick, disabled }: { children: ReactNode
     </button>
   );
 }
+
+/** The top of an inner page: kicker, big title, a line of text, and anything on the right (stats, buttons). */
+export function PageHead({ kicker, title, text, right }: { kicker?: string; title: string; text?: ReactNode; right?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end gap-6">
+      <div className="min-w-0 flex-1">
+        {kicker && <div className="kicker">{kicker}</div>}
+        <h1 className="headline mt-2 text-5xl sm:text-6xl">{title}</h1>
+        {text && <p className="mt-3 max-w-3xl text-lg text-slate-400">{text}</p>}
+      </div>
+      {right && <div className="flex flex-wrap items-end gap-4">{right}</div>}
+    </div>
+  );
+}
+
+/** A big number with a label, for page headers. */
+export function HeadStat({ label, value, tone }: { label: string; value: ReactNode; tone?: "good" | "bad" }) {
+  return (
+    <div className="text-right">
+      <div className="kicker">{label}</div>
+      <div className={`font-display text-5xl font-black leading-none ${tone === "good" ? "text-emerald-300" : tone === "bad" ? "text-rose-300" : "text-white"}`}>{value}</div>
+    </div>
+  );
+}
+
+/** A big card for lists of things you act on (offers, items, people). */
+export function Card({ title, sub, tag, children, dim }: { title: ReactNode; sub?: ReactNode; tag?: ReactNode; children?: ReactNode; dim?: boolean }) {
+  return (
+    <div className={`flex flex-col gap-4 rounded-lg border border-ink-700 bg-ink-900 p-6 ${dim ? "opacity-50" : ""}`}>
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="font-display text-3xl font-extrabold uppercase leading-none text-white">{title}</div>
+          {tag}
+        </div>
+        {sub && <div className="mt-2 text-base text-slate-400">{sub}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export const bigBtn = "rounded-lg px-5 py-3 font-display text-lg font-bold uppercase tracking-wide disabled:opacity-40";
+export const bigRed = `${bigBtn} bg-race text-white hover:bg-red-500`;
+export const bigGhost = `${bigBtn} border border-ink-600 bg-ink-800 text-slate-100 hover:border-slate-300 hover:bg-ink-700`;

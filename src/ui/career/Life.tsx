@@ -3,11 +3,10 @@ import { careerOf } from "../../engine/career/career";
 import { ITEMS } from "../../engine/career/shop";
 import { fmtM } from "../../engine/manager/state";
 import { useGame } from "../../state/game";
-import { Section } from "../components/bits";
+import { bigGhost, bigRed, Card, HeadStat, PageHead } from "../components/hub";
 import { Answer, useAct } from "../manager/kit";
 
-const perkText = (p: { xp?: number; morale?: number; fame?: number }) =>
-  [p.xp ? `+${p.xp} XP` : "", p.morale ? `+${p.morale} morale` : "", p.fame ? `+${p.fame} fame` : ""].filter(Boolean).join(", ") + " a weekend";
+const perks = (p: { xp?: number; morale?: number; fame?: number }) => [p.xp ? `+${p.xp} XP` : "", p.morale ? `+${p.morale} morale` : "", p.fame ? `+${p.fame} fame` : ""].filter(Boolean);
 
 export function Life() {
   const world = useGame((s) => s.world);
@@ -16,37 +15,58 @@ export function Life() {
   const c = careerOf(world);
   if (!c) return null;
   const owned = new Set(c.owned ?? []);
+  const items = [...ITEMS].sort((a, b) => Number(owned.has(b.id)) - Number(owned.has(a.id)));
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-8">
+      <PageHead
+        title="Paddock life"
+        text="People and things that help every weekend. Each has a yearly upkeep; some need fame first."
+        right={
+          <>
+            <HeadStat label="Bank" value={fmtM(c.cash)} tone={c.cash < 0 ? "bad" : undefined} />
+            <HeadStat label="Morale" value={Math.round(c.morale ?? 60)} />
+            <HeadStat label="Fame" value={Math.round(c.fame)} />
+          </>
+        }
+      />
       <Answer a={answer} />
-      <Section title="Paddock life" right={<span className="text-xs text-slate-400">bank {fmtM(c.cash)} · fame {Math.round(c.fame)}</span>}>
-        <div className="divide-y divide-ink-800 text-sm">
-          {ITEMS.map((it) => {
-            const have = owned.has(it.id);
-            const locked = !!it.needs && c.fame < it.needs;
-            return (
-              <div key={it.id} className={`flex flex-wrap items-center gap-3 px-4 py-2.5 ${locked ? "opacity-50" : ""}`}>
-                <div className="flex-1">
-                  <div className="font-semibold">{it.name}</div>
-                  <div className="text-xs text-slate-400">
-                    {it.blurb} {perkText(it.perks)} · {it.price ? `${fmtM(it.price)}, ` : ""}
-                    {fmtM(it.upkeep)} a season{locked ? ` · needs fame ${it.needs}` : ""}
-                  </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {items.map((it) => {
+          const have = owned.has(it.id);
+          const locked = !!it.needs && c.fame < it.needs;
+          return (
+            <Card key={it.id} title={it.name} sub={it.blurb} dim={locked} tag={have ? <span className="rounded-md bg-emerald-400 px-2 py-0.5 font-display text-base font-bold uppercase text-ink-950">Yours</span> : undefined}>
+              <div className="flex flex-wrap gap-2">
+                {perks(it.perks).map((p) => (
+                  <span key={p} className="rounded-md bg-sky-500/15 px-2.5 py-1 text-base font-semibold text-sky-300">
+                    {p}
+                  </span>
+                ))}
+                <span className="px-1 py-1 text-base text-slate-500">a weekend</span>
+              </div>
+              <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
+                <div className="text-base text-slate-300">
+                  {it.price ? <b className="font-display text-2xl text-white">{fmtM(it.price)}</b> : null}
+                  <span className="text-slate-400">
+                    {it.price ? " + " : ""}
+                    {fmtM(it.upkeep)} a season
+                  </span>
+                  {locked && <div className="text-sm text-amber-300">Needs fame {it.needs}</div>}
                 </div>
                 {have ? (
-                  <button className="text-xs text-slate-400 hover:text-rose-300" disabled={busy} onClick={() => run("sellItem", it.id)}>
+                  <button className={bigGhost} disabled={busy} onClick={() => run("sellItem", it.id)}>
                     {it.price ? "Sell" : "Stop"}
                   </button>
                 ) : (
-                  <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={busy || locked} onClick={() => run("buyItem", it.id)}>
+                  <button className={bigRed} disabled={busy || locked} onClick={() => run("buyItem", it.id)}>
                     {it.price ? "Buy" : "Hire"}
                   </button>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </Section>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

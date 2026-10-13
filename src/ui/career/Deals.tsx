@@ -2,7 +2,7 @@
 import { careerOf } from "../../engine/career/career";
 import { fmtM } from "../../engine/manager/state";
 import { useGame } from "../../state/game";
-import { Section } from "../components/bits";
+import { bigGhost, bigRed, Card, HeadStat, PageHead } from "../components/hub";
 import { Answer, useAct } from "../manager/kit";
 
 export function Deals() {
@@ -12,42 +12,50 @@ export function Deals() {
   const c = careerOf(world);
   if (!c) return null;
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-8">
+      <PageHead
+        title="Deals"
+        text="Brands follow fame. Win, get on the podium and get noticed, and the offers get bigger."
+        right={
+          <>
+            <HeadStat label="Fame" value={Math.round(c.fame)} />
+            <HeadStat label="A season" value={fmtM(c.deals.reduce((s, x) => s + x.pay, 0))} />
+          </>
+        }
+      />
       <Answer a={answer} />
-      <Section title="Offers" right={<span className="text-xs text-slate-400">fame {Math.round(c.fame)}: more fame, bigger offers</span>}>
-        <div className="divide-y divide-ink-800 text-sm">
-          {c.dealOffers.length === 0 && <div className="p-4 text-slate-500">No offers. Win races, get on the podium, and brands will call.</div>}
+      <section className="grid gap-3">
+        <h2 className="kicker">Offers</h2>
+        {c.dealOffers.length === 0 && <div className="rounded-lg border border-ink-700 bg-ink-900 p-6 text-lg text-slate-400">No offers right now.</div>}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {c.dealOffers.map((o) => (
-            <div key={o.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-              <div className="flex-1">
-                <div className="font-semibold">{o.brand}</div>
-                <div className="text-xs text-slate-400">
-                  {o.sector} · {fmtM(o.pay)} a season for {o.years} year{o.years > 1 ? "s" : ""} · open until round {o.expires}
-                </div>
+            <Card key={o.id} title={o.brand} sub={`${o.sector} · open until round ${o.expires}`}>
+              <div className="font-display text-4xl font-black text-white">
+                {fmtM(o.pay)} <span className="text-xl text-slate-400">a season · {o.years} yr</span>
               </div>
-              <button className="btn-primary !px-2.5 !py-1 text-xs" disabled={busy} onClick={() => run("signDeal", o.id, false)}>
-                Sign
-              </button>
-              <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={busy} onClick={() => run("signDeal", o.id, true)}>
-                Agent pushes for more
-              </button>
-            </div>
+              <div className="flex flex-wrap gap-2">
+                <button className={bigRed} disabled={busy} onClick={() => run("signDeal", o.id, false)}>
+                  Sign
+                </button>
+                <button className={bigGhost} disabled={busy} onClick={() => run("signDeal", o.id, true)}>
+                  Agent pushes for more
+                </button>
+              </div>
+            </Card>
           ))}
         </div>
-      </Section>
-      <Section title="Your deals">
-        <div className="divide-y divide-ink-800 text-sm">
-          {c.deals.length === 0 && <div className="p-4 text-slate-500">None yet.</div>}
+      </section>
+      <section className="grid gap-3">
+        <h2 className="kicker">Your deals</h2>
+        {c.deals.length === 0 && <div className="rounded-lg border border-ink-700 bg-ink-900 p-6 text-lg text-slate-400">None yet.</div>}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {c.deals.map((x) => (
-            <div key={x.id} className="flex items-center gap-3 px-4 py-2.5">
-              <span className="flex-1 font-semibold">{x.brand}</span>
-              <span className="text-xs text-slate-400">
-                {x.sector} · {fmtM(x.pay)} a season until {x.until}
-              </span>
-            </div>
+            <Card key={x.id} title={x.brand} sub={`${x.sector} · until ${x.until}`}>
+              <div className="font-display text-3xl font-black text-white">{fmtM(x.pay)} <span className="text-lg text-slate-400">a season</span></div>
+            </Card>
           ))}
         </div>
-      </Section>
+      </section>
     </div>
   );
 }
