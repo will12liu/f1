@@ -1,6 +1,6 @@
 # Paddock (F1 career sim)
 
-Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Coding/nba-gm`: read it for reference, never edit it). The plan and phases are in docs/HANDOFF.md. Built so far: Phases 0-5 (scaffold, data + types, headless race engine + calibration, season engine, 2D race view, resource dials + live race), stewards and flags, and team-principal (manager) mode.
+Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Coding/nba-gm`: read it for reference, never edit it). The plan and phases are in docs/HANDOFF.md. Built so far: Phases 0-6 (scaffold, data + types, race engine + calibration, season engine, 2D race view, resource dials + live race, key moments), stewards and flags, team-principal mode with an academy, real F2/F3 championships, and driver career mode (Phase 8 + 9, parts of 10/11).
 
 ## Commands
 - `npm run dev`: app at localhost:5173 · `npm test`: vitest · `npm run typecheck`
@@ -63,6 +63,12 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 ## Junior ladder and academy
 - F2 (14 rounds) and F3 (10) race on F1 weekends with the same engine (`season/juniors.ts`: spec cars at 0.6 of the spread, longer base lap, feature distance), standings, FIA super licence points (`Driver.sl`; 40 over 3 seasons = licence; the first winter seeds earlier points by level). F3 to F2 promotion by standings, F4 = prospect pool (15-18, not raced) feeding F3. F1 seats (AI market and the player) need a licence.
 - Manager academy (`manager/academy.ts`): up to 6 academy drivers (yearly fee), scouts (focus F4/F3/F2) raise `knowledge` so the potential estimate (`potEstimate`, fixed per-driver bias) narrows, buy one F2 and one F3 team (your academy drivers get its seats), pay for seats elsewhere, programme level speeds their development every winter, academy graduates ask half the F1 salary.
+
+## Driver career (src/engine/career/career.ts, src/ui/career)
+- `world.mode = "career"`, `world.careerState`. Creator: name, nationality, archetype (6; primary +6, weak -5 and capped at 84), tier (academy/mid/self-funded: start ovr, pot, cash, fame), start F3 (17) or F2 (19), difficulty (XP multiplier, `duelEdge` in duels).
+- After each round (`careerAfterRound`): your race (junior or F1) gives a 0-10 rating, Driver of the Day, XP (100 = 1 point), fame, team trust (vs expectation and team-mate), salary + endorsement income, endorsement offers by fame, F1 academy invitations; the last round makes seat offers (renewal, F2 step-up, paid seat, same series, F1 race seats where a deal ends if licensed, reserve).
+- Points buy +1 on a rating (`pointCost` rises with the level), capped by archetype and by potential. Winter: `careerMarket` (accepted offer or the best free one) before the AI ladder/market, which never move, develop or retire your driver.
+- Live: `prepareJunior` (worker) races your F2/F3 feature race; `commitRound(..., junior)` replays it inside `simJuniorRound`.
 
 ## UI rules
 - No gradients, glass, emoji in headings, badge-above-headline, three-icon rows, fade-on-hover or fade-in-on-scroll, buzzword copy. Solid colours, high contrast, one spacing scale, plain labels.

@@ -8,10 +8,12 @@ import type { MomentChoice } from "../engine/race/moments";
 import type { PreparedRound } from "../engine/season/season";
 import type * as Actions from "../engine/manager/actions";
 import type * as Academy from "../engine/manager/academy";
+import type * as Career from "../engine/career/career";
+import type { NewDriver } from "../engine/career/career";
 import type { World } from "../engine/types";
 
 /** Team-principal actions the UI can call: name + the arguments after `world`. */
-type AllActions = typeof Actions & Pick<typeof Academy, "hireScout" | "fireScout" | "setScoutFocus" | "signAcademy" | "releaseAcademy" | "buyJuniorTeam" | "placeDriver" | "upgradeProgram" | "scoutMarket">;
+type AllActions = typeof Actions & Pick<typeof Career, "spendPoint" | "autoSpend" | "signDeal" | "acceptSeat"> & { markCareerRead: (w: World) => { ok: boolean; msg: string } } & Pick<typeof Academy, "hireScout" | "fireScout" | "setScoutFocus" | "signAcademy" | "releaseAcademy" | "buyJuniorTeam" | "placeDriver" | "upgradeProgram" | "scoutMarket">;
 export type ActName = Exclude<keyof AllActions, "Answer" | "projectQuote" | "driverAsk" | "driverWilling">;
 type ActArgs<K extends ActName> = AllActions[K] extends (w: World, ...a: infer P) => unknown ? P : never;
 
@@ -24,7 +26,9 @@ interface GameState {
   busy: string | null;
   error: string | null;
   open(id: string): Promise<boolean>;
-  create(name: string, manager?: { teamId: string; principal: string }): Promise<string>;
+  create(name: string, manager?: { teamId: string; principal: string }, driver?: NewDriver): Promise<string>;
+  /** Driver career: the junior race this round, to drive it live. */
+  prepareJunior(): Promise<{ round: number; series: "F2" | "F3"; input: import("../engine/race/race").RaceInput } | null>;
   /** Run a team-principal action in the worker and save. */
   act<K extends ActName>(name: K, ...args: ActArgs<K>): Promise<{ ok: boolean; msg: string }>;
   simRounds(n: number): Promise<number>;
@@ -32,7 +36,7 @@ interface GameState {
   /** Qualifying and the race input for the next round, to drive it live. */
   prepareLive(): Promise<PreparedRound | null>;
   /** Saves the live race (replayed from its commands, so it comes out the same). */
-  commitLive(commands: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }): Promise<number | null>;
+  commitLive(commands: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: import("../engine/season/juniors").JuniorLive): Promise<number | null>;
 }
 
 async function persist(meta: SaveMeta, world: World) {
@@ -61,7 +65,12 @@ export const useGame = create<GameState>((set, get) => ({
     set({ world: res.world, meta: m });
     return res.answer;
   },
-  async create(name, manager) {
+  async prepareJunior() {
+    const { world } = get();
+    if (!world) return null;
+    return api().prepareJunior(world);
+  },
+  async create(name, manager, driver) {
     set({ busy: "Loading the 2026 grid…" });
     try {
       const res = await fetch("/data/world-2026.json");
@@ -69,6 +78,7 @@ export const useGame = create<GameState>((set, get) => ({
       world.seed = Math.floor(Math.random() * 2 ** 31);
       world.mode = "sandbox";
       if (manager) world = await api().startManager(world, manager.teamId, manager.principal);
+      if (driver) world = await api().startCareer(world, driver);
       const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       const meta: SaveMeta = { id, name, season: world.season, round: 0, createdAt: Date.now(), updatedAt: Date.now() };
       await writeSave(meta, world);
@@ -93,11 +103,11 @@ export const useGame = create<GameState>((set, get) => ({
     if (!world) return null;
     return api().prepareRound(world);
   },
-  async commitLive(commands, live) {
+  async commitLive(commands, live, junior) {
     const { world, meta } = get();
     if (!world || !meta) return null;
     set({ busy: "Saving the race…" });
-    const res = await api().commitRound(world, commands, live);
+    const res = await api().commitRound(world, commands, live, junior);
     const m = await persist(meta, res.world);
     set({ world: res.world, meta: m, busy: null });
     return res.summary?.round ?? null;

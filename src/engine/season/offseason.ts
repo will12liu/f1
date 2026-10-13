@@ -6,6 +6,7 @@ import { hashString, makeRng, type Rng } from "../rng";
 import type { Driver, Series, Team, World } from "../types";
 import { ageOf, developDriver, winterCars } from "./development";
 import { academyWinter } from "../manager/academy";
+import { careerMarket, careerWinter } from "../career/career";
 import { managerMarket, managerSeasonEnd, managerWinter } from "../manager/manager";
 import { driverStandings, seasonOver, teamStandings } from "./season";
 import { ensureProspects, hasLicence, juniorSeasonEnd, juniorStandings } from "./juniors";
@@ -53,11 +54,13 @@ export function endSeason(w: World) {
   managerSeasonEnd(w);
 
   // Develop and age everyone (the season just ended counts as this age).
-  for (const d of w.drivers) if (!d.retired) developDriver(d, season, rng);
+  // the player's driver grows through XP; only age takes from him
+  const me = w.mode === "career" ? w.careerState?.driverId : undefined;
+  for (const d of w.drivers) if (!d.retired && d.id !== me) developDriver(d, season, rng);
 
   // Retirements.
   for (const d of w.drivers) {
-    if (d.retired) continue;
+    if (d.retired || d.id === me) continue;
     const age = ageOf(d, next);
     const seated = d.series === "F1" && d.teamId;
     let p = 0;
@@ -68,6 +71,7 @@ export function endSeason(w: World) {
   }
 
   academyWinter(w);
+  careerMarket(w, next);
   juniorLadder(w, rng, next);
   managerMarket(w, next);
   driverMarket(w, rng, next);
@@ -85,6 +89,7 @@ export function endSeason(w: World) {
   w.replays = {};
   w.calendar = w.calendar.map((r) => ({ ...r, date: shiftYear(r.date) }));
   managerWinter(w);
+  careerWinter(w);
 }
 
 function retire(w: World, d: Driver, season: number) {
@@ -103,7 +108,8 @@ const shiftYear = (iso: string) => {
 /** F1 seats: expiring deals re-sign or walk, then teams (best car first) fill their seats. */
 function driverMarket(w: World, rng: Rng, next: number) {
   const f1 = w.teams.filter((t) => t.series === "F1");
-  const active = w.drivers.filter((d) => !d.retired);
+  const me = w.mode === "career" ? w.careerState?.driverId : undefined; // the player picks his own seat
+  const active = w.drivers.filter((d) => !d.retired && d.id !== me);
   // expiring contracts
   const mine = w.manager && !w.manager.fired ? w.manager.teamId : null; // the player runs his own seats
   for (const t of f1) {
@@ -156,14 +162,15 @@ function juniorLadder(w: World, rng: Rng, next: number) {
   const f3 = juniors("F3")
     .map((d) => ({ d, v: rank.has(d.id) ? 100 - rank.get(d.id)! * 3 + d.ovr * 0.2 + rng.normal(0, 2) : d.ovr + rng.normal(0, 2.5) }))
     .sort((a, b) => b.v - a.v);
-  for (const { d } of f3.slice(0, 10)) {
+  const me = w.mode === "career" ? w.careerState?.driverId : undefined;
+  for (const { d } of f3.filter((x) => x.d.id !== me).slice(0, 10)) {
     d.series = "F2";
     d.teamId = null;
   }
   // F4 prospects who are old enough move up to F3 (best first), the rest age out
   for (const d of juniors("F4" as Series)) if (ageOf(d, next) >= 19) d.retired = next - 1;
   // F2 drivers who are too old for the ladder drift out
-  for (const d of juniors("F2")) if (ageOf(d, next) >= 26 && rng.chance(0.6)) d.retired = next - 1;
+  for (const d of juniors("F2")) if (d.id !== me && ageOf(d, next) >= 26 && rng.chance(0.6)) d.retired = next - 1;
   // new F3 rookies: the best F4 prospects (academy drivers first), then generated drivers to keep 30
   const academy = new Set(w.manager?.academy?.map((a) => a.driverId) ?? []);
   const f4 = juniors("F4" as Series)

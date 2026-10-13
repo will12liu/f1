@@ -12,6 +12,18 @@ const NAV = [
   ["history", "History"],
 ] as const;
 
+const CAREER_NAV = [
+  ["", "My career"],
+  ["training", "Training"],
+  ["deals", "Deals"],
+  ["juniors", "Juniors"],
+  ["calendar", "Calendar"],
+  ["standings", "Standings"],
+  ["teams", "Teams"],
+  ["drivers", "Drivers"],
+  ["history", "History"],
+] as const;
+
 const TEAM_NAV = [
   ["", "HQ"],
   ["rnd", "Car & R&D"],
@@ -57,7 +69,7 @@ export function GameLayout() {
           </NavLink>
           <span className="hidden sm:inline text-xs text-slate-500">{meta.name} · {world.season}</span>
           <nav className="flex gap-1 overflow-x-auto text-sm ml-auto">
-            {(world.manager ? TEAM_NAV : NAV).map(([to, label]) => (
+            {(world.mode === "career" ? CAREER_NAV : world.manager ? TEAM_NAV : NAV).map(([to, label]) => (
               <NavLink
                 key={to}
                 to={to ? `${base}/${to}` : base}

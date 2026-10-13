@@ -17,6 +17,8 @@ import { Partners } from "./ui/manager/Partners";
 import { People } from "./ui/manager/People";
 import { Academy } from "./ui/manager/Academy";
 import { Juniors } from "./ui/pages/Juniors";
+import { Training } from "./ui/career/Training";
+import { Deals } from "./ui/career/Deals";
 
 export function App() {
   return (
@@ -40,6 +42,8 @@ export function App() {
           <Route path="inbox" element={<Inbox />} />
           <Route path="academy" element={<Academy />} />
           <Route path="juniors" element={<Juniors />} />
+          <Route path="training" element={<Training />} />
+          <Route path="deals" element={<Deals />} />
         </Route>
       </Routes>
     </BrowserRouter>

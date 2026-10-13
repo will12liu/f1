@@ -7,6 +7,8 @@ import { carPace } from "../ratings";
 import { qualify } from "../race/qualifying";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, Series, World } from "../types";
+import type { Command } from "../race/dials";
+import type { MomentChoice } from "../race/moments";
 
 export type Junior = "F2" | "F3";
 export const JUNIOR = {
@@ -49,14 +51,27 @@ export function juniorInput(w: World, series: Junior, round: number, circuit: Ci
   return { seed, circuit: { ...circuit, base: circuit.base * slow }, pitLoss: circuit.pitLoss, entries, laps };
 }
 
-/** Run this round's junior races (if any). */
-export function simJuniorRound(w: World, round: number, circuit: Circuit) {
+export interface JuniorLive {
+  series: Junior;
+  commands: Command[];
+  choices: MomentChoice[];
+  focus: number[];
+  moments: "off" | "key" | "all";
+}
+
+/** Run this round's junior races (if any). `live` replays the one the player drove. */
+export function simJuniorRound(w: World, round: number, circuit: Circuit, live?: JuniorLive) {
   ensureProspects(w);
   for (const series of ["F3", "F2"] as Junior[]) {
     if (!isJuniorRound(w, series, round)) continue;
     const input = juniorInput(w, series, round, circuit);
     if (input.entries.length < 6) continue;
-    const { result } = simRace(input);
+    const l = live?.series === series ? live : undefined;
+    const { result, state } = simRace(l ? { ...input, commands: l.commands, choices: l.choices, focus: l.focus, moments: l.moments, reads: w.reads } : input);
+    for (const x of state.seen) {
+      const r = ((w.reads ??= {})[x.driverId] ??= { def: {}, att: {} });
+      r[x.role][x.move] = (r[x.role][x.move] ?? 0) + 1;
+    }
     (w.juniorResults ??= []).push({
       series,
       round,

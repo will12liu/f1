@@ -4,7 +4,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { createRace, type RaceRunner } from "../../engine/race/race";
-import type { PreparedRound } from "../../engine/season/season";
+import type { RaceInput } from "../../engine/race/race";
+import { careerOf, DIFFICULTY } from "../../engine/career/career";
+
+/** What the live page races: the F1 race, or the player's junior race in career mode. */
+type PreparedRound = { round: number; input: RaceInput; series?: "F2" | "F3" };
 import type { Replay } from "../../engine/types";
 import { useGame } from "../../state/game";
 import { PitWall } from "../race/PitWall";
@@ -59,7 +63,10 @@ export function LiveRace() {
   const { id = "" } = useParams();
   const base = `/g/${id}`;
   const nav = useNavigate();
-  const { world, busy, prepareLive, commitLive } = useGame();
+  const { world, busy, prepareLive, prepareJunior, commitLive } = useGame();
+  const career = world ? careerOf(world) : null;
+  const meId = career?.driverId;
+  const meSeries = world?.drivers.find((d) => d.id === meId)?.series;
   const [prep, setPrep] = useState<PreparedRound | null | undefined>(undefined);
   const [pick, setPick] = useState<string | null>(readPick);
   const [runner, setRunner] = useState<RaceRunner | null>(null);
@@ -68,11 +75,12 @@ export function LiveRace() {
 
   useEffect(() => {
     let on = true;
-    prepareLive().then((p) => on && setPrep(p));
+    const junior = career && (meSeries === "F2" || meSeries === "F3");
+    (junior ? prepareJunior() : prepareLive()).then((p) => on && setPrep(p));
     return () => {
       on = false;
     };
-  }, [prepareLive, world?.results.length]);
+  }, [prepareLive, prepareJunior, world?.results.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { drivers, team } = useMaps(world!);
   const entries = prep?.input.entries ?? [];
@@ -82,8 +90,8 @@ export function LiveRace() {
   const [tab, setTab] = useState(0);
   const [mode, setMode] = useState<MomentMode>(readMode);
   const [pend, setPend] = useState<PendingMoment | null>(null);
-  const focus = myTeamId ? mine : [entries.findIndex((e) => e.driverId === pick)].filter((i) => i >= 0);
-  const chosen = myTeamId ? (mine[0] ?? -1) : entries.findIndex((e) => e.driverId === pick);
+  const focus = career ? [entries.findIndex((e) => e.driverId === meId)].filter((i) => i >= 0) : myTeamId ? mine : [entries.findIndex((e) => e.driverId === pick)].filter((i) => i >= 0);
+  const chosen = career ? entries.findIndex((e) => e.driverId === meId) : myTeamId ? (mine[0] ?? -1) : entries.findIndex((e) => e.driverId === pick);
   const season = world?.season ?? 0;
 
   const start = () => {
@@ -93,7 +101,7 @@ export function LiveRace() {
     } catch {
       /* private mode */
     }
-    const r = createRace({ ...prep.input, focus, moments: mode, reads: world?.reads });
+    const r = createRace({ ...prep.input, focus, moments: mode, reads: world?.reads, duelEdge: career ? DIFFICULTY[career.difficulty].duel : undefined });
     runnerRef.current = r;
     setRunner(r);
     setReplay(snapshot(r, prep, season));
@@ -149,10 +157,10 @@ export function LiveRace() {
     return (
       <div className="grid gap-4 max-w-3xl">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · drive it live</div>
+          <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · {prep.series ? `${prep.series} feature race` : "drive it live"}</div>
           <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
           <p className="mt-2 text-sm text-slate-400">
-            {myTeamId ? `You run both ${team(myTeamId)?.name} cars from the pit wall: dials, stops and team orders.` : "Pick the car you run from the pit wall."} Everyone else races on their own. Dial changes count from the next lap.
+            {career ? "You drive. Set your dials, call your stops, and fight when it's close." : myTeamId ? `You run both ${team(myTeamId)?.name} cars from the pit wall: dials, stops and team orders.` : "Pick the car you run from the pit wall."} Everyone else races on their own. Dial changes count from the next lap.
           </p>
         </div>
         <div className="panel overflow-hidden">
@@ -160,11 +168,11 @@ export function LiveRace() {
           <ol className="grid sm:grid-cols-2 text-sm">
             {entries.map((e, i) => {
               const d = drivers.get(e.driverId);
-              const sel = myTeamId ? e.teamId === myTeamId : e.driverId === pick;
+              const sel = career ? e.driverId === meId : myTeamId ? e.teamId === myTeamId : e.driverId === pick;
               return (
                 <li key={e.driverId}>
                   <button
-                    disabled={!!myTeamId}
+                    disabled={!!myTeamId || !!career}
                     onClick={() => {
                       setPick(e.driverId);
                       savePick(e.driverId);
@@ -199,7 +207,7 @@ export function LiveRace() {
         </div>
         <div className="flex gap-2">
           <button className="btn-primary" disabled={chosen < 0} onClick={start}>
-            Start the race{myTeamId ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""}
+            Start the race{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""}
           </button>
           <Link className="btn-ghost" to={base}>
             Back
@@ -235,7 +243,7 @@ export function LiveRace() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · live</div>
+          <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · {prep.series ? `${prep.series} feature race · ` : ""}live</div>
           <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
         </div>
         <div className="ml-auto flex gap-2">
@@ -244,8 +252,14 @@ export function LiveRace() {
               className="btn-primary"
               disabled={!!busy}
               onClick={async () => {
-                const round = await commitLive(runner.state.commands, { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off" });
-                if (round) nav(`${base}/race/${round}`);
+                const live = { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off" };
+                if (prep.series) {
+                  await commitLive([], undefined, { series: prep.series, commands: runner.state.commands, ...live });
+                  nav(base);
+                } else {
+                  const round = await commitLive(runner.state.commands, live);
+                  if (round) nav(`${base}/race/${round}`);
+                }
               }}
             >
               Save result

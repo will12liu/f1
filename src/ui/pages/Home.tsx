@@ -3,11 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { deleteSave, listSaves, type SaveMeta } from "../../db/db";
 import { useGame } from "../../state/game";
 import type { World } from "../../engine/types";
+import { ARCHETYPES, DIFFICULTY, TIERS, type NewDriver } from "../../engine/career/career";
+
+const NATS = ["British", "Italian", "French", "German", "Dutch", "Spanish", "Brazilian", "Japanese", "Australian", "American", "Chinese", "Indian", "Swedish", "Argentine", "Mexican", "Belgian", "Danish", "Polish", "Estonian", "New Zealander", "Canadian", "Finnish", "Monegasque", "Thai"];
 
 export function Home() {
   const [saves, setSaves] = useState<SaveMeta[]>([]);
   const [name, setName] = useState("My F1 world");
-  const [mode, setMode] = useState<"manager" | "sandbox">("manager");
+  const [mode, setMode] = useState<"manager" | "sandbox" | "career">("career");
+  const [drv, setDrv] = useState<NewDriver>({ first: "", last: "", nat: "British", archetype: "racer", tier: "mid", start: "F3", difficulty: "pro" });
   const [principal, setPrincipal] = useState("");
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teams, setTeams] = useState<{ id: string; name: string; color: string; budget: number; rank: number }[]>([]);
@@ -38,9 +42,10 @@ export function Home() {
       </div>
       <div className="panel p-4 grid gap-4">
         <h2 className="font-display text-xl font-bold uppercase">New game</h2>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid sm:grid-cols-3 gap-2">
           {(
             [
+              ["career", "Driver career", "You are one driver. Start in F3 or F2, race your own races, train, sign deals, earn an F1 seat."],
               ["manager", "Team principal", "Run one team: drivers, staff, R&D, partners, money, the cost cap. The board judges you."],
               ["sandbox", "Sandbox", "Watch and sim the whole grid season after season. Drive any car live from the pit wall."],
             ] as const
@@ -55,6 +60,72 @@ export function Home() {
           Save name
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
+        {mode === "career" && (
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="grid gap-1 text-xs text-slate-400">
+                First name
+                <input className="input" value={drv.first} onChange={(e) => setDrv({ ...drv, first: e.target.value })} />
+              </label>
+              <label className="grid gap-1 text-xs text-slate-400">
+                Last name
+                <input className="input" value={drv.last} onChange={(e) => setDrv({ ...drv, last: e.target.value })} />
+              </label>
+            </div>
+            <label className="grid gap-1 text-xs text-slate-400">
+              Nationality
+              <select className="input" value={drv.nat} onChange={(e) => setDrv({ ...drv, nat: e.target.value })}>
+                {NATS.map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-1">
+              <div className="text-xs text-slate-400">Driving style</div>
+              <div className="grid sm:grid-cols-2 gap-1">
+                {ARCHETYPES.map((a) => (
+                  <button key={a.id} onClick={() => setDrv({ ...drv, archetype: a.id })} className={`rounded-md px-2.5 py-2 text-left text-sm ${drv.archetype === a.id ? "bg-ink-700 text-white" : "bg-ink-850 hover:bg-ink-800"}`}>
+                    <div className="font-semibold">{a.label}</div>
+                    <div className="text-xs text-slate-400">{a.blurb}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-1">
+              <div className="text-xs text-slate-400">Background</div>
+              <div className="grid sm:grid-cols-3 gap-1">
+                {(Object.keys(TIERS) as (keyof typeof TIERS)[]).map((k) => (
+                  <button key={k} onClick={() => setDrv({ ...drv, tier: k })} className={`rounded-md px-2.5 py-2 text-left text-sm ${drv.tier === k ? "bg-ink-700 text-white" : "bg-ink-850 hover:bg-ink-800"}`}>
+                    <div className="font-semibold">{TIERS[k].label}</div>
+                    <div className="text-xs text-slate-400">{TIERS[k].blurb}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <div className="grid gap-1">
+                <div className="text-xs text-slate-400">Start in</div>
+                <div className="flex gap-1">
+                  {(["F3", "F2"] as const).map((k) => (
+                    <button key={k} onClick={() => setDrv({ ...drv, start: k })} className={`btn !px-3 !py-1 ${drv.start === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                      {k} {k === "F3" ? "(age 17)" : "(age 19)"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid gap-1">
+                <div className="text-xs text-slate-400">Difficulty</div>
+                <div className="flex gap-1">
+                  {(Object.keys(DIFFICULTY) as (keyof typeof DIFFICULTY)[]).map((k) => (
+                    <button key={k} onClick={() => setDrv({ ...drv, difficulty: k })} className={`btn !px-3 !py-1 ${drv.difficulty === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                      {DIFFICULTY[k].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {mode === "manager" && (
           <>
             <label className="grid gap-1 text-xs text-slate-400">
@@ -80,14 +151,15 @@ export function Home() {
         <div>
           <button
             className="btn-primary"
-            disabled={!!busy || !name.trim() || (mode === "manager" && (!teamId || !principal.trim()))}
-            onClick={async () => nav(`/g/${await create(name.trim(), mode === "manager" ? { teamId: teamId!, principal: principal.trim() } : undefined)}`)}
+            disabled={!!busy || !name.trim() || (mode === "manager" && (!teamId || !principal.trim())) || (mode === "career" && (!drv.first.trim() || !drv.last.trim()))}
+            onClick={async () =>
+              nav(`/g/${await create(name.trim(), mode === "manager" ? { teamId: teamId!, principal: principal.trim() } : undefined, mode === "career" ? { ...drv, first: drv.first.trim(), last: drv.last.trim() } : undefined)}`)
+            }
           >
             {busy ?? "Start 2026"}
           </button>
         </div>
         {error && <div className="text-sm text-rose-400">{error}</div>}
-        <p className="text-xs text-slate-500">Driver career mode (F3, F2, then F1) comes in a later phase.</p>
       </div>
       {saves.length > 0 && (
         <div className="panel divide-y divide-ink-800">

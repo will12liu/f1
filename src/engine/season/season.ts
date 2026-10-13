@@ -8,7 +8,8 @@ import type { MomentChoice } from "../race/moments";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
-import { simJuniorRound } from "./juniors";
+import { simJuniorRound, type JuniorLive } from "./juniors";
+import { careerAfterRound } from "../career/career";
 import { ensureSeats, managerAfterRound, raceBoost } from "../manager/manager";
 
 export const f1Teams = (w: World) => w.teams.filter((t) => t.series === "F1");
@@ -100,7 +101,7 @@ export function prepareNextRound(w: World): PreparedRound | null {
 
 /** Qualifying + race for the next round. Records the summary and the replay on the world.
  *  `commands` replays a race the player drove live (same input + same commands = same race). */
-export function simNextRound(w: World, commands?: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }): RaceSummary | null {
+export function simNextRound(w: World, commands?: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: JuniorLive): RaceSummary | null {
   const prep = prepareNextRound(w);
   if (!prep) return null;
   const { quali, input } = prep;
@@ -172,8 +173,9 @@ export function simNextRound(w: World, commands?: Command[], live?: { choices: M
   w.results.push(summary);
   w.replays[r.round] = replay;
   developCarsAfterRound(w, makeRng(seed ^ 0xdee));
-  simJuniorRound(w, r.round, circuit);
+  simJuniorRound(w, r.round, circuit, junior);
   managerAfterRound(w, summary);
+  careerAfterRound(w);
   return summary;
 }
 

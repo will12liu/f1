@@ -37,6 +37,7 @@ export interface RaceInput {
   moments?: "off" | "key" | "all";
   choices?: MomentChoice[]; // answers to moments (replay); when set, the race never waits for an answer
   reads?: Reads; // what the player knows of other drivers' habits
+  duelEdge?: number; // difficulty: log-odds added to the player's side in duels
 }
 
 export type Flag = "green" | "sc" | "vsc" | "red";
@@ -455,7 +456,8 @@ export function createRace(input: RaceInput): RaceRunner {
       y.wear = Math.max(0, y.wear - 0.01);
     } else {
       const m = PAYOFF[attMove][defMove];
-      const odds = (m / (1 - m)) * (p0 / (1 - p0));
+      const edge = (input.duelEdge ?? 0) * (me === x ? 1 : -1);
+      const odds = (m / (1 - m)) * (p0 / (1 - p0)) * Math.exp(edge);
       const p = clamp(odds / (1 + odds), 0.03, 0.97);
       hit = dr.chance(Math.min(0.5, pc0 * CONTACT[attMove][defMove] * 1.6));
       passed = !hit && dr.chance(p);

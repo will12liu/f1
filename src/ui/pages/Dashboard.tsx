@@ -4,6 +4,7 @@ import { COUNTRY_FLAGS } from "../../lib/format";
 import { useGame } from "../../state/game";
 import { DriverLink, Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
 import { Hq } from "../manager/Hq";
+import { CareerHq } from "../career/CareerHq";
 
 export function Dashboard() {
   const { id = "" } = useParams();
@@ -11,6 +12,7 @@ export function Dashboard() {
   const nav = useNavigate();
   const { world, busy, simRounds, nextSeason } = useGame();
   if (!world) return null;
+  if (world.mode === "career") return <CareerHq />;
   if (world.manager) return <Hq />;
   const { drivers, team } = useMaps(world);
   const next = nextRound(world);
