@@ -7,6 +7,8 @@ import { indexReplay, trackPoint, viewAt, type RaceView } from "../../engine/rac
 import type { Replay, World } from "../../engine/types";
 import { gap as fmtGap, lapTime } from "../../lib/format";
 import { useMaps, useTrack, type TrackFile } from "../components/bits";
+import { Radio } from "./Radio";
+import type { Forecast } from "../../engine/race/dials";
 
 const SPEEDS = [1, 2, 4, 8, 16];
 const BASE_RATE = 6; // race seconds per real second at 1x
@@ -27,6 +29,7 @@ export function RaceViewer({
   marks,
   focus,
   banner,
+  radio,
 }: {
   world: World;
   replay: Replay;
@@ -37,6 +40,7 @@ export function RaceViewer({
   marks?: { a: number; b?: number; role?: "attack" | "defend" } | null;
   focus?: { t: number; cars: number[]; until?: number } | null; // a key moment: play it at 1x and zoom in on these cars
   banner?: { t: number; node: ReactNode } | null; // how it went, shown once the screen gets there
+  radio?: { car: number; engineer?: string; forecast?: () => Forecast | null }; // team radio for your car
 }) {
   const track = useTrack(replay.circuitId);
   const ix = useMemo(() => indexReplay(replay, !!live), [replay, live]);
@@ -174,7 +178,8 @@ export function RaceViewer({
         })()}
         <div className="relative">
           <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} zoomOn={near(t) ? focus!.cars : null} />
-          {near(t) && !overlay && <div className="pointer-events-none absolute left-4 top-4 rounded-md bg-race px-3 py-1 font-display text-lg font-black uppercase tracking-wider text-white">Key moment · 1x</div>}
+          {radio && radio.car >= 0 && <Radio replay={replay} view={view} t={t} car={radio.car} code={cars[radio.car]?.code ?? ""} engineer={radio.engineer} forecast={radio.forecast} />}
+          {near(t) && !overlay && !bannerOn && <div className="pointer-events-none absolute bottom-4 left-4 rounded-md bg-race px-3 py-1 font-display text-lg font-black uppercase tracking-wider text-white">Key moment · 1x</div>}
           {bannerOn && !overlay && (
             <div className="absolute inset-x-0 bottom-0 cursor-pointer p-3 sm:p-4" onClick={() => setShown((x) => (x ? { ...x, at: -1e9 } : x))}>
               {banner!.node}

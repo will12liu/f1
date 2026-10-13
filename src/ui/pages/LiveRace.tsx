@@ -341,6 +341,7 @@ export function LiveRace() {
         marks={pend ? { a: pend.car, b: pend.vs, role: pend.kind === "defend" ? "defend" : "attack" } : null}
         focus={zoomAt}
         banner={banner}
+        radio={{ car: mine.length === 2 ? mine[tab] : chosen, engineer: career ? "Engineer" : "Race engineer", forecast: () => (runner && (mine.length === 2 ? mine[tab] : chosen) >= 0 ? runner.forecast(mine.length === 2 ? mine[tab] : chosen) : null) }}
         overlay={
           pend ? (
             <MomentCard
