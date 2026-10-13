@@ -322,8 +322,8 @@ export function LiveRace() {
             <MomentCard
               m={pend}
               who={codeOf(pend.car)}
-              onPick={(opt) => {
-                runner.choose(opt);
+              onPick={(opt, q) => {
+                runner.choose(opt, q);
                 runner.step();
                 refresh();
                 setPend(runner.pending());

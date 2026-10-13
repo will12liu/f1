@@ -8,7 +8,7 @@ import type { CircuitDef, Compound, DnfReason, DriverRatings, PitLoss } from "..
 import { DIAL, dialFx, NEUTRAL, type Command, type DialFx, type Dials, type Forecast } from "./dials";
 import { POINTS, RACE, tyreCost, tyreLife } from "./model";
 import {
-  ATTACK_LABEL, chooseSit, CONTACT, DEFEND_LABEL, fill, PAYOFF, pickWeighted, readText, tendencies,
+  ATTACK_LABEL, chooseSit, CONTACT, DEFEND_LABEL, execContact, execEdge, fill, PAYOFF, pickWeighted, readText, tendencies,
   type AttackMove, type DefendMove, type DuelRecord, type MCtx, type MomentChoice, type PendingMoment, type Reads,
 } from "./moments";
 import { plans, type Stint, type WearRate } from "./strategy";
@@ -142,7 +142,7 @@ export interface RaceRunner {
   forecast(idx: number): Forecast;
   /** A key moment waiting for the player (the race doesn't move until `choose`). */
   pending(): PendingMoment | null;
-  choose(opt: string): void;
+  choose(opt: string, q?: number): void; // q: how well the move was executed (0-1), for duels
 }
 
 export interface ResultRow {
@@ -411,12 +411,24 @@ export function createRace(input: RaceInput): RaceRunner {
   }
 
   /** Ask the player (or read the stored answer). Records every answer. */
-  function* ask(m: PendingMoment): Generator<PendingMoment, string, string | undefined> {
+  let lastQ: number | undefined; // execution score of the last answer (duels)
+  function* ask(m: PendingMoment): Generator<PendingMoment, string, Answer | undefined> {
     let opt: string;
-    if (replaying) opt = input.choices!.find((x) => x.lap === m.lap && x.car === m.car && x.sit === m.sit)?.opt ?? "auto";
-    else opt = (yield m) ?? "auto";
+    let q: number | undefined;
+    if (replaying) {
+      const c = input.choices!.find((x) => x.lap === m.lap && x.car === m.car && x.sit === m.sit);
+      opt = c?.opt ?? "auto";
+      q = c?.q;
+    } else {
+      const a = yield m;
+      opt = a?.opt ?? "auto";
+      q = a?.q;
+    }
     if (!m.opts.some((o) => o.id === opt && !o.disabled)) opt = "auto";
-    state.choices.push({ lap: m.lap, car: m.car, sit: m.sit, opt });
+    if (opt === "auto" || q === undefined || !isFinite(q)) q = undefined;
+    else q = Math.round(Math.max(0, Math.min(1, q)) * 1000) / 1000;
+    lastQ = q;
+    state.choices.push(q === undefined ? { lap: m.lap, car: m.car, sit: m.sit, opt } : { lap: m.lap, car: m.car, sit: m.sit, opt, q });
     lastMoment.set(m.car, m.lap);
     shown.set(m.car, (shown.get(m.car) ?? 0) + 1);
     seenSits.set(m.sit, (seenSits.get(m.sit) ?? 0) + 1);
@@ -425,7 +437,7 @@ export function createRace(input: RaceInput): RaceRunner {
   const pen = (id: string) => 1 / (1 + (seenSits.get(id) ?? 0) * 0.8);
 
   /** Resolve a duel the player answered: the other driver picks by habit, the payoff table shifts the odds. */
-  function duel(x: CarState, y: CarState, me: CarState, opt: string, p0: number, pc0: number, dr: Rng, L: number) {
+  function duel(x: CarState, y: CarState, me: CarState, opt: string, p0: number, pc0: number, dr: Rng, L: number, q?: number) {
     let attMove: AttackMove;
     let defMove: DefendMove;
     if (me === x) {
@@ -456,10 +468,10 @@ export function createRace(input: RaceInput): RaceRunner {
       y.wear = Math.max(0, y.wear - 0.01);
     } else {
       const m = PAYOFF[attMove][defMove];
-      const edge = (input.duelEdge ?? 0) * (me === x ? 1 : -1);
+      const edge = ((input.duelEdge ?? 0) + execEdge(q)) * (me === x ? 1 : -1);
       const odds = (m / (1 - m)) * (p0 / (1 - p0)) * Math.exp(edge);
       const p = clamp(odds / (1 + odds), 0.03, 0.97);
-      hit = dr.chance(Math.min(0.5, pc0 * CONTACT[attMove][defMove] * 1.6));
+      hit = dr.chance(Math.min(0.5, pc0 * CONTACT[attMove][defMove] * 1.6 * execContact(q)));
       passed = !hit && dr.chance(p);
       if (attMove === "late" && !passed && !hit && dr.chance(0.12)) lose(x, 0.8 + dr.next()); // locked up
       if (defMove === "lateDef" && !passed && dr.chance(0.14)) penalise(y, "5s", "moving under braking", L, x.cum + (y.cum - x.cum), 0);
@@ -475,7 +487,7 @@ export function createRace(input: RaceInput): RaceRunner {
     ev({ lap: L, t, kind: "yellow", a: car.idx, info: String(1 + Math.floor(frac * 3)) });
   }
 
-  function* lap(): Generator<PendingMoment, void, string | undefined> {
+  function* lap(): Generator<PendingMoment, void, Answer | undefined> {
     if (state.lap >= laps) return;
     const L = state.lap + 1;
     const flag = state.flag;
@@ -732,7 +744,7 @@ export function createRace(input: RaceInput): RaceRunner {
             if (ans !== "auto" && me) {
               const dr = makeRng(hashString(`${input.seed}:duel:${L}:${x.idx}:${y.idx}`));
               duelRng = dr;
-              const res = duel(x, y, me, ans, p, pc, dr, L);
+              const res = duel(x, y, me, ans, p, pc, dr, L, lastQ);
               if (res.hit) {
                 contact(x, y, L, x.cum + (f - x.cum) * 0.5, dr);
                 if (x.out) break;
@@ -986,9 +998,9 @@ export function createRace(input: RaceInput): RaceRunner {
   }
 
   // the runner: a lap is a generator that can stop at a moment until the player answers
-  let gen: Generator<PendingMoment, void, string | undefined> | null = null;
+  let gen: Generator<PendingMoment, void, Answer | undefined> | null = null;
   let waiting: PendingMoment | null = null;
-  let answer: string | undefined;
+  let answer: Answer | undefined;
   function step() {
     if (!gen) {
       if (state.lap >= laps) return;
@@ -1007,11 +1019,13 @@ export function createRace(input: RaceInput): RaceRunner {
   return {
     state, input, step, done: () => state.lap >= laps && !gen, result, command, forecast,
     pending: () => waiting,
-    choose: (opt: string) => {
-      if (waiting) answer = opt;
+    choose: (opt: string, q?: number) => {
+      if (waiting) answer = { opt, q };
     },
   };
 }
+
+type Answer = { opt: string; q?: number };
 
 export function simRace(input: RaceInput): { result: RaceResult; state: RaceState } {
   const r = createRace(input);

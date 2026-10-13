@@ -1,6 +1,9 @@
 // Training: spend upgrade points on ratings. Each +1 costs more as the rating rises; weak areas of your
 // archetype have a ceiling, and the overall can't pass your potential.
-import { ARCHETYPES, careerOf, meOf, pointCost, trainCap, XP_PER_POINT } from "../../engine/career/career";
+import { useState } from "react";
+import { ARCHETYPES, careerOf, meOf, pointCost, SIM_SESSIONS, simTag, trainCap, XP_PER_POINT, type SimKind } from "../../engine/career/career";
+import { DIFFICULTY } from "../../engine/career/career";
+import { HotLap, Reaction } from "./SimGames";
 import { RATING_KEYS, RATING_LABELS } from "../../engine/ratings";
 import { useGame } from "../../state/game";
 import { bigGhost, HeadStat, PageHead } from "../components/hub";
@@ -9,6 +12,7 @@ import { Answer, Meter, useAct } from "../manager/kit";
 export function Training() {
   const world = useGame((s) => s.world);
   const { run, answer, busy } = useAct();
+  const [game, setGame] = useState<SimKind | null>(null);
   if (!world) return null;
   const c = careerOf(world);
   const d = meOf(world);
@@ -28,6 +32,30 @@ export function Training() {
           </>
         }
       />
+      {game && (game === "lap" ? <HotLap onQuit={() => setGame(null)} onDone={(q) => (setGame(null), run("simSession", "lap", q))} /> : <Reaction onQuit={() => setGame(null)} onDone={(q) => (setGame(null), run("simSession", "reaction", q))} />)}
+      <section className="grid gap-3">
+        <h2 className="kicker">Simulator · once each per race weekend</h2>
+        <div className="grid gap-3 md:grid-cols-2">
+          {(Object.keys(SIM_SESSIONS) as SimKind[]).map((k) => {
+            const done = c.sims?.[k] === simTag(world);
+            const best = c.simBest?.[k];
+            const [lo, hi] = SIM_SESSIONS[k].xp.map((x) => Math.round(x * DIFFICULTY[c.difficulty].xp));
+            return (
+              <button key={k} disabled={done || busy} onClick={() => setGame(k)} className="tile !min-h-40">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="font-display text-3xl font-extrabold uppercase leading-none text-white">{SIM_SESSIONS[k].label}</span>
+                  {done ? <span className="rounded-md bg-emerald-400 px-2 py-0.5 font-display text-base font-bold uppercase text-ink-950">Done</span> : <span className="rounded-md bg-race px-2 py-0.5 font-display text-base font-bold uppercase text-white">Play</span>}
+                </div>
+                <div className="mt-2 text-base text-slate-300">{k === "lap" ? "Six braking zones, each one tighter. The same skill as the duels in a race." : "Five red lights. React when they go out. Don't jump the start."}</div>
+                <div className="mt-auto pt-4 text-sm text-slate-400">
+                  {lo}-{hi} XP{best !== undefined ? ` · best ${Math.round(best * 100)}` : ""}
+                  {done ? " · back next race weekend" : ""}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
       <div className="flex flex-wrap items-center gap-4">
         <button className={bigGhost} disabled={busy || !c.points} onClick={() => run("autoSpend")}>
           Let the coach spend them

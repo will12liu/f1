@@ -124,6 +124,8 @@ export interface CareerState {
   lastEvents?: Record<string, number>;
   lastBeatMate?: boolean;
   owned?: string[]; // shop items
+  sims?: Record<string, string>; // simulator sessions done: kind -> "season:round" (once per weekend)
+  simBest?: Record<string, number>; // best score per kind (0-1)
   clauses?: { release?: boolean; lead?: boolean }; // in the current contract
 }
 
@@ -241,6 +243,35 @@ export function trainCap(c: CareerState, k: RatingKey): number {
 }
 
 /** Spend points on one rating (+1 each). The overall can't pass the potential. */
+/** Simulator sessions (training mini-games): once per race weekend each, XP from the score (0-1). */
+export const SIM_SESSIONS = {
+  lap: { label: "Simulator hot lap", xp: [15, 70] },
+  reaction: { label: "Reaction test", xp: [10, 40] },
+} as const;
+export type SimKind = keyof typeof SIM_SESSIONS;
+export const simTag = (w: World) => `${w.season}:${w.results.length}`;
+
+export function simSession(w: World, kind: SimKind, score: number): { ok: boolean; msg: string } {
+  const c = careerOf(w);
+  const d = meOf(w);
+  const def = SIM_SESSIONS[kind];
+  if (!c || !d || !def) return { ok: false, msg: "No career." };
+  c.sims ??= {};
+  if (c.sims[kind] === simTag(w)) return { ok: false, msg: "Done this week. Go again next race weekend." };
+  const q = Math.max(0, Math.min(1, Number.isFinite(score) ? score : 0));
+  const xp = Math.round((def.xp[0] + (def.xp[1] - def.xp[0]) * q) * DIFFICULTY[c.difficulty].xp);
+  c.sims[kind] = simTag(w);
+  c.simBest ??= {};
+  const best = q > (c.simBest[kind] ?? -1);
+  if (best) c.simBest[kind] = q;
+  c.xp += xp;
+  while (c.xp >= XP_PER_POINT) {
+    c.xp -= XP_PER_POINT;
+    c.points++;
+  }
+  return { ok: true, msg: `${def.label}: +${xp} XP${best ? ", a new best" : ""}.` };
+}
+
 export function spendPoint(w: World, k: RatingKey, times = 1): { ok: boolean; msg: string } {
   const c = careerOf(w);
   const d = meOf(w);

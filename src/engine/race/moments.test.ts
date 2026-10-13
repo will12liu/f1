@@ -17,13 +17,16 @@ const input = (seed: number, extra: Partial<RaceInput> = {}): RaceInput => {
   };
 };
 /** Play a live race answering every moment with `pick` (by index of the options, skipping disabled ones). */
-function play(seed: number, focus: number[], pick: (opts: { id: string; disabled?: boolean }[], n: number) => string) {
+function play(seed: number, focus: number[], pick: (opts: { id: string; disabled?: boolean }[], n: number) => string, q?: (n: number) => number | undefined) {
   const r = createRace(input(seed, { focus, moments: "all" }));
   let n = 0;
   while (!r.done()) {
     r.step();
     const m = r.pending();
-    if (m) r.choose(pick(m.opts, n++));
+    if (m) {
+      const k = n++;
+      r.choose(pick(m.opts, k), m.kind === "call" ? undefined : q?.(k));
+    }
   }
   return { r, n };
 }
@@ -37,6 +40,26 @@ describe("key moments", () => {
     const again = simRace(input(21, { focus: [8, 9], moments: "all", choices: r.state.choices, commands: r.state.commands }));
     expect(JSON.stringify(again.result)).toBe(JSON.stringify(r.result()));
     expect(JSON.stringify(again.state.lapEnd)).toBe(JSON.stringify(r.state.lapEnd));
+  });
+
+  it("mini-game scores are stored with the answers and the race replays exactly from them", () => {
+    const { r } = play(23, [8, 9], (opts, k) => opts.filter((o) => !o.disabled)[k % opts.filter((o) => !o.disabled).length].id, (k) => (k * 0.37) % 1);
+    expect(r.state.choices.some((c) => c.q !== undefined)).toBe(true);
+    const again = simRace(input(23, { focus: [8, 9], moments: "all", choices: r.state.choices, commands: r.state.commands }));
+    expect(JSON.stringify(again.result)).toBe(JSON.stringify(r.result()));
+  });
+
+  it("execution matters: perfect braking passes more often than a missed braking point", () => {
+    const rate = (q: number) => {
+      let pass = 0;
+      let all = 0;
+      for (let s = 0; s < 30; s++) {
+        const { r } = play(500 + s, [6, 7, 8, 9, 10, 11], (opts) => (opts.some((o) => o.id === "inside") ? "inside" : "auto"), () => q);
+        for (const d of r.state.duels) if (d.attMove === "inside") (all++, (pass += d.passed ? 1 : 0));
+      }
+      return pass / Math.max(1, all);
+    };
+    expect(rate(1)).toBeGreaterThan(rate(0) + 0.1);
   });
 
   it("answering every moment with instinct gives exactly the race nobody played", () => {

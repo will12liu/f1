@@ -16,7 +16,7 @@ import type { NewDriver } from "../engine/career/career";
 import type { World } from "../engine/types";
 
 /** Team-principal actions the UI can call: name + the arguments after `world`. */
-type AllActions = typeof Actions & Pick<typeof Career, "spendPoint" | "autoSpend" | "signDeal" | "acceptSeat" | "negotiateSeat"> & Pick<typeof Events, "answerEvent"> & Pick<typeof ShopT, "buyItem" | "sellItem"> & { markCareerRead: (w: World) => { ok: boolean; msg: string } } & Pick<typeof Academy, "hireScout" | "fireScout" | "setScoutFocus" | "signAcademy" | "releaseAcademy" | "buyJuniorTeam" | "placeDriver" | "upgradeProgram" | "scoutMarket">;
+type AllActions = typeof Actions & Pick<typeof Career, "spendPoint" | "simSession" | "autoSpend" | "signDeal" | "acceptSeat" | "negotiateSeat"> & Pick<typeof Events, "answerEvent"> & Pick<typeof ShopT, "buyItem" | "sellItem"> & { markCareerRead: (w: World) => { ok: boolean; msg: string } } & Pick<typeof Academy, "hireScout" | "fireScout" | "setScoutFocus" | "signAcademy" | "releaseAcademy" | "buyJuniorTeam" | "placeDriver" | "upgradeProgram" | "scoutMarket">;
 export type ActName = Exclude<keyof AllActions, "Answer" | "projectQuote" | "driverAsk" | "driverWilling">;
 type ActArgs<K extends ActName> = AllActions[K] extends (w: World, ...a: infer P) => unknown ? P : never;
 

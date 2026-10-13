@@ -1,8 +1,30 @@
 // The freeze-frame card for a key moment: what's happening, what you know of the other driver, the options,
-// and "instinct" (let the driver decide, the plain AI path).
+// and "instinct" (let the driver decide, the plain AI path). A duel move is then executed through the braking
+// mini-game (BrakeBar); its score goes to the engine with the answer. Keys 1-n pick an option.
+import { useEffect, useState } from "react";
 import type { PendingMoment } from "../../engine/race/moments";
+import { BrakeBar, zoneFor, type BrakeZone } from "./BrakeBar";
 
-export function MomentCard({ m, onPick, who }: { m: PendingMoment; onPick: (opt: string) => void; who?: string }) {
+export function MomentCard({ m, onPick, who }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string }) {
+  const [exec, setExec] = useState<{ id: string; label: string; zone: BrakeZone } | null>(null);
+  useEffect(() => setExec(null), [m.id]);
+  const pick = (id: string) => {
+    const o = m.opts.find((x) => x.id === id);
+    if (!o || o.disabled) return;
+    const zone = m.kind === "call" ? null : zoneFor(id);
+    if (zone) setExec({ id, label: o.label, zone });
+    else onPick(id);
+  };
+  useEffect(() => {
+    if (exec) return;
+    const onKey = (e: KeyboardEvent) => {
+      const i = Number(e.key) - 1;
+      if (i >= 0 && i < m.opts.length) pick(m.opts[i].id);
+      else if (i === m.opts.length) onPick("auto");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   const tag = m.kind === "attack" ? "bg-sky-400 text-ink-950" : m.kind === "defend" ? "bg-amber-400 text-ink-950" : "bg-slate-300 text-ink-950";
   return (
     <div className="rounded-lg border border-ink-600 bg-ink-900 p-5 shadow-xl">
@@ -16,10 +38,19 @@ export function MomentCard({ m, onPick, who }: { m: PendingMoment; onPick: (opt:
       <h3 className="headline mt-3 text-4xl">{m.title}</h3>
       <p className="mt-2 text-lg text-slate-300">{m.text}</p>
       {m.read && <p className="mt-1 text-base text-sky-300">{m.read}</p>}
+      {exec ? (
+        <div className="mt-4">
+          <div className="mb-3 font-display text-2xl font-black uppercase text-race">{exec.label}</div>
+          <BrakeBar zone={exec.zone} onResult={(q) => onPick(exec.id, q)} />
+        </div>
+      ) : (
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        {m.opts.map((o) => (
-          <button key={o.id} disabled={o.disabled} onClick={() => onPick(o.id)} className="rounded-lg border-2 border-ink-700 bg-ink-800 px-4 py-3 text-left hover:border-slate-300 hover:bg-ink-700 disabled:opacity-35">
-            <div className="font-display text-xl font-bold uppercase leading-tight text-white">{o.label}</div>
+        {m.opts.map((o, i) => (
+          <button key={o.id} disabled={o.disabled} onClick={() => pick(o.id)} className="rounded-lg border-2 border-ink-700 bg-ink-800 px-4 py-3 text-left hover:border-slate-300 hover:bg-ink-700 disabled:opacity-35">
+            <div className="font-display text-xl font-bold uppercase leading-tight text-white">
+              <span className="mr-2 text-slate-500">{i + 1}</span>
+              {o.label}
+            </div>
             <div className="mt-0.5 text-sm leading-snug text-slate-400">{o.disabled ? "Not enough battery." : o.hint}</div>
           </button>
         ))}
@@ -28,6 +59,7 @@ export function MomentCard({ m, onPick, who }: { m: PendingMoment; onPick: (opt:
           <div className="mt-0.5 text-sm leading-snug text-slate-500">Let the driver decide.</div>
         </button>
       </div>
+      )}
     </div>
   );
 }

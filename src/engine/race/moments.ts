@@ -296,7 +296,13 @@ export interface MomentChoice {
   car: number;
   sit: string;
   opt: string; // "auto" = instinct (the plain AI path)
+  q?: number; // how well the player executed it (0-1, from the braking mini-game); none = an average job
 }
+
+/** A duel answer that was executed through the mini-game: log-odds and contact multiplier from the score. */
+export const EXEC = { edge: 2.2, mid: 0.55, contactLo: 0.6, contactHi: 1.3 };
+export const execEdge = (q: number | undefined) => (q === undefined ? 0 : EXEC.edge * (Math.max(0, Math.min(1, q)) - EXEC.mid));
+export const execContact = (q: number | undefined) => (q === undefined ? 1 : EXEC.contactHi - (EXEC.contactHi - EXEC.contactLo) * Math.max(0, Math.min(1, q)));
 
 export interface DuelRecord {
   lap: number;
