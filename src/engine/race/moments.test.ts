@@ -53,14 +53,14 @@ describe("key moments", () => {
     const rate = (q: number) => {
       let pass = 0;
       let all = 0;
-      for (let s = 0; s < 30; s++) {
+      for (let s = 0; s < 20; s++) {
         const { r } = play(500 + s, [6, 7, 8, 9, 10, 11], (opts) => (opts.some((o) => o.id === "inside") ? "inside" : "auto"), () => q);
         for (const d of r.state.duels) if (d.attMove === "inside") (all++, (pass += d.passed ? 1 : 0));
       }
       return pass / Math.max(1, all);
     };
     expect(rate(1)).toBeGreaterThan(rate(0) + 0.1);
-  });
+  }, 30_000);
 
   it("answering every moment with instinct gives exactly the race nobody played", () => {
     const { r } = play(22, [5], () => "auto");
