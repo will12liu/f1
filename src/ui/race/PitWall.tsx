@@ -1,7 +1,7 @@
 // The pit wall for the car you drive: dials (applied from the next lap), gauges, the forecast and the
 // engineer's calls. Reads the live runner; every change goes in as a command so the race can be replayed.
 import { useState } from "react";
-import type { Dials, EngineMode, ErsMode, FuelMix } from "../../engine/race/dials";
+import type { Dials, EngineMode, ErsMode } from "../../engine/race/dials";
 import { engineerAccepts, engineerCalls } from "../../engine/race/engineer";
 import { COMPOUNDS } from "../../engine/race/model";
 import type { RaceRunner } from "../../engine/race/race";
@@ -77,7 +77,10 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
         <div className="grid gap-2">
           <Seg label="Pace" value={want.pace} options={[1, 2, 3, 4, 5].map((v) => [v, String(v)] as const)} onPick={(v) => set("pace", v)} />
           <Seg label="Tyre care" value={want.tyres} options={[1, 2, 3, 4, 5].map((v) => [v, String(v)] as const)} onPick={(v) => set("tyres", v)} />
-          <Seg<FuelMix> label="Fuel mix" value={want.fuel} options={[["lean", "Lean"], ["std", "Std"], ["rich", "Rich"]]} onPick={(v) => set("fuel", v)} />
+          <div className="flex items-center justify-between rounded-md bg-ink-850 px-3 py-2 text-base">
+            <span className="font-semibold text-slate-300">Fuel mix</span>
+            <span className="text-slate-400">Auto · the car manages it</span>
+          </div>
           <Seg<ErsMode> label="ERS" value={want.ers} options={[["harvest", "Harvest"], ["balanced", "Bal"], ["attack", "Attack"], ["defend", "Defend"]]} onPick={(v) => set("ers", v)} />
           <Seg<EngineMode> label="Engine" value={want.engine} options={[["low", "Low"], ["std", "Std"], ["high", "High"]]} onPick={(v) => set("engine", v)} />
         </div>

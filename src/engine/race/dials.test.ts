@@ -89,16 +89,19 @@ describe("dials", () => {
     expect(dialFx({ ...NEUTRAL, ers: "harvest" }, 0.5).sec).toBeGreaterThan(0);
   });
 
-  it("a rich mix all race runs the tank short and the car has to lift", () => {
+  it("fuel is on auto: a rich order is ignored, and a car that pushed all race goes lean by itself", () => {
     const r = createRace(input(6));
     r.command({ car: 0, dials: { fuel: "rich", pace: 5 } });
-    expect(r.forecast(0).fuelMargin).toBeGreaterThanOrEqual(-0.01); // neutral until the command lands
     r.step();
-    expect(r.forecast(0).fuelShortLap).not.toBeNull();
-    const lean = createRace(input(6));
-    lean.command({ car: 0, dials: { fuel: "lean" } });
-    lean.step();
-    expect(lean.forecast(0).fuelMargin).toBeGreaterThan(3);
+    r.step();
+    expect(r.state.cars[0].dials.fuel).not.toBe("rich");
+    while (!r.done() && r.state.cars[0].dials.fuel !== "lean") r.step();
+    expect(r.state.cars[0].dials.fuel).toBe("lean");
+    const calm = createRace(input(6));
+    calm.command({ car: 0, dials: { pace: 3 } });
+    calm.step();
+    calm.step();
+    expect(calm.state.cars[0].dials.fuel).toBe("std");
   });
 
   it("a stop can be called for a compound, or put off a lap", () => {

@@ -220,7 +220,7 @@ sit({
 });
 sit({
   id: "fuel-short", kind: "call",
-  w: (c) => (c.fuelShort ? 9 : 0),
+  w: () => 0, // fuel runs on auto now (race.ts): kept so old saved answers still read
   title: ["Fuel", "We're short on fuel", "Save fuel"],
   text: ["The engineer: we're short on fuel to the flag. Lean mix or lift and coast?", "Fuel is critical. {left} laps to go."],
   calls: [{ id: "lean", label: "Lean mix", hint: "Slower, saves fuel.", dials: { fuel: "lean" } }, { id: "lift", label: "Lift and coast", hint: "Pace 1 until the numbers work.", dials: { pace: 1, fuel: "lean" } }, { id: "ignore", label: "Ignore it", hint: "Hope for a safety car." }],

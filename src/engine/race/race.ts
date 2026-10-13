@@ -5,7 +5,7 @@
 // The replay (race/replay.ts) rebuilds positions from `lapEnd` and `events`.
 import { hashString, makeRng, type Rng } from "../rng";
 import type { CircuitDef, Compound, DnfReason, DriverRatings, PitLoss } from "../types";
-import { DIAL, dialFx, NEUTRAL, type Command, type DialFx, type Dials, type Forecast } from "./dials";
+import { DIAL, dialFx, NEUTRAL, type Command, type DialFx, type Dials, type Forecast, type FuelMix } from "./dials";
 import { POINTS, RACE, tyreCost, tyreLife } from "./model";
 import {
   ATTACK_LABEL, chooseSit, CONTACT, DEFEND_LABEL, execContact, execEdge, fill, PAYOFF, pickWeighted, readText, tendencies,
@@ -550,7 +550,15 @@ export function createRace(input: RaceInput): RaceRunner {
 
     // what each touched car's dials do this lap
     const fxs = new Map<number, DialFx>();
-    for (const car of running) if (car.ctl) fxs.set(car.idx, dialFx(car.dials, car.battery));
+    for (const car of running) {
+      if (!car.ctl) continue;
+      // fuel is the car's job, not the driver's: standard mix, lean when the tank won't make the flag
+      // (no random numbers, so a replay sets the same mix; neutral dials stay exactly the AI)
+      const left = laps - state.lap; // laps still to run, this one included (state.lap = laps done)
+      const need = (mix: FuelMix) => RACE.fuelPerLapKg * dialFx({ ...car.dials, pace: 3, fuel: mix }, car.battery).burn * left; // at normal pace: push now, save later
+      car.dials = { ...car.dials, fuel: car.fuel < need("std") - 0.4 ? "lean" : "std" };
+      fxs.set(car.idx, dialFx(car.dials, car.battery));
+    }
 
     // Dirty air from the gaps at the start of the lap.
     for (let k = 0; k < running.length; k++) running[k].dirty = k > 0 && running[k].cum - running[k - 1].cum < 1.0;
