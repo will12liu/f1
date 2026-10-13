@@ -77,6 +77,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - Life layer (`career/events.ts`): about one weekend in three draws an event (`EvDef`: weight over a context, options with `Fx`: fame, trust, morale, cash, XP, relationships, rival; some options are chances). It waits on the career page until answered. Morale moves race pace a little (`moraleForm`); a rival forms after 3 close finishes against the same driver.
 
 ## UI rules
+- Big menus: `/` is a full-screen start menu (one panel per mode, its saves under it; `SaveMeta.mode/who/color` from `summarize(world)`), `/new/:mode` is the full-screen creator. Each mode's home is a hub (`components/hub.tsx`: `NextRace` banner, `BigStat`, `Tile`/`TileGroup`), the detailed pages stay in the top nav. Root font is 17px from 1024px wide, 18px from 1536px.
 - No gradients, glass, emoji in headings, badge-above-headline, three-icon rows, fade-on-hover or fade-in-on-scroll, buzzword copy. Solid colours, high contrast, one spacing scale, plain labels.
 
 ## 2D race view (src/ui/race/RaceViewer.tsx)

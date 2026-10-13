@@ -8,8 +8,9 @@ import { ageOf } from "../../engine/season/development";
 import { hasLicence, isJuniorRound, juniorStandings, licencePointsSL } from "../../engine/season/juniors";
 import { circuitOf, driverStandings, nextRound } from "../../engine/season/season";
 import { useGame } from "../../state/game";
-import { Ovr, Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
-import { Answer, Meter, Stat, useAct } from "../manager/kit";
+import { onColor, Section, TeamBar, useMaps } from "../components/bits";
+import { BigStat, HubButton, NextRace, Tile, TileGroup } from "../components/hub";
+import { Answer, Meter, useAct } from "../manager/kit";
 
 export function CareerHq() {
   const { id = "" } = useParams();
@@ -35,109 +36,108 @@ export function CareerHq() {
   const unread = c.inbox.filter((x) => !x.read).length;
   const role = d.teamId ? `${d.series} · ${t?.name}` : t ? `${t.name} reserve driver` : "No seat";
 
+  const color = t?.color ?? "#475569";
+  const pointsBadge = c.points || undefined;
+  const offersBadge = c.seatOffers.length + c.dealOffers.length || undefined;
+  const raceButtons = next && (
+    <>
+      {racesHere && !c.event && (
+        <Link className="btn-xl bg-race text-white hover:bg-red-500" to={`${base}/live`}>
+          Race the weekend ›
+        </Link>
+      )}
+      <HubButton
+        disabled={!!busy || !!c.event}
+        onClick={async () => {
+          await simRounds(1);
+          if (!junior && racesHere) nav(`${base}/race/${next.round}`);
+        }}
+      >
+        {racesHere ? "Sim the weekend" : "Next weekend"}
+      </HubButton>
+    </>
+  );
+
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-      <div className="grid gap-4 content-start">
-        {c.event && (
-          <section className="panel border-l-4 border-sky-400 p-4 grid gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">This week</div>
-            <h2 className="font-display text-2xl font-bold uppercase leading-none">{c.event.title}</h2>
-            <p className="text-sm text-slate-300">{c.event.text}</p>
-            <div className="grid sm:grid-cols-3 gap-1.5">
-              {c.event.opts.map((o, i) => (
-                <button key={i} disabled={!!busy} onClick={() => run("answerEvent", i)} className="rounded-md bg-ink-800 px-2.5 py-1.5 text-left hover:bg-ink-700">
-                  <div className="text-sm font-semibold text-white">{o.label}</div>
-                  <div className="text-[11px] text-slate-400">{o.sub}</div>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-        <section className="panel p-5 grid gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <TeamBar color={t?.color ?? "#888"} className="!h-10 !w-1.5" />
-            <div className="flex-1">
-              <h1 className="font-display text-4xl font-black uppercase leading-none">
-                {d.first} {d.last}
-              </h1>
-              <div className="text-sm text-slate-400">
-                {ageOf(d, world.season)} · {d.nat} · {arch?.label} · {TIERS[c.tier].label} · {role}
-              </div>
-            </div>
-            <div className="text-right">
-              <Ovr v={d.ovr} />
-              <div className="text-[11px] text-slate-500">potential {d.pot}</div>
-            </div>
+    <div className="grid gap-8">
+      {c.event && (
+        <section className="grid gap-4 rounded-lg border border-ink-600 bg-ink-850 p-6 md:p-8">
+          <div className="kicker text-sky-300">This week · answer before the next race</div>
+          <h2 className="headline text-4xl sm:text-5xl">{c.event.title}</h2>
+          <p className="max-w-3xl text-lg text-slate-300">{c.event.text}</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {c.event.opts.map((o, i) => (
+              <button key={i} disabled={!!busy} onClick={() => run("answerEvent", i)} className="tile !min-h-0">
+                <div className="font-display text-2xl font-extrabold uppercase leading-tight text-white">{o.label}</div>
+                <div className="mt-2 text-sm text-slate-400">{o.sub}</div>
+              </button>
+            ))}
           </div>
-          {next && circuit ? (
-            <div className="grid sm:grid-cols-[1fr_160px] items-center gap-3 rounded-md bg-ink-850 p-3">
-              <div className="grid gap-2">
-                <div className="text-xs uppercase tracking-wider text-slate-400">Round {next.round} · {circuit.gp}</div>
-                <div className="text-sm text-slate-300">{racesHere ? `${d.series} races this weekend.` : junior ? `No ${d.series} race this weekend. You test in the simulator (XP).` : "You're not racing this weekend."}</div>
-                <div className="flex flex-wrap gap-2">
-                  {racesHere && !c.event && (
-                    <Link className="btn-primary" to={`${base}/live`}>
-                      Race it
-                    </Link>
-                  )}
-                  <button
-                    className="btn-ghost"
-                    disabled={!!busy || !!c.event}
-                    onClick={async () => {
-                      await simRounds(1);
-                      if (!junior && racesHere) nav(`${base}/race/${next.round}`);
-                    }}
-                  >
-                    {racesHere ? "Sim the weekend" : "Next weekend"}
-                  </button>
-                </div>
-              </div>
-              <TrackOutline id={circuit.id} className="w-full h-28" />
-            </div>
-          ) : (
-            <div className="grid gap-2 rounded-md bg-ink-850 p-3">
-              <div className="text-sm text-slate-300">Season over. Pick your seat for next year, then go into the winter.</div>
-              <div>
-                <button className="btn-primary" disabled={!!busy} onClick={() => nextSeason()}>
-                  Go into the winter
-                </button>
-              </div>
-            </div>
-          )}
         </section>
+      )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat label={`${d.series} standings`} value={pos ? `P${pos}` : "-"} sub={`${pts} pts`} />
-          <Stat label="Team trust" value={Math.round(c.trust)} tone={c.trust >= 60 ? "good" : c.trust < 30 ? "bad" : undefined} />
-          <Stat label="Fame" value={Math.round(c.fame)} sub={`morale ${Math.round(c.morale ?? 60)}`} />
-          <Stat label="Bank" value={fmtM(c.cash)} />
+      <section className="flex flex-wrap items-stretch overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
+        <div className="flex w-24 items-center justify-center font-display text-6xl font-black sm:w-36 sm:text-7xl" style={{ background: color, color: onColor(color) }}>
+          {d.num}
         </div>
-
-        <Section title="Progression" right={<Link to={`${base}/training`} className="text-xs text-slate-400 hover:text-white">Training</Link>}>
-          <div className="p-4 grid gap-2 text-sm">
-            <Meter value={c.xp / XP_PER_POINT} color="#38bdf8" />
-            <div className="flex justify-between text-xs text-slate-400">
-              <span>{c.xp}/{XP_PER_POINT} XP to the next point</span>
-              <span className={c.points ? "text-white" : ""}>{c.points} point{c.points === 1 ? "" : "s"} to spend</span>
-            </div>
-            <div className="text-xs text-slate-400">
-              Super licence: {licencePointsSL(d, world.season)}/40 {hasLicence(world, d) ? "(you can race in F1)" : ""}
-              {c.academyOf ? ` · ${team(c.academyOf)?.name} junior programme` : ""}
-            </div>
+        <div className="min-w-0 flex-1 px-6 py-5">
+          <div className="kicker">{role}</div>
+          <h1 className="headline mt-2">
+            <span className="block text-2xl tracking-[0.15em] text-slate-300">{d.first}</span>
+            <span className="block text-5xl sm:text-6xl">{d.last}</span>
+          </h1>
+          <div className="mt-2 text-base text-slate-400">
+            Age {ageOf(d, world.season)} · {d.nat} · {arch?.label} · {TIERS[c.tier].label}
           </div>
-        </Section>
+        </div>
+        <div className="flex items-center gap-8 border-ink-700 px-6 py-5 max-sm:w-full max-sm:border-t sm:border-l">
+          <div>
+            <div className="kicker">Overall</div>
+            <div className="font-display text-6xl font-black leading-none text-white">{d.ovr}</div>
+          </div>
+          <div>
+            <div className="kicker">Potential</div>
+            <div className="font-display text-6xl font-black leading-none text-slate-500">{d.pot}</div>
+          </div>
+        </div>
+      </section>
+
+      {next && circuit ? (
+        <NextRace world={world} note={racesHere ? `${d.series} races this weekend.` : junior ? `No ${d.series} race this weekend. You test in the simulator (XP).` : "You're not racing this weekend."}>
+          {raceButtons}
+        </NextRace>
+      ) : (
+        <section className="grid gap-5 rounded-lg border border-ink-700 bg-ink-900 p-6 md:p-8">
+          <div className="kicker">{world.season} season complete</div>
+          <h1 className="headline text-5xl sm:text-6xl">Season over</h1>
+          <p className="text-lg text-slate-300">Pick your seat for next year from the offers below, then go into the winter.</p>
+          <div>
+            <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={!!busy} onClick={() => nextSeason()}>
+              Go into the winter ›
+            </button>
+          </div>
+        </section>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <BigStat label={`${d.series} standing`} value={pos ? `P${pos}` : "-"} sub={`${pts} pts`} />
+        <BigStat label="Team trust" value={Math.round(c.trust)} tone={c.trust >= 60 ? "good" : c.trust < 30 ? "bad" : undefined} />
+        <BigStat label="Fame" value={Math.round(c.fame)} sub={`morale ${Math.round(c.morale ?? 60)}`} />
+        <BigStat label="Bank" value={fmtM(c.cash)} />
+        <BigStat label="Super licence" value={`${licencePointsSL(d, world.season)}/40`} sub={hasLicence(world, d) ? "F1 eligible" : "40 needed for F1"} tone={hasLicence(world, d) ? "good" : undefined} />
+      </div>
 
         {c.seatOffers.length > 0 && (
           <Section title="Offers for next season">
-            <div className="divide-y divide-ink-800 text-sm">
+            <div className="divide-y divide-ink-800 text-base">
               {c.seatOffers.map((o) => (
-                <div key={o.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                <div key={o.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
                   <TeamBar color={team(o.teamId)?.color ?? "#888"} />
                   <div className="flex-1">
                     <div className="font-semibold">
                       {o.series} {team(o.teamId)?.name} {o.role === "reserve" ? "(reserve)" : ""}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-sm text-slate-400">
                       {o.note} {o.salary > 0 ? `${fmtM(o.salary)} a season` : o.salary < 0 ? `You pay ${fmtM(-o.salary)}` : "No salary"} · {o.years} year{o.years > 1 ? "s" : ""}
                     </div>
                   </div>
@@ -145,16 +145,16 @@ export function CareerHq() {
                     <span className="text-xs font-semibold text-emerald-300">Agreed</span>
                   ) : (
                     <>
-                      <button className="text-xs text-slate-400 hover:text-white" onClick={() => setTalk(talk === o.id ? null : o.id)}>
+                      <button className="text-sm font-semibold text-slate-300 hover:text-white" onClick={() => setTalk(talk === o.id ? null : o.id)}>
                         Negotiate
                       </button>
-                      <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={!!busy} onClick={() => run("acceptSeat", o.id)}>
+                      <button className="btn-primary" disabled={!!busy} onClick={() => run("acceptSeat", o.id)}>
                         Accept
                       </button>
                     </>
                   )}
                   {o.clauses && (o.clauses.release || o.clauses.lead) && (
-                    <div className="w-full text-[11px] text-sky-300">
+                    <div className="w-full text-sm text-sky-300">
                       {[o.clauses.release ? "release clause" : "", o.clauses.lead ? "number-one driver" : ""].filter(Boolean).join(", ")}
                     </div>
                   )}
@@ -170,6 +170,32 @@ export function CareerHq() {
         )}
         <Answer a={answer} />
 
+      <TileGroup title="Your career" cols={4}>
+        <Tile
+          to={`${base}/training`}
+          title="Training"
+          badge={pointsBadge}
+          sub={
+            <span className="grid gap-2">
+              <Meter value={c.xp / XP_PER_POINT} color="#38bdf8" />
+              {c.points ? `${c.points} point${c.points === 1 ? "" : "s"} to spend` : `${c.xp}/${XP_PER_POINT} XP to the next point`}
+            </span>
+          }
+        />
+        <Tile to={`${base}/deals`} title="Deals" badge={offersBadge} sub={`${c.deals.length} endorsement${c.deals.length === 1 ? "" : "s"} · ${fmtM(c.deals.reduce((s, x) => s + x.pay, 0))} a season`} />
+        <Tile to={`${base}/life`} title="Life" sub={`Morale ${Math.round(c.morale ?? 60)} · the shop and your people`} />
+        <Tile onClick={() => document.getElementById("messages")?.scrollIntoView({ block: "start" })} title="Messages" badge={unread || undefined} sub={c.inbox[0]?.subject ?? "Nothing yet"} />
+      </TileGroup>
+      <TileGroup title="The paddock" cols={5}>
+        <Tile to={`${base}/calendar`} title="Calendar" sub={`${world.results.length} of ${world.calendar.length} rounds run`} />
+        <Tile to={`${base}/${junior ? "juniors" : "standings"}`} title="Standings" sub={pos ? `You're P${pos} in ${d.series}` : `${d.series} tables`} />
+        <Tile to={`${base}/juniors`} title="Juniors" sub="F2 and F3" />
+        <Tile to={`${base}/drivers`} title="Drivers" sub="Every driver, every rating" />
+        <Tile to={`${base}/teams`} title="Teams" sub="Cars and line-ups" />
+      </TileGroup>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid content-start gap-6">
         <Section title="Races">
           <div className="overflow-x-auto">
             <table className="tbl">
@@ -212,23 +238,23 @@ export function CareerHq() {
         </Section>
       </div>
 
-      <div className="grid gap-4 content-start">
+      <div className="grid gap-6 content-start" id="messages">
         <Section title={`Messages${unread ? ` (${unread})` : ""}`} right={unread ? <button className="text-xs text-slate-400 hover:text-white" onClick={() => run("markCareerRead")}>Mark read</button> : undefined}>
           <div className="divide-y divide-ink-800 max-h-[520px] overflow-y-auto">
             {c.inbox.slice(0, 30).map((x) => (
-              <div key={x.id} className="px-4 py-2.5">
+              <div key={x.id} className="px-5 py-3">
                 <div className="flex items-baseline gap-2">
                   {!x.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-race" />}
-                  <span className={`text-sm ${x.read ? "text-slate-300" : "font-semibold text-white"}`}>{x.subject}</span>
+                  <span className={`text-base ${x.read ? "text-slate-300" : "font-semibold text-white"}`}>{x.subject}</span>
                 </div>
-                <div className="text-xs text-slate-500">{x.from}</div>
-                <p className="mt-0.5 text-xs text-slate-400">{x.body}</p>
+                <div className="text-sm text-slate-500">{x.from}</div>
+                <p className="mt-1 text-sm text-slate-400">{x.body}</p>
               </div>
             ))}
           </div>
         </Section>
         <Section title="Contract and deals" right={<Link to={`${base}/deals`} className="text-xs text-slate-400 hover:text-white">Deals</Link>}>
-          <div className="p-4 grid gap-1 text-sm">
+          <div className="p-5 grid gap-1.5 text-base">
             <div className="flex justify-between">
               <span className="text-slate-400">Contract</span>
               <span>{d.contract ? `${team(d.contract.teamId)?.name} until ${d.contract.until}` : "none"}</span>
@@ -249,6 +275,7 @@ export function CareerHq() {
             </div>
           </div>
         </Section>
+      </div>
       </div>
     </div>
   );

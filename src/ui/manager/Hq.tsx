@@ -6,8 +6,9 @@ import { capForecast, carRank, myTeam } from "../../engine/manager/manager";
 import { fmtM } from "../../engine/manager/state";
 import { circuitOf, nextRound, teamStandings } from "../../engine/season/season";
 import { useGame } from "../../state/game";
-import { Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
-import { Answer, AREA_LABEL, Meter, Stat, useAct } from "./kit";
+import { onColor, Section, TeamBar, useMaps } from "../components/bits";
+import { BigStat, HubButton, NextRace, Tile, TileGroup } from "../components/hub";
+import { Answer, AREA_LABEL, Meter, useAct } from "./kit";
 
 export function Hq() {
   const { id = "" } = useParams();
@@ -51,63 +52,100 @@ export function Hq() {
   const ours = me.drivers.map((d) => drivers.get(d)).filter(Boolean);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-      <div className="grid gap-4 content-start">
-        <section className="panel p-5 grid sm:grid-cols-[1fr_180px] gap-4 items-center">
-          <div className="grid gap-3">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400">
-              <TeamBar color={me.color} />
-              {me.name} · team principal {m.name}
-            </div>
-            {next && circuit ? (
-              <>
-                <h1 className="font-display text-4xl font-black uppercase leading-none">{circuit.gp}</h1>
-                <div className="text-sm text-slate-400">
-                  Round {next.round} of {world.calendar.length} · {circuit.laps} laps · {ours.map((d) => d!.last).join(" and ")}
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Link className="btn-primary" to={`${base}/live`}>
-                    Run the race from the pit wall
-                  </Link>
-                  <button
-                    className="btn-ghost"
-                    disabled={!!busy}
-                    onClick={async () => {
-                      await simRounds(1);
-                      nav(`${base}/race/${next.round}`);
-                    }}
-                  >
-                    Sim the weekend
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h1 className="font-display text-4xl font-black uppercase leading-none">Season over</h1>
-                <div className="text-sm text-slate-400">P{pos} in the constructors' championship with {pts} points.</div>
-                <div>
-                  <button className="btn-primary" disabled={!!busy} onClick={() => nextSeason()}>
-                    Go into the winter
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-          {circuit && <TrackOutline id={circuit.id} className="w-full h-36" />}
-        </section>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Stat
-            label="Constructors"
-            value={world.results.length ? `P${pos}` : "-"}
-            sub={`${pts} pts · target P${m.board.target}`}
-            tone={!world.results.length ? undefined : pos <= m.board.target ? "good" : pos > m.board.target + 1 ? "bad" : undefined}
-          />
-          <Stat label="Bank" value={fmtM(m.cash)} tone={m.cash < 0 ? "bad" : undefined} sub={m.cash < 0 ? "overdrawn" : undefined} />
-          <Stat label="Car" value={`#${carRank(world, m.teamId)}`} sub="fastest on paper" />
-          <Stat label="Board" value={`${Math.round(conf)}`} sub={conf >= 60 ? "happy" : conf >= 35 ? "watching" : "losing patience"} tone={conf >= 60 ? "good" : conf < 35 ? "bad" : undefined} />
+    <div className="grid gap-8">
+      <section className="flex flex-wrap items-stretch overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
+        <div className="flex w-24 items-center justify-center px-3 font-display text-3xl font-black uppercase sm:w-36 sm:text-4xl" style={{ background: me.color, color: onColor(me.color) }}>
+          {me.short}
         </div>
+        <div className="min-w-0 flex-1 px-6 py-5">
+          <div className="kicker">Team principal · {m.name}</div>
+          <h1 className="headline mt-2 text-5xl sm:text-6xl">{me.name}</h1>
+          <div className="mt-2 text-base text-slate-400">
+            {ours.map((d) => `${d!.first} ${d!.last}`).join(" and ")} · {me.engine} power
+          </div>
+        </div>
+        <div className="flex items-center gap-8 border-ink-700 px-6 py-5 max-sm:w-full max-sm:border-t sm:border-l">
+          <div>
+            <div className="kicker">Constructors</div>
+            <div className="font-display text-6xl font-black leading-none text-white">{world.results.length ? `P${pos}` : "-"}</div>
+          </div>
+          <div>
+            <div className="kicker">Target</div>
+            <div className="font-display text-6xl font-black leading-none text-slate-500">P{m.board.target}</div>
+          </div>
+        </div>
+      </section>
 
+      {next && circuit ? (
+        <NextRace world={world} note={`${ours.map((d) => d!.last).join(" and ")} for ${me.name}.`}>
+          <Link className="btn-xl bg-race text-white hover:bg-red-500" to={`${base}/live`}>
+            Run the weekend ›
+          </Link>
+          <HubButton
+            disabled={!!busy}
+            onClick={async () => {
+              await simRounds(1);
+              nav(`${base}/race/${next.round}`);
+            }}
+          >
+            Sim the weekend
+          </HubButton>
+        </NextRace>
+      ) : (
+        <section className="grid gap-5 rounded-lg border border-ink-700 bg-ink-900 p-6 md:p-8">
+          <div className="kicker">{world.season} season complete</div>
+          <h1 className="headline text-5xl sm:text-6xl">Season over</h1>
+          <p className="text-lg text-slate-300">P{pos} in the constructors' championship with {pts} points.</p>
+          <div>
+            <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={!!busy} onClick={() => nextSeason()}>
+              Go into the winter ›
+            </button>
+          </div>
+        </section>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <BigStat
+          label="Points"
+          value={pts}
+          sub={world.results.length ? `P${pos} · target P${m.board.target}` : `target P${m.board.target}`}
+          tone={!world.results.length ? undefined : pos <= m.board.target ? "good" : pos > m.board.target + 1 ? "bad" : undefined}
+        />
+        <BigStat label="Bank" value={fmtM(m.cash)} tone={m.cash < 0 ? "bad" : undefined} sub={m.cash < 0 ? "overdrawn" : undefined} />
+        <BigStat label="Cap room" value={fmtM(cap.room)} tone={cap.room < 0 ? "bad" : undefined} sub={cap.room >= 0 ? "left for R&D" : "over the cap"} />
+        <BigStat label="Car" value={`#${carRank(world, m.teamId)}`} sub="fastest on paper" />
+        <BigStat label="Board" value={`${Math.round(conf)}`} sub={conf >= 60 ? "happy" : conf >= 35 ? "watching" : "losing patience"} tone={conf >= 60 ? "good" : conf < 35 ? "bad" : undefined} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <TileGroup title="Engineering" cols={3}>
+          <div className="col-span-full grid gap-3">
+            <Tile to={`${base}/rnd`} title="Car & R&D" badge={m.projects.length || undefined} sub={m.projects.length ? `${m.projects.length} project${m.projects.length > 1 ? "s" : ""} in the factory` : "Nothing in the factory"} />
+          </div>
+        </TileGroup>
+        <TileGroup title="Personnel" cols={3}>
+          <div className="col-span-full grid grid-cols-2 gap-3">
+            <Tile to={`${base}/people`} title="People" sub="Drivers and staff" />
+            <Tile to={`${base}/academy`} title="Academy" sub="Juniors and scouts" />
+          </div>
+        </TileGroup>
+        <TileGroup title="Corporate" cols={3}>
+          <div className="col-span-full grid grid-cols-2 gap-3">
+            <Tile to={`${base}/partners`} title="Partners" badge={m.offers.length || undefined} sub={`${m.sponsors.length} signed`} />
+            <Tile to={`${base}/finance`} title="Finance" sub="Money and the cap" />
+          </div>
+        </TileGroup>
+      </div>
+      <TileGroup title="The championship" cols={5}>
+        <Tile to={`${base}/inbox`} title="Inbox" badge={unread || undefined} sub={m.inbox[0]?.subject ?? "No mail"} />
+        <Tile to={`${base}/calendar`} title="Calendar" sub={`${world.results.length} of ${world.calendar.length} rounds run`} />
+        <Tile to={`${base}/standings`} title="Standings" sub={world.results.length ? `P${pos} with ${pts} pts` : "Before round 1"} />
+        <Tile to={`${base}/drivers`} title="Drivers" sub="The market" />
+        <Tile to={`${base}/teams`} title="Teams" sub="Cars and line-ups" />
+      </TileGroup>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 content-start">
         <Section title="Cost cap" right={<Link to={`${base}/finance`} className="text-xs text-slate-400 hover:text-white">Finance</Link>}>
           <div className="p-4 grid gap-2 text-sm">
             <Meter value={(cap.spent + cap.committed) / (FINANCE.costCap * 1.1)} mark={1 / 1.1} color={cap.room < 0 ? "#f43f5e" : "#e10600"} />
@@ -136,7 +174,7 @@ export function Hq() {
         </Section>
       </div>
 
-      <div className="grid gap-4 content-start">
+      <div className="grid gap-6 content-start">
         <Section title={`Inbox${unread ? ` (${unread})` : ""}`} right={<Link to={`${base}/inbox`} className="text-xs text-slate-400 hover:text-white">All mail</Link>}>
           <div className="divide-y divide-ink-800">
             {m.inbox.slice(0, 6).map((x) => (
@@ -165,6 +203,7 @@ export function Hq() {
           </div>
         </Section>
         <Answer a={answer} />
+      </div>
       </div>
     </div>
   );

@@ -51,7 +51,10 @@ DNF/race 3.5 (real 2.6 all years, 4.2 in 2026) · stops/finisher 1.65 (1.6) · S
 
 Also done on 2026-10-13: Phase 7 (practice programmes, setup vs a hidden ideal, qualifying calls), the career life layer (event deck, morale, relationships, rivals), contract negotiation with clauses, the paddock life shop, career balance (`npm run check:career`), IBM Plex Sans instead of Inter, save export/import.
 
+Also on 2026-10-13 (UI pass): full-screen start menu with a panel per mode, full-screen new-game page, bigger type everywhere, hub home screens (next-race banner, stat strip, big tiles) for career, team principal and sandbox. Inner pages (training, R&D, people, standings...) still use the older, denser layout.
+
 ## Next
+- Big-menu pass over the inner pages (Training, Deals, Life, R&D, People, Finance, Standings), and the live race pre-race screen.
 - Phase 12 optional layers (investing, property, relationships, casino) if wanted.
 - Phase 13: tutorial hints for dials/duels/weekend, a phone-width pass over the new pages, accessibility.
 - Deeper AI for the other ten teams in manager mode (they still develop automatically), engine-component penalties, weather.

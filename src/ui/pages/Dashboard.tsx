@@ -1,7 +1,8 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { circuitOf, driverStandings, nextRound, teamStandings } from "../../engine/season/season";
 import { useGame } from "../../state/game";
-import { DriverLink, Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
+import { DriverLink, Section, TeamBar, useMaps } from "../components/bits";
+import { HubButton, NextRace, Tile, TileGroup } from "../components/hub";
 import { Hq } from "../manager/Hq";
 import { CareerHq } from "../career/CareerHq";
 
@@ -22,59 +23,55 @@ export function Dashboard() {
   const champ = !next && ds[0];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-      <div className="space-y-4">
-        {next && circuit ? (
-          <section className="panel p-5 grid sm:grid-cols-[1fr_200px] gap-4 items-center">
-            <div className="space-y-3">
-              <div className="text-xs uppercase tracking-wider text-slate-400">
-                Round {next.round} of {world.calendar.length} · {new Date(next.date + "T12:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-              </div>
-              <h1 className="font-display text-4xl font-black uppercase leading-none">
-                {circuit.gp}
-              </h1>
-              <div className="text-sm text-slate-400">
-                {circuit.name} · {circuit.laps} laps · {(circuit.laps * circuit.km).toFixed(1)} km · overtaking {["easy", "fair", "average", "hard", "very hard"][circuit.overtake - 1]}
-              </div>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <Link className="btn-primary" to={`${base}/live`}>
-                  Drive it live
-                </Link>
-                <button
-                  className="btn-ghost"
-                  disabled={!!busy}
-                  onClick={async () => {
-                    await simRounds(1);
-                    nav(`${base}/race/${next.round}?watch=1`);
-                  }}
-                >
-                  Watch the race
-                </button>
-                <button className="btn-ghost" disabled={!!busy} onClick={() => simRounds(1)}>
-                  Sim race
-                </button>
-                <button className="btn-ghost" disabled={!!busy} onClick={() => simRounds(99)}>
-                  Sim to season end
-                </button>
-              </div>
-            </div>
-            <TrackOutline id={circuit.id} className="w-full h-40" />
-          </section>
-        ) : (
-          <section className="panel p-5 space-y-3">
-            <div className="text-xs uppercase tracking-wider text-slate-400">{world.season} season complete</div>
-            {champ && (
-              <h1 className="font-display text-4xl font-black uppercase">
-                <DriverLink d={drivers.get(champ.driverId)} base={base} full /> is world champion
-              </h1>
-            )}
-            <div className="text-sm text-slate-400">Constructors' champions: {team(ts[0]?.teamId)?.name}</div>
-            <button className="btn-primary" disabled={!!busy} onClick={() => nextSeason()}>
-              Start the {world.season + 1} season →
+    <div className="grid gap-8">
+      {next && circuit ? (
+        <NextRace world={world}>
+          <Link className="btn-xl bg-race text-white hover:bg-red-500" to={`${base}/live`}>
+            Drive it live ›
+          </Link>
+          <HubButton
+            disabled={!!busy}
+            onClick={async () => {
+              await simRounds(1);
+              nav(`${base}/race/${next.round}?watch=1`);
+            }}
+          >
+            Watch the race
+          </HubButton>
+          <HubButton disabled={!!busy} onClick={() => simRounds(1)}>
+            Sim race
+          </HubButton>
+          <HubButton disabled={!!busy} onClick={() => simRounds(99)}>
+            Sim to season end
+          </HubButton>
+        </NextRace>
+      ) : (
+        <section className="grid gap-5 rounded-lg border border-ink-700 bg-ink-900 p-6 md:p-8">
+          <div className="kicker">{world.season} season complete</div>
+          {champ && (
+            <h1 className="headline text-5xl sm:text-6xl">
+              <DriverLink d={drivers.get(champ.driverId)} base={base} full /> is world champion
+            </h1>
+          )}
+          <div className="text-lg text-slate-300">Constructors' champions: {team(ts[0]?.teamId)?.name}</div>
+          <div>
+            <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={!!busy} onClick={() => nextSeason()}>
+              Start the {world.season + 1} season ›
             </button>
-          </section>
-        )}
+          </div>
+        </section>
+      )}
 
+      <TileGroup title="The season" cols={5}>
+        <Tile to={`${base}/calendar`} title="Calendar" sub={`${world.results.length} of ${world.calendar.length} rounds run`} />
+        <Tile to={`${base}/standings`} title="Standings" sub={ds[0] ? `${drivers.get(ds[0].driverId)?.last} leads on ${ds[0].points}` : "Before round 1"} />
+        <Tile to={`${base}/drivers`} title="Drivers" sub="Every driver, every rating" />
+        <Tile to={`${base}/teams`} title="Teams" sub="Cars and line-ups" />
+        <Tile to={`${base}/juniors`} title="Juniors" sub="F2 and F3" />
+      </TileGroup>
+
+    <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 content-start">
         {last && (
           <Section title={`Last race · ${circuitOf(world, last.circuitId).gp}`} right={<Link className="text-xs text-slate-400 hover:text-white" to={`${base}/race/${last.round}`}>Full result →</Link>}>
             <div className="grid grid-cols-3 gap-px bg-ink-800">
@@ -99,7 +96,7 @@ export function Dashboard() {
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="grid gap-6 content-start">
         <Section title="Drivers" right={<Link className="text-xs text-slate-400 hover:text-white" to={`${base}/standings`}>All →</Link>}>
           <table className="tbl">
             <tbody>
@@ -136,6 +133,7 @@ export function Dashboard() {
             </tbody>
           </table>
         </Section>
+      </div>
       </div>
     </div>
   );

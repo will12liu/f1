@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { GameLayout } from "./ui/GameLayout";
 import { Home } from "./ui/pages/Home";
+import { NewGame } from "./ui/pages/NewGame";
 import { Dashboard } from "./ui/pages/Dashboard";
 import { Calendar } from "./ui/pages/Calendar";
 import { Standings } from "./ui/pages/Standings";
@@ -26,6 +27,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/new/:mode" element={<NewGame />} />
         <Route path="/g/:id" element={<GameLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="calendar" element={<Calendar />} />

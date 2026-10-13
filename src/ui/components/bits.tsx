@@ -68,11 +68,18 @@ export function useMaps(w: World) {
 export function Section({ title, right, children, className = "" }: { title: string; right?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
     <section className={`panel overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-ink-800">
-        <h2 className="font-display text-lg font-bold uppercase tracking-wide text-slate-100">{title}</h2>
+      <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-ink-800">
+        <h2 className="font-display text-xl font-bold uppercase tracking-wide text-slate-100">{title}</h2>
         {right}
       </div>
       {children}
     </section>
   );
+}
+
+/** Readable text colour on a team colour. */
+export function onColor(hex: string): string {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6 ? "#08090c" : "#ffffff";
 }
