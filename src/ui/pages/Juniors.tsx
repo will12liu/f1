@@ -19,12 +19,12 @@ export function Juniors() {
   const acad = new Set(world.manager?.academy?.map((a) => a.driverId) ?? []);
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-end gap-2">
+    <div className="grid gap-8">
+      <div className="flex flex-wrap items-end gap-4">
         <h1 className="headline text-5xl sm:text-6xl">Junior ladder</h1>
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex flex-wrap gap-2">
           {(["F2", "F3", "F4"] as const).map((k) => (
-            <button key={k} onClick={() => setTab(k)} className={`btn !px-3 !py-1.5 ${tab === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+            <button key={k} onClick={() => setTab(k)} className={`rounded-lg px-5 py-3 font-display text-lg font-bold uppercase ${tab === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
               {k === "F4" ? "F4 prospects" : k}
             </button>
           ))}

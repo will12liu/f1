@@ -4,7 +4,7 @@ import { ageOf } from "../../engine/season/development";
 import { circuitOf } from "../../engine/season/season";
 import { barColor, FLAGS, money } from "../../lib/format";
 import { useGame } from "../../state/game";
-import { Ovr, Section, useMaps } from "../components/bits";
+import { onColor, Section, useMaps } from "../components/bits";
 
 export function DriverPage() {
   const { id = "", did = "" } = useParams();
@@ -16,39 +16,51 @@ export function DriverPage() {
   const t = team(d.teamId);
   const results = world.results.map((r) => ({ r, c: r.classification.find((x) => x.driverId === d.id) })).filter((x) => x.c);
   const titles = world.history.filter((h) => h.champion === d.id).map((h) => h.season);
+  const color = t?.color ?? "#475569";
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-      <section className="panel overflow-hidden">
-        <div className="h-2" style={{ background: t ? `linear-gradient(90deg, ${t.color}, ${t.color2})` : "#333" }} />
-        <div className="p-5 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm text-slate-400">{FLAGS[d.nat]} {d.nat} · age {ageOf(d, world.season)} · #{d.num}</div>
-              <h1 className="headline text-5xl sm:text-6xl">
-                {d.first} <span className="text-white">{d.last}</span>
-              </h1>
-              <div className="text-sm text-slate-400 mt-1">
-                {d.retired ? `Retired after ${d.retired}` : t ? `${t.name} (${d.series})` : `Free agent (${d.series})`}
-                {d.contract && ` · contract to ${d.contract.until}, ${money(d.contract.salary)} a year`}
-              </div>
-              {titles.length > 0 && <div className="text-sm text-amber-300 mt-1">World champion {titles.join(", ")}</div>}
-            </div>
-            <div className="text-center">
-              <Ovr v={d.ovr} />
-              <div className="text-xs text-slate-500 mt-1">POT {d.pot}</div>
-            </div>
+    <div className="grid gap-8">
+      <section className="flex flex-wrap items-stretch overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
+        <div className="flex w-24 items-center justify-center font-display text-6xl font-black sm:w-36 sm:text-7xl" style={{ background: color, color: onColor(color) }}>
+          {d.num}
+        </div>
+        <div className="min-w-0 flex-1 px-6 py-5">
+          <div className="kicker">{d.retired ? `Retired after ${d.retired}` : t ? `${d.series} · ${t.name}` : `${d.series} · free agent`}</div>
+          <h1 className="headline mt-2">
+            <span className="block text-2xl tracking-[0.15em] text-slate-300">{d.first}</span>
+            <span className="block text-5xl sm:text-6xl">{d.last}</span>
+          </h1>
+          <div className="mt-2 text-base text-slate-400">
+            {FLAGS[d.nat]} {d.nat} · age {ageOf(d, world.season)}
+            {d.contract && ` · contract to ${d.contract.until}, ${money(d.contract.salary)} a year`}
           </div>
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
-            {RATING_KEYS.map((k) => (
-              <div key={k} className="flex items-center gap-2 text-sm">
-                <span className="w-32 text-slate-400">{RATING_LABELS[k]}</span>
-                <div className="flex-1 h-1.5 rounded bg-ink-700 overflow-hidden">
-                  <div className={`h-full ${k === "aggression" ? "bg-violet-400" : barColor(d.ratings[k])}`} style={{ width: `${d.ratings[k]}%` }} />
-                </div>
-                <span className="w-6 text-right font-mono">{d.ratings[k]}</span>
-              </div>
-            ))}
+          {titles.length > 0 && <div className="mt-1 text-base font-semibold text-amber-300">World champion {titles.join(", ")}</div>}
+        </div>
+        <div className="flex items-center gap-8 border-ink-700 px-6 py-5 max-sm:w-full max-sm:border-t sm:border-l">
+          <div>
+            <div className="kicker">Overall</div>
+            <div className="font-display text-6xl font-black leading-none text-white">{d.ovr}</div>
           </div>
+          <div>
+            <div className="kicker">Potential</div>
+            <div className="font-display text-6xl font-black leading-none text-slate-500">{d.pot}</div>
+          </div>
+        </div>
+      </section>
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+      <section className="grid content-start gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
+        <h2 className="font-display text-2xl font-extrabold uppercase text-white">Ratings</h2>
+        <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          {RATING_KEYS.map((k) => (
+            <div key={k} className="grid gap-1.5">
+              <div className="flex items-baseline justify-between">
+                <span className="text-base text-slate-300">{RATING_LABELS[k]}</span>
+                <span className="font-display text-2xl font-black text-white">{d.ratings[k]}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-sm bg-ink-700">
+                <div className={`h-full ${k === "aggression" ? "bg-violet-400" : barColor(d.ratings[k])}`} style={{ width: `${d.ratings[k]}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
       </section>
       <Section title={`${world.season} results`}>
@@ -81,6 +93,7 @@ export function DriverPage() {
           </table>
         )}
       </Section>
+      </div>
     </div>
   );
 }
