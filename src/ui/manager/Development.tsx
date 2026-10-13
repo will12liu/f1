@@ -45,7 +45,7 @@ export function Development() {
               const span = Math.max(1, best - worst);
               return (
                 <div key={a} className="grid gap-1.5">
-                  <div className="flex justify-between text-xs">
+                  <div className="flex justify-between text-sm">
                     <span className="text-slate-300">{AREA_LABEL[a]}</span>
                     <span className="font-mono text-slate-400">
                       {me.car[a].toFixed(1)} · #{rank} of {teams.length}
@@ -60,30 +60,30 @@ export function Development() {
                 </div>
               );
             })}
-            {!isWorks(me.id) && <p className="text-xs text-slate-500">{me.name} buys {me.engine} power units: power-unit work is limited to integration (half the effect).</p>}
+            {!isWorks(me.id) && <p className="text-sm text-slate-500">{me.name} buys {me.engine} power units: power-unit work is limited to integration (half the effect).</p>}
           </div>
         </Section>
 
-        <Section title="New project" right={<span className="text-xs text-slate-400">{m.projects.length}/{max} in the factory</span>}>
+        <Section title="New project" right={<span className="text-sm text-slate-400">{m.projects.length}/{max} in the factory</span>}>
           <div className="p-4 grid gap-3 text-sm">
             <div className="grid grid-cols-[90px_1fr] items-center gap-2">
-              <span className="text-xs text-slate-400">Area</span>
+              <span className="text-sm text-slate-400">Area</span>
               <div className="flex flex-wrap gap-1">
                 {AREAS.map((a) => (
-                  <button key={a} onClick={() => setArea(a)} className={`btn !px-2.5 !py-1 ${area === a ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                  <button key={a} onClick={() => setArea(a)} className={`btn !px-3.5 !py-2 ${area === a ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                     {AREA_LABEL[a]}
                   </button>
                 ))}
               </div>
-              <span className="text-xs text-slate-400">Size</span>
+              <span className="text-sm text-slate-400">Size</span>
               <div className="flex gap-1">
                 {SIZES.map(([s, label]) => (
-                  <button key={s} onClick={() => setSize(s)} className={`btn !px-2.5 !py-1 ${size === s ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                  <button key={s} onClick={() => setSize(s)} className={`btn !px-3.5 !py-2 ${size === s ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                     {label}
                   </button>
                 ))}
               </div>
-              <span className="text-xs text-slate-400">For</span>
+              <span className="text-sm text-slate-400">For</span>
               <div className="flex gap-1">
                 {(
                   [
@@ -91,13 +91,13 @@ export function Development() {
                     ["next", "Next year's car"],
                   ] as const
                 ).map(([t, label]) => (
-                  <button key={t} onClick={() => setTarget(t)} className={`btn !px-2.5 !py-1 ${target === t ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                  <button key={t} onClick={() => setTarget(t)} className={`btn !px-3.5 !py-2 ${target === t ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                     {label}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md bg-ink-850 p-3 font-mono text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-md bg-ink-850 p-3 font-mono text-sm">
               <div>
                 <div className="text-slate-500">Cost</div>
                 <div className="text-white">{fmtM(q.cost)}</div>
@@ -115,7 +115,7 @@ export function Development() {
                 <div className="text-white">+{q.gain.toFixed(2)}</div>
               </div>
             </div>
-            <div className="text-xs text-slate-400">
+            <div className="text-sm text-slate-400">
               Department efficiency {Math.round(efficiency(world, m, area) * 100)}% · R&D room under the cap {fmtM(Math.max(0, cap.room))} · results vary, and about one project in fourteen doesn't correlate.
             </div>
             <div>
@@ -129,10 +129,10 @@ export function Development() {
       </div>
 
       <div className="grid gap-4 content-start">
-        <Section title="Wind tunnel and CFD" right={<span className="text-xs text-slate-400">{Math.round(m.atr.pct * 100)}% allocation</span>}>
+        <Section title="Wind tunnel and CFD" right={<span className="text-sm text-slate-400">{Math.round(m.atr.pct * 100)}% allocation</span>}>
           <div className="p-4 grid gap-2 text-sm">
             <Meter value={m.atr.used / Math.max(1, m.atr.hours)} color="#38bdf8" />
-            <div className="text-xs text-slate-400">
+            <div className="text-sm text-slate-400">
               {Math.round(hoursLeft)} of {Math.round(m.atr.hours)} hours left this half of the season. The allocation follows the constructors' standings: lower teams get more.
             </div>
           </div>
@@ -145,7 +145,7 @@ export function Development() {
               <div key={p.id} className="grid grid-cols-[1fr_110px] items-center gap-3 px-4 py-2">
                 <div>
                   <div className="font-semibold">{p.name}</div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-sm text-slate-400">
                     {AREA_LABEL[p.area]} · {p.target === "next" ? "next year" : "this year"} · {p.roundsLeft} to go
                   </div>
                 </div>
@@ -170,13 +170,13 @@ export function Development() {
                       ))}
                     </div>
                   </div>
-                  <div className="ml-auto text-right text-xs text-slate-400">
+                  <div className="ml-auto text-right text-sm text-slate-400">
                     {f.building ? (
                       `Level ${f.building.to} in ${f.building.roundsLeft} races`
                     ) : f.level >= 5 ? (
                       "Top level"
                     ) : (
-                      <button className="btn-ghost !px-2.5 !py-1" disabled={busy} onClick={() => run("upgradeFacility", k)}>
+                      <button className="btn-ghost !px-3.5 !py-2" disabled={busy} onClick={() => run("upgradeFacility", k)}>
                         Upgrade · {fmtM(nextCost)}
                       </button>
                     )}
@@ -185,7 +185,7 @@ export function Development() {
               );
             })}
           </div>
-          <p className="px-4 pb-3 text-xs text-slate-500">Facilities are capital spending, outside the cost cap. Tunnel and CFD help aero; factory and simulator help mechanical, power and reliability, and the factory decides how many projects can run at once.</p>
+          <p className="px-4 pb-3 text-sm text-slate-500">Facilities are capital spending, outside the cost cap. Tunnel and CFD help aero; factory and simulator help mechanical, power and reliability, and the factory decides how many projects can run at once.</p>
         </Section>
 
         <Section title="Recent results">
@@ -195,7 +195,7 @@ export function Development() {
               <div key={p.id} className="flex items-center gap-3 px-4 py-2">
                 <TeamBar color={p.outcome === "failed" ? "#f43f5e" : p.outcome === "good" ? "#34d399" : p.outcome === "poor" ? "#f59e0b" : "#94a3b8"} />
                 <span className="flex-1">{p.name}</span>
-                <span className="font-mono text-xs text-slate-400">
+                <span className="font-mono text-sm text-slate-400">
                   {p.outcome === "failed" ? "failed" : `+${(p.gain ?? 0).toFixed(2)} ${p.area}`}
                   {p.target === "next" ? " (next year)" : ""}
                 </span>

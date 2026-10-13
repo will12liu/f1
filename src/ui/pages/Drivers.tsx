@@ -5,6 +5,7 @@ import { ageOf } from "../../engine/season/development";
 import type { Driver, RatingKey, Series } from "../../engine/types";
 import { FLAGS } from "../../lib/format";
 import { useGame } from "../../state/game";
+import { PageHead } from "../components/hub";
 import { DriverLink, Ovr, Section, TeamBar, useMaps } from "../components/bits";
 
 const SHORT: Record<RatingKey, string> = {
@@ -31,12 +32,14 @@ export function Drivers() {
     </th>
   );
   return (
+    <div className="grid gap-8">
+    <PageHead kicker={`${list.length} drivers`} title="Drivers" text="Click a column to sort. Click a driver for the full page." />
     <Section
-      title="Drivers"
+      title={series === "Free" ? "Free agents" : series}
       right={
         <div className="flex gap-1">
           {(["F1", "F2", "F3", "Free"] as const).map((s) => (
-            <button key={s} onClick={() => setSeries(s)} className={`btn !px-2.5 !py-1 ${series === s ? "bg-race text-white" : "bg-ink-800 text-slate-300"}`}>
+            <button key={s} onClick={() => setSeries(s)} className={`btn !px-3.5 !py-2 ${series === s ? "bg-race text-white" : "bg-ink-800 text-slate-300"}`}>
               {s === "Free" ? "Free agents" : s}
             </button>
           ))}
@@ -80,5 +83,6 @@ export function Drivers() {
         </table>
       </div>
     </Section>
+    </div>
   );
 }

@@ -32,9 +32,9 @@ body {
 }
 ::selection { @apply bg-race/40; }
 
-.tbl { @apply w-full text-sm border-collapse; }
-.tbl th { @apply sticky top-0 z-10 bg-ink-850 text-xs font-semibold uppercase tracking-wider text-slate-400 text-left px-3 py-2.5 border-b border-ink-700 whitespace-nowrap select-none; }
-.tbl td { @apply px-3 py-2 border-b border-ink-800 whitespace-nowrap; }
+.tbl { @apply w-full text-base border-collapse; }
+.tbl th { @apply sticky top-0 z-10 bg-ink-850 text-xs font-semibold uppercase tracking-wider text-slate-400 text-left px-4 py-3 border-b border-ink-700 whitespace-nowrap select-none; }
+.tbl td { @apply px-4 py-2.5 border-b border-ink-800 whitespace-nowrap; }
 .tbl tbody tr { @apply hover:bg-ink-800/60; }
 @utility num { @apply text-right font-mono tabular-nums; }
 

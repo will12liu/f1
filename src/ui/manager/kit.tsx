@@ -39,7 +39,7 @@ export function Meter({ value, color = "#e10600", mark, height = 8 }: { value: n
 export function Stat({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "good" | "bad" }) {
   return (
     <div className="panel px-5 py-4">
-      <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</div>
+      <div className="text-sm font-semibold uppercase tracking-wider text-slate-400">{label}</div>
       <div className={`mt-1.5 font-display text-3xl font-bold leading-none ${tone === "good" ? "text-emerald-300" : tone === "bad" ? "text-rose-300" : "text-white"}`}>{value}</div>
       {sub && <div className="mt-1 text-sm text-slate-400">{sub}</div>}
     </div>

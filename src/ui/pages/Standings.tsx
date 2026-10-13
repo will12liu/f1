@@ -2,6 +2,7 @@ import { useParams } from "react-router-dom";
 import { driverStandings, teamStandings } from "../../engine/season/season";
 import { useGame } from "../../state/game";
 import { DriverLink, Section, TeamBar, useMaps } from "../components/bits";
+import { PageHead } from "../components/hub";
 
 const cellClass = (pos: number | undefined, out: boolean) => {
   if (pos === undefined) return "text-slate-600";
@@ -20,7 +21,8 @@ export function Standings() {
   const ds = driverStandings(world);
   const ts = teamStandings(world);
   return (
-    <div className="space-y-4">
+    <div className="grid gap-8">
+      <PageHead kicker={`After ${world.results.length} of ${world.calendar.length} rounds`} title="Standings" />
       <Section title={`${world.season} drivers' championship`}>
         <div className="overflow-x-auto">
           <table className="tbl">
@@ -53,7 +55,7 @@ export function Standings() {
                     const c = res.classification.find((x) => x.driverId === r.driverId);
                     const out = !!c && c.status !== "Finished" && c.status !== "Lapped";
                     return (
-                      <td key={res.round} className={`!px-1 text-center font-mono text-xs ${cellClass(c?.pos, out)}`}>
+                      <td key={res.round} className={`!px-1 text-center font-mono text-sm ${cellClass(c?.pos, out)}`}>
                         {c ? (out ? "R" : c.pos) : ""}
                       </td>
                     );

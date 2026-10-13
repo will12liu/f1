@@ -29,7 +29,7 @@ export function Inbox() {
       right={
         <div className="flex flex-wrap gap-1">
           {(["all", ...kinds] as const).map((k) => (
-            <button key={k} onClick={() => setFilter(k)} className={`btn !px-2 !py-0.5 text-xs ${filter === k ? "bg-white text-black" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+            <button key={k} onClick={() => setFilter(k)} className={`btn !px-3 !py-1.5 text-sm ${filter === k ? "bg-white text-black" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
               {k === "all" ? "All" : KIND[k]}
             </button>
           ))}
@@ -42,7 +42,7 @@ export function Inbox() {
             <div className="flex flex-wrap items-baseline gap-2">
               {!x.read && <span className="h-1.5 w-1.5 rounded-full bg-race" />}
               <h3 className={`text-sm ${x.read ? "text-slate-200" : "font-semibold text-white"}`}>{x.subject}</h3>
-              <span className="ml-auto text-xs text-slate-500">
+              <span className="ml-auto text-sm text-slate-500">
                 {x.from} · {x.season}
                 {x.round ? `, after round ${x.round}` : ", pre-season"}
               </span>

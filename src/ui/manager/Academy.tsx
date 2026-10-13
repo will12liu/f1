@@ -44,7 +44,7 @@ export function Academy() {
     <div className="grid gap-4">
       <Answer a={answer} />
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
-        <Section title={`Academy · ${academy.length}/${ACADEMY.max}`} right={<span className="text-xs text-slate-400">programme level {m.program ?? 2}</span>}>
+        <Section title={`Academy · ${academy.length}/${ACADEMY.max}`} right={<span className="text-sm text-slate-400">programme level {m.program ?? 2}</span>}>
           <div className="divide-y divide-ink-800 text-sm">
             {academy.length === 0 && <div className="p-4 text-slate-500">No drivers yet. Sign prospects below.</div>}
             {academy.map((a) => {
@@ -56,17 +56,17 @@ export function Academy() {
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex-1">
                       <DriverLink d={d} base={base} full />
-                      <div className="text-xs text-slate-400">
+                      <div className="text-sm text-slate-400">
                         {ageOf(d, world.season)} · {d.series}
                         {d.teamId ? ` · ${team(d.teamId)?.name}` : " · no seat"} · ovr {d.ovr} · potential {est.lo}-{est.hi}
                         {standing(d.id, d.series) ? ` · ${standing(d.id, d.series)}` : ""} · licence {licencePointsSL(d, world.season)}
                         {hasLicence(world, d) ? " (ready for F1)" : ""}
                       </div>
                     </div>
-                    <button className="btn-ghost !px-2 !py-1 text-xs" onClick={() => setPlaceFor(placeFor === d.id ? null : d.id)}>
+                    <button className="btn-ghost !px-2 !py-1 text-sm" onClick={() => setPlaceFor(placeFor === d.id ? null : d.id)}>
                       Place in a team
                     </button>
-                    <button className="text-xs text-slate-500 hover:text-rose-300" disabled={busy} onClick={() => run("releaseAcademy", d.id)}>
+                    <button className="text-sm text-slate-500 hover:text-rose-300" disabled={busy} onClick={() => run("releaseAcademy", d.id)}>
                       Release
                     </button>
                   </div>
@@ -75,7 +75,7 @@ export function Academy() {
                       {juniorTeams
                         .filter((t) => (d.series === "F4" ? t.series === "F3" : true))
                         .map((t) => (
-                          <button key={t.id} disabled={busy} onClick={() => run("placeDriver", d.id, t.id).then(() => setPlaceFor(null))} className="btn bg-ink-800 !px-2 !py-1 text-xs text-slate-200 hover:bg-ink-700">
+                          <button key={t.id} disabled={busy} onClick={() => run("placeDriver", d.id, t.id).then(() => setPlaceFor(null))} className="btn bg-ink-800 !px-2 !py-1 text-sm text-slate-200 hover:bg-ink-700">
                             <TeamBar color={t.color} />
                             {t.series} {t.name} {owned.has(t.id) ? "(yours)" : `· ${fmtM(ACADEMY.seatFee[t.series])}`}
                           </button>
@@ -86,10 +86,10 @@ export function Academy() {
               );
             })}
           </div>
-          <div className="flex items-center gap-3 border-t border-ink-800 px-4 py-2.5 text-xs text-slate-400">
+          <div className="flex items-center gap-3 border-t border-ink-800 px-4 py-2.5 text-sm text-slate-400">
             Coaching and simulator time make academy drivers improve faster every winter.
             {(m.program ?? 2) < 5 && (
-              <button className="btn-ghost ml-auto !px-2 !py-1 text-xs" disabled={busy} onClick={() => run("upgradeProgram")}>
+              <button className="btn-ghost ml-auto !px-2 !py-1 text-sm" disabled={busy} onClick={() => run("upgradeProgram")}>
                 Programme level {(m.program ?? 2) + 1} · {fmtM(ACADEMY.program[(m.program ?? 2) + 1])}
               </button>
             )}
@@ -103,27 +103,27 @@ export function Academy() {
               .map((s) => (
                 <div key={s.id} className="flex flex-wrap items-center gap-2 px-4 py-2">
                   <span className="flex-1">
-                    {s.first} {s.last} <span className="text-xs text-slate-400">· {s.rating} · {fmtM(s.salary)}</span>
+                    {s.first} {s.last} <span className="text-sm text-slate-400">· {s.rating} · {fmtM(s.salary)}</span>
                   </span>
                   {(["F4", "F3", "F2"] as const).map((f) => (
-                    <button key={f} disabled={busy} onClick={() => run("setScoutFocus", s.id, f)} className={`btn !px-2 !py-0.5 text-xs ${s.focus === f ? "bg-white text-black" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                    <button key={f} disabled={busy} onClick={() => run("setScoutFocus", s.id, f)} className={`btn !px-3 !py-1.5 text-sm ${s.focus === f ? "bg-white text-black" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                       {f}
                     </button>
                   ))}
-                  <button className="text-xs text-slate-500 hover:text-rose-300" disabled={busy} onClick={() => run("fireScout", s.id)}>
+                  <button className="text-sm text-slate-500 hover:text-rose-300" disabled={busy} onClick={() => run("fireScout", s.id)}>
                     Release
                   </button>
                 </div>
               ))}
-            <div className="px-4 py-2 text-[11px] uppercase tracking-wider text-slate-500">Available</div>
+            <div className="px-4 py-2 text-xs uppercase tracking-wider text-slate-500">Available</div>
             {(m.scouts ?? [])
               .filter((s) => !s.hired)
               .map((s) => (
                 <div key={s.id} className="flex items-center gap-2 px-4 py-2">
                   <span className="flex-1">
-                    {s.first} {s.last} <span className="text-xs text-slate-400">· {s.nat} · rating {s.rating}</span>
+                    {s.first} {s.last} <span className="text-sm text-slate-400">· {s.nat} · rating {s.rating}</span>
                   </span>
-                  <button className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={() => run("hireScout", s.id)}>
+                  <button className="btn-ghost !px-2 !py-1 text-sm" disabled={busy} onClick={() => run("hireScout", s.id)}>
                     Hire · {fmtM(s.salary)}
                   </button>
                 </div>
@@ -137,7 +137,7 @@ export function Academy() {
         right={
           <div className="flex gap-1">
             {(["F4", "F3", "F2"] as const).map((k) => (
-              <button key={k} onClick={() => setSeries(k)} className={`btn !px-2.5 !py-1 text-xs ${series === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+              <button key={k} onClick={() => setSeries(k)} className={`btn !px-3.5 !py-2 text-sm ${series === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                 {k}
               </button>
             ))}
@@ -162,7 +162,7 @@ export function Academy() {
                 <tr key={d.id}>
                   <td>
                     <DriverLink d={d} base={base} full />
-                    <div className="text-[11px] text-slate-500">{d.teamId ? team(d.teamId)?.name : d.nat}</div>
+                    <div className="text-xs text-slate-500">{d.teamId ? team(d.teamId)?.name : d.nat}</div>
                   </td>
                   <td className="num">{ageOf(d, world.season)}</td>
                   <td className="num">{d.ovr}</td>
@@ -170,9 +170,9 @@ export function Academy() {
                   <td className="w-28">
                     <Meter value={est.k / 100} color="#38bdf8" height={6} />
                   </td>
-                  <td className="text-xs text-slate-400">{standing(d.id, d.series) ?? "-"}</td>
+                  <td className="text-sm text-slate-400">{standing(d.id, d.series) ?? "-"}</td>
                   <td className="text-right">
-                    <button className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={() => run("signAcademy", d.id)}>
+                    <button className="btn-ghost !px-2 !py-1 text-sm" disabled={busy} onClick={() => run("signAcademy", d.id)}>
                       Sign · {fmtM(ACADEMY.fee[d.series] ?? 0)}/yr
                     </button>
                   </td>
@@ -190,12 +190,12 @@ export function Academy() {
               <TeamBar color={t.color} />
               <span className="flex-1">
                 {t.series} {t.name}
-                <span className="block text-[11px] text-slate-500">{t.drivers.map((x) => drivers.get(x)?.last).join(", ")}</span>
+                <span className="block text-xs text-slate-500">{t.drivers.map((x) => drivers.get(x)?.last).join(", ")}</span>
               </span>
               {owned.has(t.id) ? (
-                <span className="text-xs text-emerald-300">Yours · {fmtM(ACADEMY.running[t.series])}/yr to run</span>
+                <span className="text-sm text-emerald-300">Yours · {fmtM(ACADEMY.running[t.series])}/yr to run</span>
               ) : (
-                <button className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={() => confirm(`Buy ${t.name}?`) && run("buyJuniorTeam", t.id)}>
+                <button className="btn-ghost !px-2 !py-1 text-sm" disabled={busy} onClick={() => confirm(`Buy ${t.name}?`) && run("buyJuniorTeam", t.id)}>
                   Buy · {fmtM(ACADEMY.buy[t.series])}
                 </button>
               )}

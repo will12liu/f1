@@ -4,10 +4,11 @@ import { ageOf } from "../../engine/season/development";
 import { money } from "../../lib/format";
 import { useGame } from "../../state/game";
 import { DriverLink, Ovr, useMaps } from "../components/bits";
+import { PageHead } from "../components/hub";
 
 function Bar({ label, v, max = 100 }: { label: string; v: number; max?: number }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex items-center gap-2 text-sm">
       <span className="w-20 text-slate-400">{label}</span>
       <div className="flex-1 h-1.5 rounded bg-ink-700 overflow-hidden">
         <div className="h-full bg-slate-300" style={{ width: `${Math.max(0, Math.min(100, ((v - 50) / (max - 50)) * 100))}%` }} />
@@ -24,18 +25,20 @@ export function Teams() {
   const { drivers } = useMaps(world);
   const teams = world.teams.filter((t) => t.series === "F1").sort((a, b) => carOvr(b.car) - carOvr(a.car));
   return (
+    <div className="grid gap-8">
+    <PageHead kicker="Fastest car first" title="Teams" />
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {teams.map((t) => (
         <section key={t.id} className="panel overflow-hidden">
-          <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${t.color}, ${t.color2})` }} />
+          <div className="h-3" style={{ background: t.color }} />
           <div className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-display text-2xl font-black uppercase leading-none">{t.name}</div>
-                <div className="text-xs text-slate-500">{t.engine} power · budget {"$".repeat(t.budget)}</div>
+                <div className="text-sm text-slate-500">{t.engine} power · budget {"$".repeat(t.budget)}</div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase text-slate-500">Car</div>
+                <div className="text-xs uppercase text-slate-500">Car</div>
                 <Ovr v={carOvr(t.car)} />
               </div>
             </div>
@@ -52,10 +55,10 @@ export function Teams() {
                 if (!d) return null;
                 return (
                   <div key={did} className="flex items-center gap-2 py-1.5">
-                    <span className="font-mono text-xs text-slate-500 w-6">#{d.num}</span>
+                    <span className="font-mono text-sm text-slate-500 w-6">#{d.num}</span>
                     <DriverLink d={d} base={base} full />
-                    <span className="text-xs text-slate-500">{ageOf(d, world.season)}</span>
-                    <span className="ml-auto text-xs text-slate-500">{d.contract ? `to ${d.contract.until} · ${money(d.contract.salary, 0)}` : ""}</span>
+                    <span className="text-sm text-slate-500">{ageOf(d, world.season)}</span>
+                    <span className="ml-auto text-sm text-slate-500">{d.contract ? `to ${d.contract.until} · ${money(d.contract.salary, 0)}` : ""}</span>
                     <Ovr v={d.ovr} />
                   </div>
                 );
@@ -64,6 +67,7 @@ export function Teams() {
           </div>
         </section>
       ))}
+    </div>
     </div>
   );
 }

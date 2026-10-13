@@ -21,7 +21,7 @@ export function Juniors() {
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end gap-2">
-        <h1 className="font-display text-3xl font-black uppercase leading-none">Junior ladder</h1>
+        <h1 className="headline text-5xl sm:text-6xl">Junior ladder</h1>
         <div className="ml-auto flex gap-1">
           {(["F2", "F3", "F4"] as const).map((k) => (
             <button key={k} onClick={() => setTab(k)} className={`btn !px-3 !py-1.5 ${tab === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
@@ -33,7 +33,7 @@ export function Juniors() {
 
       {tab !== "F4" ? (
         <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <Section title={`${tab} championship`} right={<span className="text-xs text-slate-400">{(world.juniorResults ?? []).filter((r) => r.series === tab).length} of {juniorRounds(world.calendar.length, tab).length} rounds</span>}>
+          <Section title={`${tab} championship`} right={<span className="text-sm text-slate-400">{(world.juniorResults ?? []).filter((r) => r.series === tab).length} of {juniorRounds(world.calendar.length, tab).length} rounds</span>}>
             <div className="overflow-x-auto">
               <table className="tbl">
                 <thead>
@@ -59,7 +59,7 @@ export function Juniors() {
                         <td className="num w-10">{r ? i + 1 : "-"}</td>
                         <td>
                           <DriverLink d={d} base={base} full />
-                          {acad.has(d.id) && <span className="ml-2 text-[10px] font-bold text-sky-300">ACADEMY</span>}
+                          {acad.has(d.id) && <span className="ml-2 text-xs font-bold text-sky-300">ACADEMY</span>}
                         </td>
                         <td>
                           <span className="flex items-center gap-2 text-slate-400">
@@ -87,7 +87,7 @@ export function Juniors() {
                 .reverse()
                 .map((r) => (
                   <div key={r.round} className="px-4 py-2">
-                    <div className="text-xs text-slate-400">Round {r.round} · {circuitOf(world, r.circuitId).name}</div>
+                    <div className="text-sm text-slate-400">Round {r.round} · {circuitOf(world, r.circuitId).name}</div>
                     <div className="flex flex-wrap gap-x-3">
                       {r.rows.slice(0, 3).map((x) => (
                         <span key={x.driverId}>
@@ -99,11 +99,11 @@ export function Juniors() {
                 ))}
               {!(world.juniorResults ?? []).some((r) => r.series === tab) && <div className="p-4 text-slate-500">No races yet this season.</div>}
             </div>
-            <p className="px-4 pb-3 text-xs text-slate-500">An F1 seat needs 40 super licence points over three seasons (F2 champion: 40, F3 champion: 30).</p>
+            <p className="px-4 pb-3 text-sm text-slate-500">An F1 seat needs 40 super licence points over three seasons (F2 champion: 40, F3 champion: 30).</p>
           </Section>
         </div>
       ) : (
-        <Section title="F4 prospects" right={<span className="text-xs text-slate-400">15-18 year-olds; the best move up to F3 each winter</span>}>
+        <Section title="F4 prospects" right={<span className="text-sm text-slate-400">15-18 year-olds; the best move up to F3 each winter</span>}>
           <div className="overflow-x-auto">
             <table className="tbl">
               <thead>

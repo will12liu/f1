@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useGame } from "../../state/game";
 import { DriverLink, Section, TeamBar, useMaps } from "../components/bits";
+import { PageHead } from "../components/hub";
 
 export function History() {
   const { id = "" } = useParams();
@@ -8,6 +9,8 @@ export function History() {
   const world = useGame((s) => s.world)!;
   const { drivers, team } = useMaps(world);
   return (
+    <div className="grid gap-8">
+    <PageHead kicker={`${world.history.length} season${world.history.length === 1 ? "" : "s"} complete`} title="History" />
     <Section title="Champions">
       {world.history.length === 0 ? (
         <div className="p-4 text-sm text-slate-500">Finish a season to see it here.</div>
@@ -41,5 +44,6 @@ export function History() {
         </table>
       )}
     </Section>
+    </div>
   );
 }

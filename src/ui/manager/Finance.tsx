@@ -51,7 +51,7 @@ export function Finance() {
       <Section title="Cost cap">
         <div className="p-4 grid gap-2 text-sm">
           <Meter value={(cap.spent + cap.committed) / (FINANCE.costCap * 1.1)} mark={1 / 1.1} height={10} color={cap.room < 0 ? "#f43f5e" : "#e10600"} />
-          <p className="text-xs text-slate-400">
+          <p className="text-sm text-slate-400">
             The line is the cap. The bar is what you've spent plus the running costs still to come this season (staff, operations, power units). Driver pay and your three best-paid staff are outside the cap, and so are facilities. Up to 5% over is a minor breach: a fine and less wind-tunnel time. More is a material breach: a big fine, less tunnel time and an angry board.
           </p>
         </div>

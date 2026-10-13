@@ -24,7 +24,7 @@ export function DriverPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm text-slate-400">{FLAGS[d.nat]} {d.nat} · age {ageOf(d, world.season)} · #{d.num}</div>
-              <h1 className="font-display text-4xl font-black uppercase leading-none">
+              <h1 className="headline text-5xl sm:text-6xl">
                 {d.first} <span className="text-white">{d.last}</span>
               </h1>
               <div className="text-sm text-slate-400 mt-1">
@@ -35,12 +35,12 @@ export function DriverPage() {
             </div>
             <div className="text-center">
               <Ovr v={d.ovr} />
-              <div className="text-[10px] text-slate-500 mt-1">POT {d.pot}</div>
+              <div className="text-xs text-slate-500 mt-1">POT {d.pot}</div>
             </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
             {RATING_KEYS.map((k) => (
-              <div key={k} className="flex items-center gap-2 text-xs">
+              <div key={k} className="flex items-center gap-2 text-sm">
                 <span className="w-32 text-slate-400">{RATING_LABELS[k]}</span>
                 <div className="flex-1 h-1.5 rounded bg-ink-700 overflow-hidden">
                   <div className={`h-full ${k === "aggression" ? "bg-violet-400" : barColor(d.ratings[k])}`} style={{ width: `${d.ratings[k]}%` }} />

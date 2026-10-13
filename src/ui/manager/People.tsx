@@ -41,24 +41,24 @@ export function People() {
     <div className="grid gap-4">
       <Answer a={answer} />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Key staff" right={<span className="text-xs text-slate-400">prestige {prestigeOf(world, me.id).toFixed(2)}</span>}>
+        <Section title="Key staff" right={<span className="text-sm text-slate-400">prestige {prestigeOf(world, me.id).toFixed(2)}</span>}>
           <div className="divide-y divide-ink-800 text-sm">
             {ROLES.map((r) => {
               const s = ours.find((x) => x.role === r);
               return (
                 <div key={r} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
                   <div className="w-44">
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400">{STAFF_ROLES[r].label}</div>
+                    <div className="text-xs uppercase tracking-wider text-slate-400">{STAFF_ROLES[r].label}</div>
                     <div className="font-semibold">{s ? `${s.first} ${s.last}` : <span className="text-rose-300">Empty</span>}</div>
                   </div>
                   {s && (
                     <>
                       <Ovr v={s.rating} />
-                      <span className="text-xs text-slate-400">
+                      <span className="text-sm text-slate-400">
                         {s.age} · {fmtM(s.salary)} · {s.joins ? `starts round ${s.joins.round}` : `until ${s.until}`}
                       </span>
                       {!s.joins && (
-                        <span className="ml-auto flex gap-2 text-xs">
+                        <span className="ml-auto flex gap-2 text-sm">
                           <button className="text-slate-300 hover:text-white" disabled={busy} onClick={() => run("renewStaff", s.id, 2)}>
                             Extend 2 yrs
                           </button>
@@ -79,12 +79,12 @@ export function People() {
           <div className="grid gap-3 p-4 text-sm">
             <div className="flex flex-wrap gap-1">
               {ROLES.map((r) => (
-                <button key={r} onClick={() => setRole(r)} className={`btn !px-2 !py-1 text-xs ${role === r ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                <button key={r} onClick={() => setRole(r)} className={`btn !px-2 !py-1 text-sm ${role === r ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                   {STAFF_ROLES[r].label}
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               {(
                 [
                   ["free", "Free agents"],
@@ -102,7 +102,7 @@ export function People() {
                 </button>
               ))}
             </div>
-            {show === "rivals" && <p className="text-xs text-slate-500">Poaching costs about a third more, he may say no, and he serves four races of gardening leave. His old team loses some development pace.</p>}
+            {show === "rivals" && <p className="text-sm text-slate-500">Poaching costs about a third more, he may say no, and he serves four races of gardening leave. His old team loses some development pace.</p>}
           </div>
           <div className="divide-y divide-ink-800 text-sm">
             {market.map((s) => {
@@ -114,12 +114,12 @@ export function People() {
                     <div className="font-semibold">
                       {s.first} {s.last}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-sm text-slate-400">
                       {s.nat} · {s.age}
                       {s.teamId ? ` · ${team(s.teamId)?.name}` : ""}
                     </div>
                   </div>
-                  <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={busy} onClick={() => run("hireStaff", s.id, ask, years)}>
+                  <button className="btn-ghost !px-3.5 !py-2 text-sm" disabled={busy} onClick={() => run("hireStaff", s.id, ask, years)}>
                     {s.teamId ? "Approach" : "Hire"} · {fmtM(ask)}
                   </button>
                 </div>
@@ -138,31 +138,31 @@ export function People() {
                 <Ovr v={d.ovr} />
                 <div className="flex-1">
                   <DriverLink d={d} base={base} full />
-                  <div className="text-xs text-slate-400">
+                  <div className="text-sm text-slate-400">
                     {ageOf(d, season)} · {fmtM(d.contract?.salary ?? 0)} a season · until {d.contract?.until ?? season}
                   </div>
                 </div>
-                <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={busy} onClick={() => run("renewDriver", d.id, ask, 2)}>
+                <button className="btn-ghost !px-3.5 !py-2 text-sm" disabled={busy} onClick={() => run("renewDriver", d.id, ask, 2)}>
                   Extend 2 yrs · {fmtM(ask)}
                 </button>
-                <button className="text-xs text-slate-500 hover:text-rose-300" disabled={busy} onClick={() => confirm(`Release ${d.first} ${d.last}? You pay half of what's left on his contract.`) && run("releaseDriver", d.id)}>
+                <button className="text-sm text-slate-500 hover:text-rose-300" disabled={busy} onClick={() => confirm(`Release ${d.first} ${d.last}? You pay half of what's left on his contract.`) && run("releaseDriver", d.id)}>
                   Release
                 </button>
               </div>
             );
           })}
           {m.precontracts.map((p) => (
-            <div key={p.driverId} className="px-4 py-2 text-xs text-sky-300">
+            <div key={p.driverId} className="px-4 py-2 text-sm text-sky-300">
               Signed for {season + 1}: {drivers.get(p.driverId)?.first} {drivers.get(p.driverId)?.last}, {fmtM(p.salary)} a season until {p.until}
             </div>
           ))}
-          <div className="px-4 py-2 text-xs text-slate-400">
+          <div className="px-4 py-2 text-sm text-slate-400">
             Reserve: {me.reserve ? `${drivers.get(me.reserve)?.first} ${drivers.get(me.reserve)?.last}` : "none"} · races if a driver is banned or a seat is empty.
           </div>
         </div>
       </Section>
 
-      <Section title="Driver market" right={<span className="text-xs text-slate-400">free agents, F2, and F1 drivers out of contract this year</span>}>
+      <Section title="Driver market" right={<span className="text-sm text-slate-400">free agents, F2, and F1 drivers out of contract this year</span>}>
         <div className="overflow-x-auto">
           <table className="tbl">
             <thead>
@@ -199,17 +199,17 @@ export function People() {
                     <td className="text-right">
                       {willing ? (
                         <span className="flex justify-end gap-2">
-                          <button className="btn-ghost !px-2 !py-1 text-xs" disabled={busy} onClick={() => run("signDriver", d.id, ask, 2)}>
+                          <button className="btn-ghost !px-2 !py-1 text-sm" disabled={busy} onClick={() => run("signDriver", d.id, ask, 2)}>
                             {f1 ? "Sign for next year" : "Sign"}
                           </button>
                           {!f1 && (
-                            <button className="text-xs text-slate-400 hover:text-white" disabled={busy} onClick={() => run("setReserve", d.id)}>
+                            <button className="text-sm text-slate-400 hover:text-white" disabled={busy} onClick={() => run("setReserve", d.id)}>
                               Reserve
                             </button>
                           )}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-500">not interested</span>
+                        <span className="text-sm text-slate-500">not interested</span>
                       )}
                     </td>
                   </tr>
