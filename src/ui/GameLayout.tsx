@@ -98,6 +98,22 @@ export function GameLayout() {
         </div>
       )}
       {!loc.pathname.endsWith("/live") && <Ceremonies world={world} saveId={meta.id} />}
+      {world.careerState && !loc.pathname.endsWith("/live") && !loc.pathname.endsWith("/life") && (
+        <NavLink
+          to={`${base}/life${world.careerState.event ? "?app=messages" : ""}`}
+          className="fixed bottom-5 right-5 z-30 flex items-center gap-3 rounded-[1.4rem] border-2 border-ink-600 bg-black py-2 pl-2 pr-5 hover:border-slate-400"
+          title="Your phone"
+        >
+          <span className="relative grid h-14 w-9 place-items-center rounded-lg border-2 border-slate-500 bg-ink-900">
+            <span className="absolute top-1 h-1 w-3 rounded-full bg-slate-500" />
+            {world.careerState.event && <span className="absolute -right-2.5 -top-2.5 grid h-6 w-6 place-items-center rounded-full bg-race text-sm font-bold text-white">1</span>}
+          </span>
+          <span className="max-w-56">
+            <span className="block font-display text-xl font-black uppercase leading-none text-white">Phone</span>
+            <span className="block truncate text-sm text-slate-400">{world.careerState.event ? `${world.careerState.event.from ?? "New message"}: ${world.careerState.event.text}` : "Money, homes, people"}</span>
+          </span>
+        </NavLink>
+      )}
       <main className={`mx-auto px-4 py-6 sm:px-6 ${loc.pathname.endsWith("/live") || loc.search.includes("watch") ? "max-w-[2200px]" : "max-w-[1600px]"}`}>
         <Outlet />
       </main>

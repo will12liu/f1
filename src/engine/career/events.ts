@@ -67,7 +67,7 @@ const ev = (d: EvDef) => defs.push(d);
 // ── after a result ──
 ev({
   id: "win-press", from: "Press officer", gap: 3, w: (c) => (c.lastPos === 1 ? 8 : 0),
-  title: "Winner's press conference", text: "Microphones everywhere after your win. A journalist asks if you're ready for the next step.",
+  title: "Winner's press conference", text: "Winner's presser in ten minutes. They'll ask if you're ready for the next step. How do you want to play it?",
   opts: [
     { label: "Humble: thank the team", sub: "The team likes it", fx: { trust: 3, fame: 1, rel: { boss: 3, engineer: 2 } } },
     { label: "Confident: \"I'm ready for anything\"", sub: "Headlines, and a few raised eyebrows", fx: { fame: 3, rel: { press: 3, boss: -1 } } },
@@ -75,7 +75,7 @@ ev({
 });
 ev({
   id: "dnf-blame", from: "{engineer}", gap: 4, w: (c) => (c.lastDnf ? 6 : 0),
-  title: "A retirement", text: "You didn't see the flag. {engineer} wants to go through what happened before the debrief.",
+  title: "A retirement", text: "Tough one. Before the debrief I need to hear what happened out there.",
   opts: [
     { label: "Own it", sub: "Morale takes a hit, the team respects it", fx: { morale: -3, trust: 2, rel: { engineer: 3 } } },
     { label: "Blame the car", sub: "Feel better, team less happy", fx: { morale: 2, trust: -3, rel: { engineer: -4 } } },
@@ -84,7 +84,7 @@ ev({
 });
 ev({
   id: "beaten-mate", from: "{engineer}", gap: 4, w: (c) => (c.beatMate === false ? 5 : 0),
-  title: "{mate} beat you", text: "{mate} finished ahead again. The data shows you lost time in the slow corners.",
+  title: "{mate} beat you", text: "{mate} was ahead again. The data says you're losing it in the slow corners. Want to go through it?",
   opts: [
     { label: "Study {mate}'s data", sub: "Learn, and swallow your pride", fx: { xp: 30, morale: -2, rel: { mate: 1, engineer: 2 } } },
     { label: "Ask for a different setup direction", sub: "Your engineer may or may not agree", p: (c) => 0.4 + c.rel("engineer") / 200, fx: { xp: 15, rel: { engineer: 2 } }, miss: { rel: { engineer: -3 }, morale: -2 }, ok: "{engineer} agrees. It feels better already.", bad: "{engineer} thinks it's you, not the car." },
@@ -92,7 +92,7 @@ ev({
 });
 ev({
   id: "beat-mate", from: "{boss}", gap: 4, w: (c) => (c.beatMate === true ? 3 : 0),
-  title: "Team-mate tension", text: "{mate} is cold with you after you beat him again. The team asks you to keep it professional.",
+  title: "Team-mate tension", text: "{mate} isn't happy after today. Keep it professional this week, okay?",
   opts: [
     { label: "Offer to share data", sub: "The team loves it", fx: { trust: 3, rel: { mate: 4, boss: 2 } } },
     { label: "Keep your secrets", sub: "Your edge stays yours", fx: { morale: 2, rel: { mate: -3 } } },
@@ -100,7 +100,7 @@ ev({
 });
 ev({
   id: "big-gain", from: "Media team", gap: 4, w: (c) => (c.lastPos !== null && c.lastGrid !== null && c.lastGrid - c.lastPos >= 6 ? 6 : 0),
-  title: "The overtake everyone's talking about", text: "Your move into the last chicane is all over social media.",
+  title: "The overtake everyone's talking about", text: "Your move into the last chicane is everywhere. Two million views and climbing. Post the onboard?",
   opts: [
     { label: "Post the onboard", sub: "Fame", fx: { fame: 3, rel: { press: 1 } } },
     { label: "Let it speak for itself", sub: "Calm and cool", fx: { fame: 1, morale: 2 } },
@@ -109,7 +109,7 @@ ev({
 // ── rivals ──
 ev({
   id: "rival-words", from: "Press officer", gap: 5, w: (c) => (c.rival ? 5 : 0),
-  title: "{rival} has something to say", text: "In the paddock, {rival} tells reporters you're dangerous in the braking zones.",
+  title: "{rival} has something to say", text: "Heads up: {rival} just told reporters you're dangerous in the braking zones. They want a reaction.",
   opts: [
     { label: "Fire back", sub: "The rivalry heats up", fx: { fame: 2, morale: 2, rel: { press: 2 } } },
     { label: "Ignore it", sub: "Stay above it", fx: { morale: -1, rel: { boss: 1 } } },
@@ -119,7 +119,7 @@ ev({
 // ── team ──
 ev({
   id: "boss-meeting", from: "{boss}", gap: 6, w: (c) => (c.trust < 35 ? 6 : 1),
-  title: "{boss} wants a word", text: "{boss} calls you into the motorhome. \"We need more from you.\"",
+  title: "{boss} wants a word", text: "Motorhome, after the briefing. We need more from you.",
   opts: [
     { label: "Promise results", sub: "Pressure on", fx: { trust: 3, morale: -2 } },
     { label: "Ask for better equipment", sub: "Could go either way", p: (c) => 0.3 + c.rel("boss") / 200, fx: { trust: 1, morale: 3, rel: { boss: 2 } }, miss: { trust: -4, rel: { boss: -3 } }, ok: "{boss} agrees to look at the car.", bad: "{boss} doesn't like excuses." },
@@ -127,7 +127,7 @@ ev({
 });
 ev({
   id: "sim-day", from: "{engineer}", gap: 3, w: () => 3,
-  title: "Simulator day", text: "The factory has a free simulator slot this week.",
+  title: "Simulator day", text: "There's a free simulator slot at the factory this week. Want it?",
   opts: [
     { label: "Take it", sub: "XP, a tired week", fx: { xp: 35, morale: -1, rel: { engineer: 1 } } },
     { label: "Rest", sub: "Recharge", fx: { morale: 4 } },
@@ -135,7 +135,7 @@ ev({
 });
 ev({
   id: "engineer-bond", from: "{engineer}", gap: 6, w: (c) => (c.rel("engineer") > 60 ? 2 : 1),
-  title: "Dinner with {engineer}", text: "{engineer} invites you to dinner with the race engineers.",
+  title: "Dinner with {engineer}", text: "A few of us are getting dinner tonight. You in?",
   opts: [
     { label: "Go", sub: "A better relationship", fx: { rel: { engineer: 4 }, morale: 2 } },
     { label: "Skip it, early night", sub: "Focus", fx: { xp: 10 } },
@@ -143,7 +143,7 @@ ev({
 });
 ev({
   id: "setup-dispute", from: "{engineer}", gap: 5, w: () => 2,
-  title: "A setup argument", text: "You want more front wing for the next race. {engineer} disagrees.",
+  title: "A setup argument", text: "Saw your note about more front wing. I don't agree: it'll eat the rears.",
   opts: [
     { label: "Insist", sub: "Your car, your call", p: () => 0.5, fx: { morale: 3, xp: 10 }, miss: { rel: { engineer: -3 }, morale: -2 }, ok: "You were right. The car feels great.", bad: "It didn't work. {engineer} is not impressed." },
     { label: "Trust {engineer}", sub: "Teamwork", fx: { rel: { engineer: 3 }, trust: 1 } },
@@ -151,7 +151,7 @@ ev({
 });
 ev({
   id: "team-event", from: "{boss}", gap: 6, w: () => 2,
-  title: "Factory visit", text: "The team asks you to visit the factory and thank the staff.",
+  title: "Factory visit", text: "The factory staff would love to see you this week. Can you come by and say thanks?",
   opts: [
     { label: "Spend the whole day there", sub: "They love it", fx: { trust: 3, rel: { boss: 2, engineer: 2 }, morale: -1 } },
     { label: "A quick visit", sub: "Done", fx: { trust: 1 } },
@@ -160,7 +160,7 @@ ev({
 // ── agent, money, fame ──
 ev({
   id: "agent-plan", from: "{agent}", gap: 8, w: (c) => (c.round > 4 ? 2 : 0),
-  title: "{agent} has a plan", text: "Your manager {agent} wants to talk about the next two years.",
+  title: "{agent} has a plan", text: "We need to talk about the next two years. Call me when you're out of the car.",
   opts: [
     { label: "Push for a bigger team", sub: "Fame, the team hears about it", fx: { fame: 1, trust: -2, rel: { agent: 3 } } },
     { label: "Stay loyal", sub: "The team appreciates it", fx: { trust: 3, rel: { agent: -1, boss: 2 } } },
@@ -168,7 +168,7 @@ ev({
 });
 ev({
   id: "social", from: "Media team", gap: 4, w: (c) => (c.fame > 10 ? 3 : 1),
-  title: "Social media", text: "A video of you karting as a kid is going viral.",
+  title: "Social media", text: "Someone dug up a video of you karting at nine. It's going viral.",
   opts: [
     { label: "Share it", sub: "Fame", fx: { fame: 2 } },
     { label: "Stay off your phone", sub: "Focus", fx: { morale: 1, xp: 5 } },
@@ -176,7 +176,7 @@ ev({
 });
 ev({
   id: "fan-event", from: "Fan club", gap: 5, w: (c) => (c.fame > 15 ? 3 : 0),
-  title: "Fan event", text: "Hundreds of fans in your colours want autographs. It eats your preparation time.",
+  title: "Fan event", text: "About three hundred fans in your colours at the gate, asking for autographs. Prep starts in an hour.",
   opts: [
     { label: "Sign everything", sub: "Fame, a tired evening", fx: { fame: 2, morale: -1 } },
     { label: "Half an hour, then back to work", sub: "Balance", fx: { fame: 1 } },
@@ -184,7 +184,7 @@ ev({
 });
 ev({
   id: "charity", from: "{agent}", gap: 10, w: (c) => (c.fame > 20 ? 2 : 0),
-  title: "Charity karting race", text: "A charity asks you to drive in their karting event.",
+  title: "Charity karting race", text: "A children's charity wants you at their karting day. They'd love a donation too. Good cause.",
   opts: [
     { label: "Do it and donate", sub: "Good for everyone", fx: { fame: 2, cash: -20_000, morale: 3 } },
     { label: "Politely decline", sub: "Busy schedule", fx: {} },
@@ -192,7 +192,7 @@ ev({
 });
 ev({
   id: "interview", from: "{agent}", gap: 4, w: (c) => (c.fame > 8 ? 3 : 1),
-  title: "Big interview", text: "A magazine wants an in-depth interview. They'll ask about your future.",
+  title: "Big interview", text: "A big magazine wants a long sit-down. They'll ask about your future.",
   opts: [
     { label: "Open up", sub: "Fame, press likes you", fx: { fame: 2, rel: { press: 3 } } },
     { label: "Say nothing interesting", sub: "Safe", fx: { rel: { press: -1 }, morale: 1 } },
@@ -201,7 +201,7 @@ ev({
 });
 ev({
   id: "money-trouble", from: "{agent}", gap: 8, w: (c) => (c.cash < 100_000 && c.series !== "F1" ? 4 : 0),
-  title: "Money is tight", text: "Your savings are running low. Racing in the juniors is expensive.",
+  title: "Money is tight", text: "I looked at your account. Junior racing is eating it. We need to sort this.",
   opts: [
     { label: "Ask {agent} for a personal sponsor", sub: "Might work", p: (c) => 0.35 + c.fame / 100, fx: { cash: 150_000, rel: { agent: 2 } }, miss: { morale: -3 }, ok: "{agent} found a local backer.", bad: "Nobody bit." },
     { label: "Coach karting on weekends off", sub: "Money, less rest", fx: { cash: 40_000, morale: -2 } },
@@ -210,7 +210,7 @@ ev({
 // ── personal ──
 ev({
   id: "family", from: "Mum", gap: 6, w: () => 2,
-  title: "Home", text: "Your family wants you home for a weekend. You haven't seen them in months.",
+  title: "Home", text: "We haven't seen you since the winter. Come home for a weekend?",
   opts: [
     { label: "Go home", sub: "Recharge", fx: { morale: 5, rel: { family: 4 } } },
     { label: "Stay and train", sub: "XP", fx: { xp: 25, rel: { family: -3 } } },
@@ -218,7 +218,7 @@ ev({
 });
 ev({
   id: "fitness", from: "Trainer", gap: 5, w: () => 2,
-  title: "Fitness camp", text: "Your trainer wants a week of altitude training.",
+  title: "Fitness camp", text: "I want you at altitude camp for a week. Your neck strength is behind where it should be.",
   opts: [
     { label: "Do it", sub: "Fitness and XP", fx: { xp: 25, morale: -1 } },
     { label: "Normal week", sub: "Rest", fx: { morale: 1 } },
@@ -226,7 +226,7 @@ ev({
 });
 ev({
   id: "nerves", from: "Trainer", gap: 6, w: (c) => (c.morale < 40 ? 5 : 0),
-  title: "Doubts", text: "You can't sleep before races. It's getting into your head.",
+  title: "Doubts", text: "You're not sleeping before races, are you? I can tell. We should talk.",
   opts: [
     { label: "Talk to a sports psychologist", sub: "Costs money, helps", fx: { cash: -15_000, morale: 8 } },
     { label: "Push through", sub: "Might pass", p: () => 0.5, fx: { morale: 4 }, miss: { morale: -3 }, ok: "It passes.", bad: "It gets worse." },
@@ -234,7 +234,7 @@ ev({
 });
 ev({
   id: "mentor", from: "Unknown number", gap: 12, w: (c) => (c.age < 21 ? 2 : 0),
-  title: "A former champion calls", text: "A retired champion offers to coach you for a few weekends.",
+  title: "A former champion calls", text: "This is a former world champion. I've been watching your onboards. I could coach you for a few weekends, if you want.",
   opts: [
     { label: "Yes, absolutely", sub: "XP and morale", fx: { xp: 40, morale: 3 } },
     { label: "Not now", sub: "Stay focused", fx: {} },
@@ -242,7 +242,7 @@ ev({
 });
 ev({
   id: "rumour", from: "{agent}", gap: 6, w: (c) => (c.fame > 12 ? 2 : 0),
-  title: "Paddock rumour", text: "A rumour says another team wants you next year. {boss} has heard it too.",
+  title: "Paddock rumour", text: "The paddock's saying another team wants you next year. Your boss has heard it too.",
   opts: [
     { label: "Deny it", sub: "Keep the team happy", fx: { trust: 2 } },
     { label: "\"I'm focused on now\"", sub: "Keeps your options open", fx: { fame: 1, trust: -1, rel: { agent: 2 } } },
