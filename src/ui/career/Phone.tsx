@@ -2,7 +2,7 @@
 // Garage, Business, Team, Social). Life events arrive in Messages as texts you reply to.
 import { useEffect, useState, type ReactNode } from "react";
 import { careerOf, meOf, type CareerState } from "../../engine/career/career";
-import { BIZ, bizIncome, POST_KINDS, unread, CARS, doneThisWeek, followers, homePerks, homePrice, HOMES, money, netWorth, priceOf, rentOf, TICKERS, type LifeState, type Market, type Person } from "../../engine/career/life";
+import { BIZ, bizIncome, POST_KINDS, REPLIES, unread, CARS, doneThisWeek, followers, homePerks, homePrice, HOMES, money, netWorth, priceOf, rentOf, TICKERS, type LifeState, type Market, type Person } from "../../engine/career/life";
 import { ITEMS } from "../../engine/career/shop";
 import type { World } from "../../engine/types";
 import { useAct } from "../manager/kit";
@@ -86,7 +86,7 @@ export function Phone({ world, app, setApp }: { world: World; app: AppId; setApp
           ) : app === "home" ? (
             <HomeScreen world={world} c={c} badge={badge} setApp={setApp} teamColor={team?.color ?? "#e10600"} next={next?.circuitId} />
           ) : app === "messages" ? (
-            <Messages c={c} L={L} me={d.first} act={act} />
+            <Messages world={world} c={c} L={L} me={d.first} act={act} />
           ) : app === "contacts" ? (
             <Contacts world={world} c={c} L={L} act={act} />
           ) : app === "bank" ? (
@@ -172,7 +172,7 @@ function HomeScreen({ world, c, badge, setApp, teamColor, next }: { world: World
 const compact = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e5 ? 0 : 1)}K` : String(n));
 
 // ───────── Messages ─────────
-function Messages({ c, L, me, act }: { c: CareerState; L: LifeState; me: string; act: Act }) {
+function Messages({ world, c, L, me, act }: { world: World; c: CareerState; L: LifeState; me: string; act: Act }) {
   const n = unread(L);
   useEffect(() => {
     if (n > 0) void act.run("lifeRead");
@@ -203,6 +203,9 @@ function Messages({ c, L, me, act }: { c: CareerState; L: LifeState; me: string;
     );
   const msgs = L.msgs.filter((m) => m.from === open);
   const pending = c.event && (c.event.from ?? "Paddock") === open ? c.event : null;
+  const person = L.people.find((p) => p.name === open);
+  const waiting = person && [...msgs].reverse().find((m) => !m.me)?.open ? person : null;
+  const seen = person ? doneThisWeek(world, person.id) : true;
   return (
     <div className="flex min-h-full flex-col">
       <button onClick={() => setOpen(null)} className="flex items-center gap-3 border-b border-ink-800 px-5 py-3 text-left hover:bg-ink-900">
@@ -223,6 +226,23 @@ function Messages({ c, L, me, act }: { c: CareerState; L: LifeState; me: string;
           </Bubble>
         )}
       </div>
+      {!pending && person && (
+        <div className="sticky bottom-0 grid gap-2 border-t border-ink-800 bg-ink-950 p-3">
+          <div className="px-1 text-sm font-bold uppercase text-slate-500">{waiting ? `Reply to ${open.split(" ")[0]}` : "Send a text"}</div>
+          {waiting
+            ? REPLIES[waiting.role].map(([text, rel], i) => (
+                <button key={i} disabled={act.busy} onClick={() => act.run("lifeReply", open, i)} className={`rounded-2xl px-4 py-3 text-left text-lg font-semibold text-white ${rel > 0 ? "bg-sky-600 hover:bg-sky-500" : "bg-ink-700 hover:bg-ink-600"}`}>
+                  {text}
+                </button>
+              ))
+            : (
+                <button disabled={act.busy || seen} onClick={() => act.run("lifePerson", person.id, "talk")} className="rounded-2xl bg-sky-600 px-4 py-3 text-left text-lg font-semibold text-white hover:bg-sky-500 disabled:opacity-40">
+                  {seen ? `You've talked to ${open.split(" ")[0]} this weekend` : "Hey, got a minute?"}
+                </button>
+              )}
+          {waiting && <div className="px-1 text-sm text-slate-500">Or leave it. Nobody likes being left on read for long.</div>}
+        </div>
+      )}
       {pending && (
         <div className="sticky bottom-0 grid gap-2 border-t border-ink-800 bg-ink-950 p-3">
           <div className="px-1 text-sm font-bold uppercase text-slate-500">Reply as {me}</div>
@@ -443,10 +463,16 @@ function Spark({ h, w = 96, hgt = 32, color }: { h: number[]; w?: number; hgt?: 
     </svg>
   );
 }
+/** "250k", "1.5m", "$40,000" -> a number (0 if it can't be read). */
+const parseMoney = (t: string) => {
+  const m = t.trim().toLowerCase().replace(/[$,\s]/g, "").match(/^(\d*\.?\d+)([km]?)$/);
+  return m ? Math.round(Number(m[1]) * (m[2] === "m" ? 1e6 : m[2] === "k" ? 1e3 : 1)) : 0;
+};
 const fmtP = (p: number) => (p >= 1000 ? p.toLocaleString(undefined, { maximumFractionDigits: 0 }) : p >= 1 ? p.toFixed(2) : p.toFixed(4));
 
 function Markets({ c, L, market, act }: { c: CareerState; L: LifeState; market: Market; act: Act }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [amt, setAmt] = useState("");
   const list = TICKERS.filter((t) => t.market === market);
   const held = list.reduce((s, t) => s + (L.hold[t.sym]?.units ?? 0) * priceOf(L, t.sym), 0);
   const cost = list.reduce((s, t) => s + (L.hold[t.sym]?.cost ?? 0), 0);
@@ -459,6 +485,7 @@ function Markets({ c, L, market, act }: { c: CareerState; L: LifeState; market: 
     const hold = L.hold[tk.sym];
     const val = (hold?.units ?? 0) * p;
     const amounts = [10_000, 100_000, 1_000_000];
+    const typed = parseMoney(amt);
     return (
       <div className="grid gap-5 p-5">
         <button onClick={() => setOpen(null)} className="justify-self-start text-lg font-bold text-sky-400">
@@ -519,6 +546,17 @@ function Markets({ c, L, market, act }: { c: CareerState; L: LifeState; market: 
               All
             </button>
           </div>
+          <div className="mt-2 text-sm font-bold uppercase text-slate-400">Exact amount</div>
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2">
+            <input value={amt} onChange={(e) => setAmt(e.target.value)} inputMode="decimal" placeholder="e.g. 250k or 1.5m" className="min-w-0 rounded-xl border-2 border-ink-700 bg-ink-900 px-4 py-3 font-display text-2xl font-bold text-white outline-none focus:border-sky-500" />
+            <button disabled={act.busy || !typed || typed > c.cash} onClick={() => act.run("lifeTrade", tk.sym, typed).then(() => setAmt(""))} className="rounded-xl bg-emerald-600 px-4 font-display text-xl font-bold uppercase text-white hover:bg-emerald-500 disabled:opacity-35">
+              Buy
+            </button>
+            <button disabled={act.busy || !typed || typed > val + 1} onClick={() => act.run("lifeTrade", tk.sym, -typed).then(() => setAmt(""))} className="rounded-xl bg-ink-700 px-4 font-display text-xl font-bold uppercase text-white hover:bg-ink-600 disabled:opacity-35">
+              Sell
+            </button>
+          </div>
+          {typed ? <div className="text-sm text-slate-400">{money(typed)} = {(typed / p).toLocaleString(undefined, { maximumFractionDigits: p >= 100 ? 2 : 4 })} {tk.sym}</div> : null}
           <div className="text-sm text-slate-500">Fee {market === "stock" ? "0.5%" : "1.5%"} on each trade. Prices move once a race weekend.</div>
         </div>
       </div>

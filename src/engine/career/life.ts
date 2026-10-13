@@ -109,6 +109,7 @@ export interface Msg {
   text: string;
   me?: boolean;
   t: number; // weekend index
+  open?: boolean; // waiting for your reply (a person's text)
 }
 export interface Post {
   who: string;
@@ -341,6 +342,7 @@ export function lifeAfterRound(w: World) {
       friend: ["Simulator battle tonight?", "Dinner after the briefing?", "Good race. You were mega in the last sector"],
     };
     msg(L, p.name, r.pick(lines[p.role]), t);
+    L.msgs[L.msgs.length - 1].open = true;
   }
   void R;
 }
@@ -621,6 +623,30 @@ export const money = (x: number) => {
   const s = a >= 1e6 ? `${trim((a / 1e6).toFixed(2))}M` : a >= 1e3 ? `${trim((a / 1e3).toFixed(a >= 1e5 ? 0 : 1))}K` : `${Math.round(a)}`;
   return `${x < 0 ? "-" : ""}$${s}`;
 };
+
+/** Replies to a person's text: [what you send, relationship change, morale]. */
+export const REPLIES: Record<Role, [string, number, number][]> = {
+  mum: [["Call you tonight, promise", 5, 1], ["Busy week, talk soon", -1, 0]],
+  dad: [["Thanks Dad. Means a lot", 5, 1], ["Yeah yeah, I know", -2, 0]],
+  sibling: [["Of course. I'll sort it", 5, 1], ["We'll see", -1, 0]],
+  partner: [["Miss you too. Back Sunday", 6, 1.5], ["Can't talk, race prep", -3, 0]],
+  friend: [["You're on", 5, 1], ["Next week maybe", -1, 0]],
+};
+export function lifeReply(w: World, from: string, i: number): Ans {
+  const L = ensureLife(w);
+  const c = careerOf(w);
+  const m = L ? [...L.msgs].reverse().find((x) => x.from === from && x.open) : undefined;
+  const p = L?.people.find((x) => x.name === from);
+  if (!c || !L || !m || !p) return no("");
+  const r = REPLIES[p.role][i];
+  if (!r) return no("");
+  m.open = false;
+  p.rel = clamp(p.rel + r[1]);
+  p.seen = wk(w);
+  morale(c, r[2]);
+  msg(L, from, r[0], wk(w), true);
+  return { ok: true, msg: `${from.split(" ")[0]} ${r[1] > 0 ? "+" : ""}${r[1]}` };
+}
 
 export const unread = (L: LifeState | undefined | null) => (L ? Math.max(0, L.msgs.filter((m) => !m.me).length - (L.read ?? 0)) : 0);
 export function lifeRead(w: World): Ans {
