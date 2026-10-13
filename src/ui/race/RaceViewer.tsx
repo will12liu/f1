@@ -92,27 +92,27 @@ export function RaceViewer({
   };
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[1fr_300px]">
+    <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
       <div className="panel overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 px-3 py-2 border-b border-ink-800">
-          <div className="font-display text-xl font-bold tracking-wide">
+        <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-ink-800">
+          <div className="font-display text-3xl font-black tracking-wide">
             LAP {Math.max(1, view.lap)}
             <span className="text-slate-500">/{replay.laps}</span>
           </div>
           <FlagBadge flag={view.flag} />
-          <div className="ml-auto flex items-center gap-1">
-            <button className="btn-ghost !px-2.5 !py-1" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"}>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <button className="btn-ghost !px-4 !py-2 !text-base" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Pause" : "Play"}>
               {playing ? "❚❚" : "▶"}
             </button>
             {SPEEDS.map((s) => (
-              <button key={s} onClick={() => setSpeed(s)} className={`btn !px-2 !py-1 ${speed === s ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+              <button key={s} onClick={() => setSpeed(s)} className={`btn !px-3 !py-2 !text-base ${speed === s ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                 {s}x
               </button>
             ))}
-            <button className="btn-ghost !px-2 !py-1" onClick={() => jumpLap(1)} title="Next lap">
+            <button className="btn-ghost !px-3 !py-2 !text-base" onClick={() => jumpLap(1)} title="Next lap">
               +1 lap
             </button>
-            <button className="btn-ghost !px-2 !py-1" onClick={() => { if (live) { live.finish(); setT(Infinity); } else setT(ix.end); setPlaying(false); }} title={live ? "Sim the rest at the current dials" : "Skip to the flag"}>
+            <button className="btn-ghost !px-3 !py-2 !text-base" onClick={() => { if (live) { live.finish(); setT(Infinity); } else setT(ix.end); setPlaying(false); }} title={live ? "Sim the rest at the current dials" : "Skip to the flag"}>
               Flag
             </button>
           </div>
@@ -135,16 +135,16 @@ export function RaceViewer({
         </div>}
       </div>
 
-      <div className="grid gap-3 content-start">
+      <div className="grid gap-4 content-start">
         {side}
         <div className="panel overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-ink-800 text-[11px] uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-ink-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
             <span>Timing</span>
             <button className="hover:text-white" onClick={() => setShowInterval((x) => !x)}>
               {showInterval ? "Interval" : "Gap to leader"} ⇄
             </button>
           </div>
-          <ol className="text-sm">
+          <ol className="text-base">
             {view.cars.map((c) => {
               const info = cars[c.idx];
               let right: string;
@@ -160,25 +160,25 @@ export function RaceViewer({
                 <li
                   key={c.idx}
                   onClick={() => setFollow((f) => (f === c.idx ? null : c.idx))}
-                  className={`flex items-center gap-2 px-2 py-[3px] border-b border-ink-800/60 cursor-pointer ${follow === c.idx ? "bg-ink-700/70" : "hover:bg-ink-800"} ${c.out ? "opacity-40" : ""}`}
+                  className={`flex items-center gap-2.5 px-3 py-1 border-b border-ink-800/60 cursor-pointer ${follow === c.idx ? "bg-ink-700/70" : "hover:bg-ink-800"} ${c.out ? "opacity-40" : ""}`}
                 >
-                  <span className="w-5 text-right font-mono text-xs text-slate-400">{c.pos}</span>
+                  <span className="w-6 text-right font-mono text-sm text-slate-400">{c.pos}</span>
                   <span className="w-1 h-4 rounded-sm" style={{ background: info.color }} />
-                  <span className="font-semibold w-10">{info.code}</span>
-                  {c.pen > 0 && !c.out && <span className="rounded-sm bg-amber-400 px-1 text-[10px] font-bold text-black">+{c.pen}</span>}
+                  <span className="font-display text-lg font-bold w-12">{info.code}</span>
+                  {c.pen > 0 && !c.out && <span className="rounded-sm bg-amber-400 px-1 text-xs font-bold text-black">+{c.pen}</span>}
                   {c.bw && !c.out && <span className="h-3 w-3 border border-slate-500" style={{ background: "linear-gradient(135deg,#fff 50%,#000 50%)" }} title="Black-and-white flag" />}
                   {c.blue && !c.out && <span className="h-3 w-1.5 bg-blue-500" title="Blue flags" />}
-                  <span className="ml-auto font-mono text-xs text-slate-300">{right}</span>
-                  <span className="w-4 h-4 rounded-full border-2 text-[8px] grid place-items-center font-bold" style={{ borderColor: COMPOUNDS[c.compound as keyof typeof COMPOUNDS]?.color ?? "#999" }} title={COMPOUNDS[c.compound as keyof typeof COMPOUNDS]?.name}>
+                  <span className="ml-auto font-mono text-sm text-slate-300">{right}</span>
+                  <span className="w-5 h-5 rounded-full border-2 text-[10px] grid place-items-center font-bold" style={{ borderColor: COMPOUNDS[c.compound as keyof typeof COMPOUNDS]?.color ?? "#999" }} title={COMPOUNDS[c.compound as keyof typeof COMPOUNDS]?.name}>
                     {c.compound}
                   </span>
-                  <span className="w-3 text-[10px] text-slate-500 font-mono">{c.pits || ""}</span>
+                  <span className="w-3 text-xs text-slate-500 font-mono">{c.pits || ""}</span>
                 </li>
               );
             })}
           </ol>
         </div>
-        <div className="panel p-3 text-xs space-y-1.5">
+        <div className="panel p-4 text-sm space-y-2">
           {feed.length === 0 && <div className="text-slate-500">Lights out and away we go…</div>}
           {feed.map((e, i) => (
             <div key={i} className="flex gap-2">
@@ -406,7 +406,7 @@ function TrackCanvas({
     line(2 / 3, "#e10600", 2);
 
     // corner numbers
-    g.font = "600 10px 'IBM Plex Sans', sans-serif";
+    g.font = "600 13px 'IBM Plex Sans', sans-serif";
     g.fillStyle = "#64748b";
     g.textAlign = "center";
     g.textBaseline = "middle";
@@ -442,7 +442,7 @@ function TrackCanvas({
       const f = view.cars[0].frac + 0.012;
       const [x, y] = offset(f, 0);
       drawCar(g, x, y, heading(f, 0), carScale, "#d4d4d8", "#facc15", false);
-      g.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+      g.font = "700 13px ui-sans-serif, system-ui, sans-serif";
       g.fillStyle = "#facc15";
       g.textAlign = "left";
       g.fillText("SC", x + 10, y - 8);
@@ -478,7 +478,7 @@ function TrackCanvas({
         g.fillRect(x - 3, y - 14, 6, 4);
       }
       if (c.pos <= 3 || mine || c.pit) {
-        g.font = "700 11px ui-sans-serif, system-ui, sans-serif";
+        g.font = "700 14px ui-sans-serif, system-ui, sans-serif";
         g.fillStyle = mine ? "#ffffff" : "#e2e8f0";
         g.textAlign = "left";
         g.fillText(`${c.pos} ${info.code}`, x + 11, y - 7);
@@ -517,7 +517,7 @@ function TrackCanvas({
           g.lineWidth = 2.5;
           g.stroke();
           const [lx, ly] = offset(f0 + 0.024, side * 1.4);
-          g.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+          g.font = "700 13px ui-sans-serif, system-ui, sans-serif";
           g.fillStyle = side < 0 ? "#38bdf8" : "#a3e635";
           g.textAlign = "center";
           g.fillText(label, lx, ly);
