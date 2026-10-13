@@ -4,6 +4,7 @@ import { useGame } from "../../state/game";
 import { Section } from "../components/bits";
 import type { Message } from "../../engine/manager/state";
 import { useAct } from "./kit";
+import { PageHead } from "../components/hub";
 
 const KIND: Record<Message["kind"], string> = { board: "Board", sponsor: "Partners", rnd: "Factory", staff: "People", fia: "FIA", driver: "Drivers", finance: "Finance", race: "Race" };
 
@@ -24,8 +25,10 @@ export function Inbox() {
   const kinds = [...new Set(m.inbox.map((x) => x.kind))];
 
   return (
+    <div className="grid gap-8">
+    <PageHead title="Inbox" />
     <Section
-      title="Inbox"
+      title="Mail"
       right={
         <div className="flex flex-wrap gap-1">
           {(["all", ...kinds] as const).map((k) => (
@@ -52,5 +55,6 @@ export function Inbox() {
         ))}
       </div>
     </Section>
+    </div>
   );
 }

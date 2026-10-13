@@ -9,6 +9,7 @@ import { f1Teams } from "../../engine/season/season";
 import { useGame } from "../../state/game";
 import { Section, TeamBar } from "../components/bits";
 import { Answer, AREA_LABEL, Meter, useAct } from "./kit";
+import { PageHead } from "../components/hub";
 
 const AREAS: Area[] = ["aero", "mech", "power", "reliability"];
 const SIZES: [Size, string][] = [
@@ -33,7 +34,9 @@ export function Development() {
   const teams = f1Teams(world);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+    <div className="grid gap-8">
+    <PageHead title="Car & R&D" text="The car against the field, projects in the factory and next year's car." />
+    <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
       <div className="grid gap-4 content-start">
         <Section title="The car against the field">
           <div className="p-4 grid gap-4">
@@ -142,7 +145,7 @@ export function Development() {
           <div className="divide-y divide-ink-800 text-sm">
             {m.projects.length === 0 && <div className="p-4 text-slate-500">No projects running.</div>}
             {m.projects.map((p) => (
-              <div key={p.id} className="grid grid-cols-[1fr_110px] items-center gap-3 px-4 py-2">
+              <div key={p.id} className="grid grid-cols-[1fr_110px] items-center gap-3 px-5 py-3">
                 <div>
                   <div className="font-semibold">{p.name}</div>
                   <div className="text-sm text-slate-400">
@@ -161,7 +164,7 @@ export function Development() {
               const f = m.facilities[k];
               const nextCost = FACILITIES[k].cost[f.level + 1];
               return (
-                <div key={k} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                <div key={k} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                   <div className="min-w-40">
                     <div className="font-semibold">{FACILITIES[k].label}</div>
                     <div className="flex gap-1 pt-1">
@@ -192,7 +195,7 @@ export function Development() {
           <div className="divide-y divide-ink-800 text-sm">
             {m.finished.length === 0 && <div className="p-4 text-slate-500">Nothing delivered yet.</div>}
             {m.finished.slice(0, 10).map((p) => (
-              <div key={p.id} className="flex items-center gap-3 px-4 py-2">
+              <div key={p.id} className="flex items-center gap-3 px-5 py-3">
                 <TeamBar color={p.outcome === "failed" ? "#f43f5e" : p.outcome === "good" ? "#34d399" : p.outcome === "poor" ? "#f59e0b" : "#94a3b8"} />
                 <span className="flex-1">{p.name}</span>
                 <span className="font-mono text-sm text-slate-400">
@@ -204,6 +207,7 @@ export function Development() {
           </div>
         </Section>
       </div>
+    </div>
     </div>
   );
 }

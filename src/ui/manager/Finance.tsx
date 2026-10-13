@@ -5,6 +5,7 @@ import { fmtM, type LedgerCat } from "../../engine/manager/state";
 import { useGame } from "../../state/game";
 import { Section } from "../components/bits";
 import { Meter, Stat } from "./kit";
+import { PageHead } from "../components/hub";
 
 const CAT: Record<LedgerCat, string> = {
   prize: "Prize fund",
@@ -40,7 +41,8 @@ export function Finance() {
   const cap = capForecast(world, m);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-8">
+      <PageHead title="Finance" text="Money in, money out, and the cost cap." />
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Stat label="Bank" value={fmtM(m.cash)} tone={m.cash < 0 ? "bad" : undefined} />
         <Stat label={`${world.season} so far`} value={fmtM(net)} tone={net >= 0 ? "good" : "bad"} />

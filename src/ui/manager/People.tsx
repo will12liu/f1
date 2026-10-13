@@ -10,6 +10,7 @@ import { useGame } from "../../state/game";
 import { DriverLink, Ovr, Section, TeamBar, useMaps } from "../components/bits";
 import { useParams } from "react-router-dom";
 import { Answer, useAct } from "./kit";
+import { PageHead } from "../components/hub";
 
 export function People() {
   const { id = "" } = useParams();
@@ -38,7 +39,8 @@ export function People() {
     .slice(0, 20);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-8">
+      <PageHead title="People" text="Your drivers, your staff, and who you could bring in." />
       <Answer a={answer} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Key staff" right={<span className="text-sm text-slate-400">prestige {prestigeOf(world, me.id).toFixed(2)}</span>}>
@@ -46,7 +48,7 @@ export function People() {
             {ROLES.map((r) => {
               const s = ours.find((x) => x.role === r);
               return (
-                <div key={r} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                <div key={r} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                   <div className="w-44">
                     <div className="text-xs uppercase tracking-wider text-slate-400">{STAFF_ROLES[r].label}</div>
                     <div className="font-semibold">{s ? `${s.first} ${s.last}` : <span className="text-rose-300">Empty</span>}</div>
@@ -108,7 +110,7 @@ export function People() {
             {market.map((s) => {
               const ask = staffAsk(s.role, s.rating) * (s.teamId ? 1.35 : 1);
               return (
-                <div key={s.id} className="flex flex-wrap items-center gap-3 px-4 py-2">
+                <div key={s.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
                   <Ovr v={s.rating} />
                   <div className="flex-1">
                     <div className="font-semibold">
@@ -134,7 +136,7 @@ export function People() {
           {ourDrivers.map((d) => {
             const ask = driverAsk(world, d);
             return (
-              <div key={d.id} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+              <div key={d.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                 <Ovr v={d.ovr} />
                 <div className="flex-1">
                   <DriverLink d={d} base={base} full />

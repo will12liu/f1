@@ -9,6 +9,7 @@ import { hasLicence, juniorStandings, licencePointsSL } from "../../engine/seaso
 import { useGame } from "../../state/game";
 import { DriverLink, Section, TeamBar, useMaps } from "../components/bits";
 import { Answer, Meter, useAct } from "./kit";
+import { PageHead } from "../components/hub";
 
 export function Academy() {
   const { id = "" } = useParams();
@@ -41,7 +42,8 @@ export function Academy() {
   const owned = new Set(m.juniorTeams ?? []);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-8">
+      <PageHead title="Academy" text="Your junior drivers, your scouts and your F2 and F3 teams." />
       <Answer a={answer} />
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <Section title={`Academy · ${academy.length}/${ACADEMY.max}`} right={<span className="text-sm text-slate-400">programme level {m.program ?? 2}</span>}>
@@ -52,7 +54,7 @@ export function Academy() {
               if (!d) return null;
               const est = potEstimate(world, d);
               return (
-                <div key={a.driverId} className="grid gap-2 px-4 py-2.5">
+                <div key={a.driverId} className="grid gap-2 px-5 py-3.5">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="flex-1">
                       <DriverLink d={d} base={base} full />
@@ -86,7 +88,7 @@ export function Academy() {
               );
             })}
           </div>
-          <div className="flex items-center gap-3 border-t border-ink-800 px-4 py-2.5 text-sm text-slate-400">
+          <div className="flex items-center gap-3 border-t border-ink-800 px-5 py-3.5 text-sm text-slate-400">
             Coaching and simulator time make academy drivers improve faster every winter.
             {(m.program ?? 2) < 5 && (
               <button className="btn-ghost ml-auto !px-2 !py-1 text-sm" disabled={busy} onClick={() => run("upgradeProgram")}>
@@ -101,7 +103,7 @@ export function Academy() {
             {(m.scouts ?? [])
               .filter((s) => s.hired)
               .map((s) => (
-                <div key={s.id} className="flex flex-wrap items-center gap-2 px-4 py-2">
+                <div key={s.id} className="flex flex-wrap items-center gap-2 px-5 py-3">
                   <span className="flex-1">
                     {s.first} {s.last} <span className="text-sm text-slate-400">· {s.rating} · {fmtM(s.salary)}</span>
                   </span>
@@ -119,7 +121,7 @@ export function Academy() {
             {(m.scouts ?? [])
               .filter((s) => !s.hired)
               .map((s) => (
-                <div key={s.id} className="flex items-center gap-2 px-4 py-2">
+                <div key={s.id} className="flex items-center gap-2 px-5 py-3">
                   <span className="flex-1">
                     {s.first} {s.last} <span className="text-sm text-slate-400">· {s.nat} · rating {s.rating}</span>
                   </span>

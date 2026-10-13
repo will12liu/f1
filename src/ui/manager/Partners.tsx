@@ -5,6 +5,7 @@ import { fmtM, type Bonus, type Tier } from "../../engine/manager/state";
 import { useGame } from "../../state/game";
 import { Section } from "../components/bits";
 import { Answer, Meter, useAct } from "./kit";
+import { PageHead } from "../components/hub";
 
 const bonusText = (b: Bonus) =>
   b.kind === "position" ? `${fmtM(b.amount)} if the team finishes P${b.target} or better` : `${fmtM(b.amount)} per ${b.kind === "points" ? "points finish" : b.kind === "podium" ? "podium" : "win"}`;
@@ -19,7 +20,8 @@ export function Partners() {
   const total = m.sponsors.reduce((s, x) => s + x.perSeason, 0);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-8">
+      <PageHead title="Partners" text="Sponsors pay by the season. Keep them happy, sign new ones." />
       <Answer a={answer} />
       <Section title="Partners" right={<span className="text-sm text-slate-400">{fmtM(total)} a season</span>}>
         <div className="divide-y divide-ink-800">
@@ -60,7 +62,7 @@ export function Partners() {
             const clash = m.sponsors.some((s) => s.sector === o.sector);
             const full = slotsFree(m, o.tier) <= 0;
             return (
-              <div key={o.id} className="grid sm:grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-sm">
+              <div key={o.id} className="grid sm:grid-cols-[1fr_auto] items-center gap-3 px-5 py-4 text-sm">
                 <div>
                   <div className="font-semibold">
                     {o.brand} <span className="font-normal text-slate-400">· {SPONSOR_TIERS[o.tier].label.toLowerCase()}{o.renewal ? " · renewal" : ""}</span>
