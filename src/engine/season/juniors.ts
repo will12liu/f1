@@ -9,6 +9,7 @@ import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, Series, World } from "../types";
 import type { Command } from "../race/dials";
 import { moraleForm } from "../career/career";
+import { planEffects, type WeekendPlan } from "../race/weekend";
 import type { MomentChoice } from "../race/moments";
 
 export type Junior = "F2" | "F3";
@@ -35,16 +36,37 @@ export function juniorRounds(calendarLength: number, series: Junior): number[] {
 export const isJuniorRound = (w: World, series: Junior, round: number) => juniorRounds(w.calendar.length, series).includes(round);
 
 /** The junior grid at a circuit as a race input (spec cars: a third of the F1-style spread). */
-export function juniorInput(w: World, series: Junior, round: number, circuit: Circuit): RaceInput {
+export function juniorInput(w: World, series: Junior, round: number, circuit: Circuit, plan?: WeekendPlan): RaceInput {
   const seed = hashString(`${w.seed}:${w.season}:${round}:${series}`);
+  const fx = (id: string) => (plan?.[id] ? planEffects(seed, circuit, plan[id]) : null);
   const teams = w.teams.filter((t) => t.series === series);
   const dm = new Map(w.drivers.map((d) => [d.id, d]));
   const field = teams.flatMap((t) => t.drivers.map((id) => ({ team: t, driver: dm.get(id) })).filter((x): x is { team: (typeof teams)[number]; driver: Driver } => !!x.driver && !x.driver.retired));
   const car = (t: (typeof teams)[number]) => 80 + (carPace(t.car, circuit) - 80) * 0.6;
-  const q = qualify(seed, circuit, field.map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, car: car(team), r: driver.ratings })));
+  const q = qualify(
+    seed,
+    circuit,
+    field.map(({ team, driver }) => ({
+      driverId: driver.id,
+      teamId: team.id,
+      car: car(team),
+      r: fx(driver.id)?.quali(driver.ratings) ?? driver.ratings,
+      form: (moraleForm(w, driver.id) || 0) + (fx(driver.id)?.form ?? 0) || undefined,
+      plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late } : undefined,
+    })),
+  );
   const grid = new Map(q.map((x) => [x.driverId, x.pos]));
   const entries: Entry[] = field
-    .map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, grid: grid.get(driver.id)!, car: car(team), reliability: team.car.reliability, r: driver.ratings, name: driver.last, form: moraleForm(w, driver.id) || undefined }))
+    .map(({ team, driver }) => ({
+      driverId: driver.id,
+      teamId: team.id,
+      grid: grid.get(driver.id)!,
+      car: car(team),
+      reliability: team.car.reliability,
+      r: fx(driver.id)?.race(driver.ratings) ?? driver.ratings,
+      name: driver.last,
+      form: (moraleForm(w, driver.id) || 0) + (fx(driver.id)?.form ?? 0) || undefined,
+    }))
     .sort((a, b) => a.grid - b.grid);
   const laps = Math.max(12, Math.round(JUNIOR[series].km / circuit.km));
   // junior cars are slower: a longer base lap (F2 ~ +8%, F3 ~ +14%)
@@ -58,6 +80,7 @@ export interface JuniorLive {
   choices: MomentChoice[];
   focus: number[];
   moments: "off" | "key" | "all";
+  plan?: WeekendPlan;
 }
 
 /** Run this round's junior races (if any). `live` replays the one the player drove. */
@@ -65,7 +88,7 @@ export function simJuniorRound(w: World, round: number, circuit: Circuit, live?:
   ensureProspects(w);
   for (const series of ["F3", "F2"] as Junior[]) {
     if (!isJuniorRound(w, series, round)) continue;
-    const input = juniorInput(w, series, round, circuit);
+    const input = juniorInput(w, series, round, circuit, live?.series === series ? live.plan : undefined);
     if (input.entries.length < 6) continue;
     const l = live?.series === series ? live : undefined;
     const { result, state } = simRace(l ? { ...input, commands: l.commands, choices: l.choices, focus: l.focus, moments: l.moments, reads: w.reads } : input);

@@ -12,6 +12,7 @@ import * as Car from "./career/career";
 import * as Ev from "./career/events";
 import { meOf, startCareer, type NewDriver } from "./career/career";
 import { isJuniorRound, juniorInput } from "./season/juniors";
+import type { WeekendPlan } from "./race/weekend";
 import type { World } from "./types";
 
 const api = {
@@ -25,12 +26,12 @@ const api = {
     return { world, done };
   },
   /** Qualifying and the race input for the next round, to drive it live. */
-  prepareRound(world: World) {
-    return prepareNextRound(world);
+  prepareRound(world: World, plan?: WeekendPlan) {
+    return prepareNextRound(world, plan);
   },
   /** Records the next round as driven live: the same race replayed with the player's commands. */
-  commitRound(world: World, commands: Command[], live?: Parameters<typeof simNextRound>[2], junior?: Parameters<typeof simNextRound>[3]) {
-    const summary = simNextRound(world, commands, live, junior);
+  commitRound(world: World, commands: Command[], live?: Parameters<typeof simNextRound>[2], junior?: Parameters<typeof simNextRound>[3], plan?: WeekendPlan) {
+    const summary = simNextRound(world, commands, live, junior, plan);
     return { world, summary };
   },
   /** Driver career: create the driver and his first seat. */
@@ -39,12 +40,12 @@ const api = {
     return world;
   },
   /** The player's junior race this round (if his series races), to drive it live. */
-  prepareJunior(world: World) {
+  prepareJunior(world: World, plan?: WeekendPlan) {
     const d = meOf(world);
     const r = nextRound(world);
     if (!d || !r || (d.series !== "F2" && d.series !== "F3") || !isJuniorRound(world, d.series, r.round)) return null;
     const circuit = circuitOf(world, r.circuitId);
-    return { round: r.round, series: d.series as "F2" | "F3", input: juniorInput(world, d.series, r.round, circuit) };
+    return { round: r.round, series: d.series as "F2" | "F3", input: juniorInput(world, d.series, r.round, circuit, plan) };
   },
   /** Team-principal mode: take over a team. */
   startManager(world: World, teamId: string, name: string) {

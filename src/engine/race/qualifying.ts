@@ -10,6 +10,7 @@ export interface QualiEntry {
   car: number;
   r: DriverRatings;
   form?: number;
+  plan?: { risk: number[]; late: boolean[] }; // the player's qualifying calls (AI: none)
 }
 
 export interface QualiRow {
@@ -35,12 +36,17 @@ export function qualify(seed: number, circuit: CircuitDef, entries: QualiEntry[]
   const q3 = Math.min(10, n);
   const q2 = Math.min(n, q3 + Math.ceil((n - q3) / 2));
   const lap = (e: QualiEntry, s: number): number | null => {
-    if (rng.chance(QUALI.noTime * (1 + (100 - e.r.consistency) / 20))) return null;
+    // the player's calls change the odds and the pace, never the number of random draws
+    const risk = e.plan?.risk[s] ?? 2;
+    const late = e.plan?.late[s] ?? false;
+    const riskMult = risk === 3 ? 2.3 : risk === 1 ? 0.45 : 1;
+    if (rng.chance(QUALI.noTime * (1 + (100 - e.r.consistency) / 20) * riskMult * (late ? 1.6 : 1))) return null;
     let t = circuit.base * (1 + RACE.carK * (100 - e.car) + RACE.drvK * (100 - e.r.quali) + (e.form ?? 0)) - 0.4;
     t += QUALI.evolution[s];
+    if (e.plan) t += (2 - risk) * 0.13 - (late ? 0.12 : 0);
     t += rng.normal(0, QUALI.sd + (100 - e.r.consistency) * QUALI.sdPerPoint);
     t += rng.normal(0, QUALI.tow);
-    if (rng.chance(QUALI.scrappy * (1 + (100 - e.r.consistency) / 25))) t += 0.3 + rng.next() * 1.2;
+    if (rng.chance(QUALI.scrappy * (1 + (100 - e.r.consistency) / 25) * riskMult)) t += 0.3 + rng.next() * 1.2;
     return t;
   };
   const rows: QualiRow[] = entries.map((e) => ({ driverId: e.driverId, teamId: e.teamId, pos: 0, q: [null, null, null], out: 1 }));

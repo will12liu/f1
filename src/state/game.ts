@@ -5,6 +5,7 @@ import { readSave, writeSave, type SaveMeta } from "../db/db";
 import type { WorkerApi } from "../engine/worker";
 import type { Command } from "../engine/race/dials";
 import type { MomentChoice } from "../engine/race/moments";
+import type { WeekendPlan } from "../engine/race/weekend";
 import type { PreparedRound } from "../engine/season/season";
 import type * as Actions from "../engine/manager/actions";
 import type * as Academy from "../engine/manager/academy";
@@ -29,15 +30,15 @@ interface GameState {
   open(id: string): Promise<boolean>;
   create(name: string, manager?: { teamId: string; principal: string }, driver?: NewDriver): Promise<string>;
   /** Driver career: the junior race this round, to drive it live. */
-  prepareJunior(): Promise<{ round: number; series: "F2" | "F3"; input: import("../engine/race/race").RaceInput } | null>;
+  prepareJunior(plan?: WeekendPlan): Promise<{ round: number; series: "F2" | "F3"; input: import("../engine/race/race").RaceInput } | null>;
   /** Run a team-principal action in the worker and save. */
   act<K extends ActName>(name: K, ...args: ActArgs<K>): Promise<{ ok: boolean; msg: string }>;
   simRounds(n: number): Promise<number>;
   nextSeason(): Promise<void>;
   /** Qualifying and the race input for the next round, to drive it live. */
-  prepareLive(): Promise<PreparedRound | null>;
+  prepareLive(plan?: WeekendPlan): Promise<PreparedRound | null>;
   /** Saves the live race (replayed from its commands, so it comes out the same). */
-  commitLive(commands: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: import("../engine/season/juniors").JuniorLive): Promise<number | null>;
+  commitLive(commands: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: import("../engine/season/juniors").JuniorLive, plan?: WeekendPlan): Promise<number | null>;
 }
 
 async function persist(meta: SaveMeta, world: World) {
@@ -66,10 +67,10 @@ export const useGame = create<GameState>((set, get) => ({
     set({ world: res.world, meta: m });
     return res.answer;
   },
-  async prepareJunior() {
+  async prepareJunior(plan) {
     const { world } = get();
     if (!world) return null;
-    return api().prepareJunior(world);
+    return api().prepareJunior(world, plan);
   },
   async create(name, manager, driver) {
     set({ busy: "Loading the 2026 grid…" });
@@ -99,16 +100,16 @@ export const useGame = create<GameState>((set, get) => ({
     set({ world: res.world, meta: m, busy: null });
     return res.done;
   },
-  async prepareLive() {
+  async prepareLive(plan) {
     const { world } = get();
     if (!world) return null;
-    return api().prepareRound(world);
+    return api().prepareRound(world, plan);
   },
-  async commitLive(commands, live, junior) {
+  async commitLive(commands, live, junior, plan) {
     const { world, meta } = get();
     if (!world || !meta) return null;
     set({ busy: "Saving the race…" });
-    const res = await api().commitRound(world, commands, live, junior);
+    const res = await api().commitRound(world, commands, live, junior, plan);
     const m = await persist(meta, res.world);
     set({ world: res.world, meta: m, busy: null });
     return res.summary?.round ?? null;

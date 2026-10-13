@@ -6,6 +6,11 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { createRace, type RaceRunner } from "../../engine/race/race";
 import type { RaceInput } from "../../engine/race/race";
 import { careerOf, DIFFICULTY } from "../../engine/career/career";
+import { Weekend } from "../race/Weekend";
+import type { CarPlan, WeekendPlan } from "../../engine/race/weekend";
+import { circuitOf, nextRound, roundSeed } from "../../engine/season/season";
+import { hashString } from "../../engine/rng";
+import { teamStaff } from "../../engine/manager/manager";
 
 /** What the live page races: the F1 race, or the player's junior race in career mode. */
 type PreparedRound = { round: number; input: RaceInput; series?: "F2" | "F3" };
@@ -73,14 +78,23 @@ export function LiveRace() {
   const [replay, setReplay] = useState<Replay | null>(null);
   const runnerRef = useRef<RaceRunner | null>(null);
 
+  // career and team-principal: practice and qualifying calls first; sandbox goes straight to the grid
+  const planned = !!career || !!(world?.manager && !world.manager.fired);
+  const [plan, setPlan] = useState<WeekendPlan | null>(null);
+  const planIds = career ? [meId!] : world?.manager ? (world.teams.find((t) => t.id === world.manager!.teamId)?.drivers ?? []) : [];
+  const runQuali = (p: CarPlan) => setPlan(Object.fromEntries(planIds.map((id) => [id, p])));
   useEffect(() => {
+    if (planned && !plan) {
+      setPrep(undefined);
+      return;
+    }
     let on = true;
     const junior = career && (meSeries === "F2" || meSeries === "F3");
-    (junior ? prepareJunior() : prepareLive()).then((p) => on && setPrep(p));
+    (junior ? prepareJunior(plan ?? undefined) : prepareLive(plan ?? undefined)).then((p) => on && setPrep(p));
     return () => {
       on = false;
     };
-  }, [prepareLive, prepareJunior, world?.results.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prepareLive, prepareJunior, world?.results.length, plan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { drivers, team } = useMaps(world!);
   const entries = prep?.input.entries ?? [];
@@ -144,6 +158,28 @@ export function LiveRace() {
   }, [runner, refresh]);
 
   if (!world) return null;
+  if (planned && !plan && world) {
+    const r = nextRound(world);
+    if (!r) return <div className="text-slate-400">No race left this season.</div>;
+    const circuit = circuitOf(world, r.circuitId);
+    const junior = career && (meSeries === "F2" || meSeries === "F3");
+    const seed = junior ? hashString(`${world.seed}:${world.season}:${r.round}:${meSeries}`) : roundSeed(world, r.round);
+    const engineer = career ? 40 + (career.rel?.engineer ?? 50) * 0.4 : (teamStaff(world, world.manager!.teamId).engineer?.rating ?? 50);
+    return (
+      <div className="grid gap-4 max-w-3xl">
+        <div>
+          <div className="text-xs uppercase tracking-wider text-slate-400">Round {r.round} · {junior ? `${meSeries} weekend` : "race weekend"}</div>
+          <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
+        </div>
+        <Weekend seed={seed} circuit={circuit} driverId={planIds[0] ?? ""} engineer={engineer} onRun={runQuali} busy={!!busy} />
+        <div>
+          <Link className="btn-ghost" to={base}>
+            Back
+          </Link>
+        </div>
+      </div>
+    );
+  }
   if (prep === undefined) return <div className="text-slate-500">Qualifying…</div>;
   if (prep === null)
     return (
@@ -254,10 +290,10 @@ export function LiveRace() {
               onClick={async () => {
                 const live = { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off" };
                 if (prep.series) {
-                  await commitLive([], undefined, { series: prep.series, commands: runner.state.commands, ...live });
+                  await commitLive([], undefined, { series: prep.series, commands: runner.state.commands, ...live, plan: plan ?? undefined });
                   nav(base);
                 } else {
-                  const round = await commitLive(runner.state.commands, live);
+                  const round = await commitLive(runner.state.commands, live, undefined, plan ?? undefined);
                   if (round) nav(`${base}/race/${round}`);
                 }
               }}

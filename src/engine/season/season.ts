@@ -5,6 +5,7 @@ import { dayForms } from "../race/model";
 import { qualify } from "../race/qualifying";
 import type { Command } from "../race/dials";
 import type { MomentChoice } from "../race/moments";
+import { planEffects, type WeekendPlan } from "../race/weekend";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
@@ -65,7 +66,7 @@ export interface PreparedRound {
 }
 
 /** Qualifying for the next round and the race input. Doesn't change the world. */
-export function prepareNextRound(w: World): PreparedRound | null {
+export function prepareNextRound(w: World, plan?: WeekendPlan): PreparedRound | null {
   const r = nextRound(w);
   if (!r) return null;
   const circuit = circuitOf(w, r.circuitId);
@@ -74,11 +75,20 @@ export function prepareNextRound(w: World): PreparedRound | null {
   const field = raceLineup(w, r.round);
   // the player's people (engineers, simulator) help the team's pace a little; AI teams are unchanged
   const boost = new Map(field.map(({ team }) => [team.id, raceBoost(w, team.id)]));
-  const form = dayForms(seed, field.length).map((f, i) => f + boost.get(field[i].team.id)!.form + moraleForm(w, field[i].driver.id));
+  // the player's weekend plan (practice programme, setup, qualifying calls)
+  const fx = field.map(({ driver }) => (plan?.[driver.id] ? planEffects(seed, circuit, plan[driver.id]) : null));
+  const form = dayForms(seed, field.length).map((f, i) => f + boost.get(field[i].team.id)!.form + moraleForm(w, field[i].driver.id) + (fx[i]?.form ?? 0));
   const quali = qualify(
     seed,
     circuit,
-    field.map(({ team, driver }, i) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings, form: form[i] })),
+    field.map(({ team, driver }, i) => ({
+      driverId: driver.id,
+      teamId: team.id,
+      car: carPace(team.car, circuit),
+      r: fx[i] ? fx[i]!.quali(driver.ratings) : driver.ratings,
+      form: form[i],
+      plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late } : undefined,
+    })),
   );
   const gridPos = new Map(quali.map((q) => [q.driverId, q.pos]));
   const entries: Entry[] = field
@@ -88,7 +98,7 @@ export function prepareNextRound(w: World): PreparedRound | null {
       grid: gridPos.get(driver.id)!,
       car: carPace(team.car, circuit),
       reliability: team.car.reliability,
-      r: driver.ratings,
+      r: fx[i] ? fx[i]!.race(driver.ratings) : driver.ratings,
       name: driver.last,
       form: form[i],
       pit: boost.get(team.id)!.pit,
@@ -101,8 +111,8 @@ export function prepareNextRound(w: World): PreparedRound | null {
 
 /** Qualifying + race for the next round. Records the summary and the replay on the world.
  *  `commands` replays a race the player drove live (same input + same commands = same race). */
-export function simNextRound(w: World, commands?: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: JuniorLive): RaceSummary | null {
-  const prep = prepareNextRound(w);
+export function simNextRound(w: World, commands?: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }, junior?: JuniorLive, plan?: WeekendPlan): RaceSummary | null {
+  const prep = prepareNextRound(w, plan);
   if (!prep) return null;
   const { quali, input } = prep;
   const r = { round: prep.round };
