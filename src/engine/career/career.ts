@@ -3,7 +3,7 @@
 // offers that take you to F1. The AI runs everyone else exactly as in the sandbox.
 import { SPONSOR_BRANDS } from "../../../data/manual/manager";
 import { genDriver } from "../generate";
-import { clampRating, ovrOf, RATING_KEYS } from "../ratings";
+import { clampRating, OVR_WEIGHTS, ovrOf, RATING_KEYS } from "../ratings";
 import { hashString, makeRng, type Rng } from "../rng";
 import { ageOf } from "../season/development";
 import { hasLicence, juniorStandings, licencePointsSL, type Junior } from "../season/juniors";
@@ -31,6 +31,65 @@ export const ARCHETYPES: Archetype[] = [
   { id: "aggressor", label: "Aggressor", blurb: "Late on the brakes, never gives an inch. Stewards know your name.", primary: ["overtaking", "starts", "pace"], weak: ["consistency", "tyres"] },
   { id: "technician", label: "Technician", blurb: "Engineers love you: feedback, setup, energy management.", primary: ["feedback", "energy", "pace"], weak: ["overtaking", "racecraft"] },
 ];
+
+// ───────────── your build (the creator) ─────────────
+// Every skill starts at BUILD_FLOOR; +1 costs its overall weight x 100, so the overall is exactly
+// 25 + spent / 100. The budget gives the same overall as the background's start, presets or not.
+export const BUILD_FLOOR = 25;
+export const BUILD_MAX = 90;
+export const BUILD_KEYS = RATING_KEYS.filter((k) => k !== "aggression");
+export const buildCost = (k: RatingKey) => Math.round(OVR_WEIGHTS[k] * 100);
+export const buildBudget = (tier: Tier, start: Junior) => (TIERS[tier].ovr[start] - BUILD_FLOOR) * 100;
+export type Build = Partial<Record<RatingKey, number>>;
+export const buildSpent = (b: Build) => BUILD_KEYS.reduce((s, k) => s + buildCost(k) * ((b[k] ?? BUILD_FLOOR) - BUILD_FLOOR), 0);
+/** The two weakest skills of a build (they top out at 84) and the three strongest (the coach's focus). */
+export function buildShape(b: Build): { weak: RatingKey[]; primary: RatingKey[] } {
+  const v = (k: RatingKey) => (b[k] ?? BUILD_FLOOR) + OVR_WEIGHTS[k]; // ties: the heavier skill counts as stronger
+  const sorted = [...BUILD_KEYS].sort((a, z) => v(a) - v(z));
+  return { weak: sorted.slice(0, 2), primary: sorted.slice(-3).reverse() };
+}
+/** Rescale a build to spend `budget` (keeps its shape). */
+export function fitBuild(b: Build, budget: number): Build {
+  const spent = buildSpent(b);
+  const f = spent > 0 ? budget / spent : 0;
+  const want: Record<string, number> = {};
+  const out: Build = {};
+  for (const k of BUILD_KEYS) {
+    want[k] = spent > 0 ? BUILD_FLOOR + f * ((b[k] ?? BUILD_FLOOR) - BUILD_FLOOR) : BUILD_FLOOR + budget / 100;
+    out[k] = Math.max(BUILD_FLOOR, Math.min(BUILD_MAX, Math.round(want[k])));
+  }
+  for (let guard = 0; guard < 2000; guard++) {
+    const left = budget - buildSpent(out);
+    if (left < 0) {
+      const k = BUILD_KEYS.filter((x) => out[x]! > BUILD_FLOOR).sort((a, z) => out[z]! - want[z] - (out[a]! - want[a]))[0];
+      if (!k) break;
+      out[k]!--;
+    } else {
+      const k = BUILD_KEYS.filter((x) => out[x]! < BUILD_MAX && buildCost(x) <= left).sort((a, z) => want[z] - out[z]! - (want[a] - out[a]!))[0];
+      if (!k) break;
+      out[k]!++;
+    }
+  }
+  if (b.aggression !== undefined) out.aggression = b.aggression;
+  return out;
+}
+/** A preset: the archetype's shape on the background's budget. */
+export function presetBuild(archId: string, tier: Tier, start: Junior): Build {
+  const a = ARCHETYPES.find((x) => x.id === archId) ?? ARCHETYPES[1];
+  const base = TIERS[tier].ovr[start];
+  const b: Build = {};
+  for (const k of BUILD_KEYS) b[k] = base + (a.primary.includes(k) ? 6 : a.weak.includes(k) ? -5 : 0);
+  const out = fitBuild(b, buildBudget(tier, start));
+  out.aggression = a.id === "aggressor" ? 82 : a.id === "technician" ? 45 : 60;
+  return out;
+}
+
+/** Your style as the pages show it: the preset, or "Custom build" with its own strengths and weak areas. */
+export function archOf(c: CareerState): { label: string; primary: RatingKey[]; weak: RatingKey[] } {
+  const a = ARCHETYPES.find((x) => x.id === c.archetype);
+  const weak = (Object.keys(c.caps) as RatingKey[]).filter((k) => (c.caps[k] ?? 99) < 99);
+  return { label: a?.label ?? "Custom build", primary: c.primary ?? a?.primary ?? [], weak: weak.length ? weak : (a?.weak ?? []) };
+}
 
 export const TIERS = {
   academy: { label: "Academy-backed", blurb: "An F1 team's junior programme pays your way. More talent, more pressure.", ovr: { F3: 66, F2: 72 }, pot: 90, cash: 0.2e6, fame: 8 },
@@ -97,7 +156,8 @@ export interface RaceLog {
 
 export interface CareerState {
   driverId: string;
-  archetype: string;
+  archetype: string; // a preset id, or "custom"
+  primary?: RatingKey[]; // strongest skills (the coach's focus)
   tier: Tier;
   difficulty: Difficulty;
   helmet?: string; // helmet colour from the creator
@@ -162,6 +222,7 @@ export interface NewDriver {
   difficulty: Difficulty;
   num?: number; // car number (2-99)
   helmet?: string; // helmet colour
+  build?: Build; // skills from the creator (presets fill it); without it, the archetype's shape with a little noise
 }
 
 export function startCareer(w: World, o: NewDriver) {
@@ -176,10 +237,21 @@ export function startCareer(w: World, o: NewDriver) {
   if (o.num && o.num >= 1 && o.num <= 99) d.num = Math.round(o.num);
   d.code = o.last.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase().padEnd(3, "X");
   const r = { ...d.ratings };
-  for (const k of RATING_KEYS) r[k] = clampRating(tier.ovr[o.start] + rng.normal(0, 2));
-  for (const k of arch.primary) r[k] = clampRating(r[k] + 6);
-  for (const k of arch.weak) r[k] = clampRating(r[k] - 5);
-  r.aggression = arch.id === "aggressor" ? 82 : arch.id === "technician" ? 45 : 60;
+  let shape: { weak: RatingKey[]; primary: RatingKey[] } = arch;
+  if (o.build) {
+    // your own build: clamp it, and never more than the budget
+    const b: Build = {};
+    for (const k of BUILD_KEYS) b[k] = Math.max(BUILD_FLOOR, Math.min(BUILD_MAX, Math.round(o.build[k] ?? BUILD_FLOOR)));
+    const fit = buildSpent(b) > buildBudget(o.tier, o.start) ? fitBuild(b, buildBudget(o.tier, o.start)) : b;
+    for (const k of BUILD_KEYS) r[k] = fit[k]!;
+    r.aggression = Math.max(30, Math.min(90, Math.round(o.build.aggression ?? 60)));
+    shape = buildShape(fit);
+  } else {
+    for (const k of RATING_KEYS) r[k] = clampRating(tier.ovr[o.start] + rng.normal(0, 2));
+    for (const k of arch.primary) r[k] = clampRating(r[k] + 6);
+    for (const k of arch.weak) r[k] = clampRating(r[k] - 5);
+    r.aggression = arch.id === "aggressor" ? 82 : arch.id === "technician" ? 45 : 60;
+  }
   d.ratings = r as DriverRatings;
   d.ovr = ovrOf(d.ratings);
   d.pot = tier.pot;
@@ -192,12 +264,13 @@ export function startCareer(w: World, o: NewDriver) {
   takeSeat(w, d, team);
   d.contract = { teamId: team.id, until: w.season, salary: 0 };
   const caps: Partial<Record<RatingKey, number>> = {};
-  for (const k of arch.weak) caps[k] = 84;
+  for (const k of shape.weak) caps[k] = 84;
   const academyOf = o.tier === "academy" ? rng.pick(f1Teams(w).filter((t) => t.budget >= 4)).id : undefined;
   w.mode = "career";
   w.careerState = {
     driverId: d.id,
-    archetype: arch.id,
+    archetype: o.build && !ARCHETYPES.some((a) => a.id === o.archetype) ? "custom" : arch.id,
+    primary: shape.primary,
     tier: o.tier,
     difficulty: o.difficulty,
     helmet: o.helmet,
@@ -300,10 +373,10 @@ export function autoSpend(w: World): { ok: boolean; msg: string } {
   const c = careerOf(w);
   const d = meOf(w);
   if (!c || !d) return { ok: false, msg: "" };
-  const arch = ARCHETYPES.find((a) => a.id === c.archetype)!;
+  const primary = c.primary ?? ARCHETYPES.find((a) => a.id === c.archetype)?.primary ?? [];
   let n = 0;
   for (let guard = 0; guard < 200 && c.points > 0; guard++) {
-    const keys = RATING_KEYS.filter((k) => k !== "aggression").sort((a, b) => d.ratings[a] + (arch.primary.includes(a) ? -6 : 0) - (d.ratings[b] + (arch.primary.includes(b) ? -6 : 0)));
+    const keys = RATING_KEYS.filter((k) => k !== "aggression").sort((a, b) => d.ratings[a] + (primary.includes(a) ? -6 : 0) - (d.ratings[b] + (primary.includes(b) ? -6 : 0)));
     let spent = false;
     for (const k of keys) {
       if (pointCost(d.ratings[k]) <= c.points && spendPoint(w, k).ok) {

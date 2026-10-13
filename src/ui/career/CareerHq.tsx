@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Negotiate } from "./Negotiate";
-import { ARCHETYPES, careerOf, meOf, TIERS, XP_PER_POINT } from "../../engine/career/career";
+import { archOf, careerOf, meOf, TIERS, XP_PER_POINT } from "../../engine/career/career";
 import { fmtM } from "../../engine/manager/state";
 import { ageOf } from "../../engine/season/development";
 import { hasLicence, isJuniorRound, juniorStandings, licencePointsSL } from "../../engine/season/juniors";
@@ -33,7 +33,7 @@ export function CareerHq() {
   const st = junior ? juniorStandings(world, d.series as "F2" | "F3") : driverStandings(world);
   const pos = st.findIndex((r) => r.driverId === d.id) + 1;
   const pts = st.find((r) => r.driverId === d.id)?.points ?? 0;
-  const arch = ARCHETYPES.find((a) => a.id === c.archetype);
+  const arch = archOf(c);
   const unread = c.inbox.filter((x) => !x.read).length;
   const role = d.teamId ? `${d.series} · ${t?.name}` : t ? `${t.name} reserve driver` : "No seat";
 

@@ -142,3 +142,32 @@ describe("the events sheet", () => {
     expect(r.errors.join("\n")).toMatch(/Row 4 \(y\)/);
   });
 });
+
+import { buildBudget, buildShape, buildSpent, presetBuild, ARCHETYPES, TIERS as TIERS_ } from "./career";
+import { ovrOf } from "../ratings";
+describe("the creator's build", () => {
+  it("presets and custom builds spend the same budget and land on the background's overall", () => {
+    for (const tier of ["academy", "mid", "self"] as const)
+      for (const start of ["F3", "F2"] as const)
+        for (const a of ARCHETYPES) {
+          const b = presetBuild(a.id, tier, start);
+          expect(buildSpent(b)).toBe(buildBudget(tier, start));
+        }
+    const w = loadWorld(57);
+    // all in on race pace and qualifying, the rest at the floor
+    const build = { pace: 90, quali: 90, aggression: 70 } as Record<string, number>;
+    const left = buildBudget("mid", "F3") - buildSpent(build);
+    expect(left).toBeGreaterThan(0);
+    startCareer(w, { first: "Cus", last: "Tom", nat: "Taiwanese", archetype: "custom", tier: "mid", start: "F3", difficulty: "pro", build: { ...build, racecraft: 90, tyres: 90, consistency: 90, overtaking: 90 } });
+    const c = careerOf(w)!;
+    const d = w.drivers.find((x) => x.id === c.driverId)!;
+    expect(d.ovr).toBeLessThanOrEqual(TIERS_.mid.ovr.F3); // over budget gets scaled back
+    expect(c.archetype).toBe("custom");
+    expect(Object.keys(c.caps).length).toBe(2);
+    expect(buildShape(d.ratings).weak.every((k) => c.caps[k] === 84)).toBe(true);
+    const w2 = loadWorld(57);
+    startCareer(w2, { first: "Pre", last: "Set", nat: "British", archetype: "qualifier", tier: "mid", start: "F3", difficulty: "pro", build: presetBuild("qualifier", "mid", "F3") });
+    const d2 = w2.drivers.find((x) => x.id === careerOf(w2)!.driverId)!;
+    expect(ovrOf(d2.ratings)).toBe(TIERS_.mid.ovr.F3);
+  });
+});

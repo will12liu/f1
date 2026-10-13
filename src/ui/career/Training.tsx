@@ -1,7 +1,7 @@
 // Training: spend upgrade points on ratings. Each +1 costs more as the rating rises; weak areas of your
 // archetype have a ceiling, and the overall can't pass your potential.
 import { useState } from "react";
-import { ARCHETYPES, careerOf, meOf, pointCost, SIM_SESSIONS, simTag, trainCap, XP_PER_POINT, type SimKind } from "../../engine/career/career";
+import { archOf, careerOf, meOf, pointCost, SIM_SESSIONS, simTag, trainCap, XP_PER_POINT, type SimKind } from "../../engine/career/career";
 import { DIFFICULTY } from "../../engine/career/career";
 import { HotLap, Reaction } from "./SimGames";
 import { RATING_KEYS, RATING_LABELS } from "../../engine/ratings";
@@ -17,7 +17,7 @@ export function Training() {
   const c = careerOf(world);
   const d = meOf(world);
   if (!c || !d) return null;
-  const arch = ARCHETYPES.find((a) => a.id === c.archetype)!;
+  const arch = archOf(c);
   return (
     <div className="grid gap-8">
       <PageHead
