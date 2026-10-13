@@ -229,7 +229,7 @@ function takeSeat(w: World, d: Driver, team: Team) {
 // ───────────── progression ─────────────
 
 export const XP_PER_POINT = 100;
-export const pointCost = (v: number) => (v < 60 ? 1 : v < 70 ? 2 : v < 80 ? 3 : v < 85 ? 5 : v < 90 ? 8 : 12);
+export const pointCost = (v: number) => (v < 70 ? 1 : v < 80 ? 2 : v < 85 ? 3 : v < 90 ? 4 : 6);
 
 export function trainCap(c: CareerState, k: RatingKey): number {
   return Math.min(99, c.caps[k] ?? 99);
@@ -315,7 +315,7 @@ export function careerAfterRound(w: World) {
       circuitId = res.circuitId;
     }
   }
-  let xp = 14; // testing and the simulator, every weekend
+  let xp = 30; // testing and the simulator, every weekend
   if (row) {
     series = d.series;
     const fin = row.status === "Finished" || row.status === "Lapped";
@@ -323,7 +323,7 @@ export function careerAfterRound(w: World) {
     const gained = row.grid - row.pos;
     let rating = 6 + (fin ? (exp - row.pos) * 0.18 + gained * 0.08 : -1.5) + (row.pos === 1 && fin ? 1.2 : row.pos <= 3 && fin ? 0.6 : 0);
     rating = Math.round(Math.max(1, Math.min(10, rating + rng.normal(0, 0.3))) * 10) / 10;
-    xp += 25 + Math.max(0, rating - 5) * 10 + (fin && row.pos === 1 ? 25 : fin && row.pos <= 3 ? 12 : 0);
+    xp += 40 + Math.max(0, rating - 5) * 12 + (fin && row.pos === 1 ? 30 : fin && row.pos <= 3 ? 15 : 0);
     const tier = series === "F1" ? 1.6 : series === "F2" ? 0.8 : 0.5;
     const fameGain = (fin ? (row.pos === 1 ? 4 : row.pos <= 3 ? 2 : row.points > 0 ? 0.5 : 0) : -0.3) * tier;
     c.fame = Math.max(0, Math.min(100, c.fame + fameGain));
@@ -541,6 +541,18 @@ export function signDeal(w: World, offerId: string, push: boolean): { ok: boolea
 export function careerWinter(w: World) {
   const c = careerOf(w);
   if (!c) return;
+  // a young driver also grows on his own (racing teaches); an old one slowly fades
+  const d = meOf(w);
+  if (d) {
+    const age = ageOf(d, w.season);
+    const gain = age < d.peak ? Math.max(0, d.pot - d.ovr) * 0.18 : age >= d.decline ? -(1.2 + (age - d.decline) * 0.5) : 0;
+    for (const k of RATING_KEYS) {
+      if (k === "aggression") continue;
+      const cap = trainCap(c, k);
+      d.ratings[k] = clampRating(Math.min(cap, d.ratings[k] + gain * (gain < 0 && (k === "racecraft" || k === "tyres") ? 0.4 : 1)));
+    }
+    d.ovr = Math.min(d.pot, ovrOf(d.ratings));
+  }
   c.deals = c.deals.filter((x) => x.until >= w.season);
   c.dealOffers = [];
   c.fame = Math.max(0, c.fame * 0.92); // people forget

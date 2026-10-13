@@ -8,6 +8,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - `npm run data`: rebuild `public/data/world-2026.json`, `public/data/tracks/*.json` and `data/generated/targets.json`
 - `npm run calibrate [races]`: sim races on the 2026 calendar with the real grid, compare with real averages (tuning knobs: `RACE` in `src/engine/race/model.ts`)
 - `npm run check:season [seed] [seasons]`: sim seasons + winters headlessly (champions, car order, grid changes, development by age)
+- `npm run check:career [seasons] [seed]`: driver careers for each background and start (auto training, best seat each winter): series, standing, overall, licence, first F1 seat
 - `npm run check:manager [team] [seasons] [seed]`: team-principal seasons with an automatic principal (position, cap spend, profit, car rank, board)
 
 ## Workflow
@@ -70,7 +71,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 ## Driver career (src/engine/career/career.ts, src/ui/career)
 - `world.mode = "career"`, `world.careerState`. Creator: name, nationality, archetype (6; primary +6, weak -5 and capped at 84), tier (academy/mid/self-funded: start ovr, pot, cash, fame), start F3 (17) or F2 (19), difficulty (XP multiplier, `duelEdge` in duels).
 - After each round (`careerAfterRound`): your race (junior or F1) gives a 0-10 rating, Driver of the Day, XP (100 = 1 point), fame, team trust (vs expectation and team-mate), salary + endorsement income, endorsement offers by fame, F1 academy invitations; the last round makes seat offers (renewal, F2 step-up, paid seat, same series, F1 race seats where a deal ends if licensed, reserve).
-- Points buy +1 on a rating (`pointCost` rises with the level), capped by archetype and by potential. Winter: `careerMarket` (accepted offer or the best free one) before the AI ladder/market, which never move, develop or retire your driver.
+- Points buy +1 on a rating (`pointCost` rises with the level), capped by archetype and by potential. Winter: natural growth (18% of the gap to potential while young; decline after `decline`). Target (check:career): academy/mid reach F1 in 3-5 seasons, a blue-chip is ~87 by year 5. Winter: `careerMarket` (accepted offer or the best free one) before the AI ladder/market, which never move, develop or retire your driver.
 - Live: `prepareJunior` (worker) races your F2/F3 feature race; `commitRound(..., junior)` replays it inside `simJuniorRound`.
 - Contract talks (`negotiateSeat`): money, years and a clause (release if a top team calls / number-one driver); acceptance from how much they want you, fame, agent; two rounds, then final; pushing too hard can lose the offer. Paddock life shop (`career/shop.ts`): items with a price, yearly upkeep and per-weekend perks (XP, morale, fame), some gated by fame.
 - Life layer (`career/events.ts`): about one weekend in three draws an event (`EvDef`: weight over a context, options with `Fx`: fame, trust, morale, cash, XP, relationships, rival; some options are chances). It waits on the career page until answered. Morale moves race pace a little (`moraleForm`); a rival forms after 3 close finishes against the same driver.
