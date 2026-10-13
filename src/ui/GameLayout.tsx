@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Ceremonies } from "./components/Ceremony";
 import { useGame } from "../state/game";
 
 const NAV = [
@@ -46,6 +47,7 @@ export function GameLayout() {
   const nav = useNavigate();
   const { world, meta, busy, open } = useGame();
   const [missing, setMissing] = useState(false);
+  const loc = useLocation();
   useEffect(() => {
     open(id).then((ok) => setMissing(!ok));
   }, [id, open]);
@@ -94,6 +96,7 @@ export function GameLayout() {
           <div className="mt-3 rounded-lg bg-race px-5 py-2 text-base font-semibold text-white shadow-lg">{busy}</div>
         </div>
       )}
+      {!loc.pathname.endsWith("/live") && <Ceremonies world={world} saveId={meta.id} />}
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
         <Outlet />
       </main>
