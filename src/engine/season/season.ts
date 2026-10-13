@@ -9,7 +9,7 @@ import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
 import { simJuniorRound, type JuniorLive } from "./juniors";
-import { careerAfterRound } from "../career/career";
+import { careerAfterRound, moraleForm } from "../career/career";
 import { ensureSeats, managerAfterRound, raceBoost } from "../manager/manager";
 
 export const f1Teams = (w: World) => w.teams.filter((t) => t.series === "F1");
@@ -74,7 +74,7 @@ export function prepareNextRound(w: World): PreparedRound | null {
   const field = raceLineup(w, r.round);
   // the player's people (engineers, simulator) help the team's pace a little; AI teams are unchanged
   const boost = new Map(field.map(({ team }) => [team.id, raceBoost(w, team.id)]));
-  const form = dayForms(seed, field.length).map((f, i) => f + boost.get(field[i].team.id)!.form);
+  const form = dayForms(seed, field.length).map((f, i) => f + boost.get(field[i].team.id)!.form + moraleForm(w, field[i].driver.id));
   const quali = qualify(
     seed,
     circuit,

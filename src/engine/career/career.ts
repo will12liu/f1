@@ -10,6 +10,7 @@ import { hasLicence, juniorStandings, licencePointsSL, type Junior } from "../se
 import { driverValue, salaryFor } from "../season/offseason";
 import { driverStandings, f1Teams } from "../season/season";
 import type { Driver, DriverRatings, RatingKey, Series, Team, World } from "../types";
+import { drawEvent } from "./events";
 
 // ───────────── who you are ─────────────
 
@@ -110,7 +111,21 @@ export interface CareerState {
   seasons: { season: number; series: Series; teamId: string | null; pos: number; points: number; wins: number; podiums: number }[];
   caps: Partial<Record<RatingKey, number>>;
   seq: number;
+  // the life layer (events.ts)
+  morale?: number; // 0-100: a happy driver is a little quicker
+  rel?: Record<string, number>; // engineer, boss, agent, mate, family, press: 0-100
+  rival?: string; // driver id
+  battles?: Record<string, number>; // close finishes against each driver
+  event?: { id: string; title: string; text: string; opts: { label: string; sub: string }[] };
+  lastEvents?: Record<string, number>;
+  lastBeatMate?: boolean;
 }
+
+/** Pace from morale for the player's car (fraction of a lap; negative = quicker). */
+export const moraleForm = (w: World, driverId: string) => {
+  const c = careerOf(w);
+  return c && c.driverId === driverId ? -((c.morale ?? 60) - 60) * 0.00004 : 0;
+};
 
 const id = (c: CareerState, p: string) => `${p}${++c.seq}`;
 export const careerOf = (w: World): CareerState | null => (w.mode === "career" && w.careerState ? w.careerState : null);
@@ -312,6 +327,19 @@ export function careerAfterRound(w: World) {
     const mateRow = d.series === "F1" ? w.results[w.results.length - 1]?.classification.find((r) => r.driverId === mate?.id) : (w.juniorResults ?? []).find((r) => r.round === round && r.series === d.series)?.rows.find((r) => r.driverId === mate?.id);
     let dt = fin ? (exp - row.pos) * 0.6 : -2;
     if (mateRow) dt += mateRow.pos > row.pos ? 2 : -1.5;
+    c.lastBeatMate = mateRow ? mateRow.pos > row.pos : undefined;
+    // rivals: the driver you keep finishing next to
+    const rows = d.series === "F1" ? w.results[w.results.length - 1]?.classification : (w.juniorResults ?? []).find((r) => r.round === round && r.series === d.series)?.rows;
+    const near = rows?.find((r) => Math.abs(r.pos - row!.pos) === 1 && r.driverId !== mate?.id && r.pos < row!.pos);
+    if (near) {
+      const b = ((c.battles ??= {})[near.driverId] = (c.battles[near.driverId] ?? 0) + 1);
+      if (b >= 3 && c.rival !== near.driverId) {
+        c.rival = near.driverId;
+        const rv = w.drivers.find((x) => x.id === near.driverId);
+        note(w, c, "Press", "A rivalry", `You and ${rv?.first} ${rv?.last} keep fighting over the same piece of track. The press has noticed.`);
+      }
+    }
+    c.morale = Math.max(0, Math.min(100, (c.morale ?? 60) + (fin ? (exp - row.pos) * 0.4 : -3)));
     c.trust = Math.max(0, Math.min(100, c.trust + Math.max(-5, Math.min(5, dt))));
     const dotd = rating >= 8.5 || (gained >= 6 && fin);
     c.log.push({ season: w.season, round, series, circuitId, grid: row.grid, pos: row.pos, status: row.status, rating, xp: Math.round(xp * mult), dotd });
@@ -346,6 +374,7 @@ export function careerAfterRound(w: World) {
     c.trust = Math.min(100, c.trust + 3);
   }
   if (round === R) seasonEndOffers(w, c, d);
+  else drawEvent(w);
 }
 
 function endorseOffer(w: World, c: CareerState, rng: Rng): EndorseOffer {

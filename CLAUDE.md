@@ -69,6 +69,7 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - After each round (`careerAfterRound`): your race (junior or F1) gives a 0-10 rating, Driver of the Day, XP (100 = 1 point), fame, team trust (vs expectation and team-mate), salary + endorsement income, endorsement offers by fame, F1 academy invitations; the last round makes seat offers (renewal, F2 step-up, paid seat, same series, F1 race seats where a deal ends if licensed, reserve).
 - Points buy +1 on a rating (`pointCost` rises with the level), capped by archetype and by potential. Winter: `careerMarket` (accepted offer or the best free one) before the AI ladder/market, which never move, develop or retire your driver.
 - Live: `prepareJunior` (worker) races your F2/F3 feature race; `commitRound(..., junior)` replays it inside `simJuniorRound`.
+- Life layer (`career/events.ts`): about one weekend in three draws an event (`EvDef`: weight over a context, options with `Fx`: fame, trust, morale, cash, XP, relationships, rival; some options are chances). It waits on the career page until answered. Morale moves race pace a little (`moraleForm`); a rival forms after 3 close finishes against the same driver.
 
 ## UI rules
 - No gradients, glass, emoji in headings, badge-above-headline, three-icon rows, fade-on-hover or fade-in-on-scroll, buzzword copy. Solid colours, high contrast, one spacing scale, plain labels.

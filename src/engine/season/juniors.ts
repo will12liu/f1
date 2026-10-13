@@ -8,6 +8,7 @@ import { qualify } from "../race/qualifying";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, Series, World } from "../types";
 import type { Command } from "../race/dials";
+import { moraleForm } from "../career/career";
 import type { MomentChoice } from "../race/moments";
 
 export type Junior = "F2" | "F3";
@@ -43,7 +44,7 @@ export function juniorInput(w: World, series: Junior, round: number, circuit: Ci
   const q = qualify(seed, circuit, field.map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, car: car(team), r: driver.ratings })));
   const grid = new Map(q.map((x) => [x.driverId, x.pos]));
   const entries: Entry[] = field
-    .map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, grid: grid.get(driver.id)!, car: car(team), reliability: team.car.reliability, r: driver.ratings, name: driver.last }))
+    .map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, grid: grid.get(driver.id)!, car: car(team), reliability: team.car.reliability, r: driver.ratings, name: driver.last, form: moraleForm(w, driver.id) || undefined }))
     .sort((a, b) => a.grid - b.grid);
   const laps = Math.max(12, Math.round(JUNIOR[series].km / circuit.km));
   // junior cars are slower: a longer base lap (F2 ~ +8%, F3 ~ +14%)

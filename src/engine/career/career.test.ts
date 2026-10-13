@@ -40,3 +40,25 @@ describe("driver career", () => {
     expect(d.retired).toBeUndefined();
   }, 60_000);
 });
+
+import { answerEvent, EVENT_COUNT } from "./events";
+describe("life between races", () => {
+  it("events come up, wait for an answer, and change the career", () => {
+    expect(EVENT_COUNT()).toBeGreaterThan(20);
+    const w = loadWorld(47);
+    startCareer(w, { first: "Lee", last: "Life", nat: "Italian", archetype: "wet", tier: "mid", start: "F3", difficulty: "pro" });
+    const c = careerOf(w)!;
+    let seen = 0;
+    for (let i = 0; i < 12; i++) {
+      simNextRound(w);
+      if (c.event) {
+        seen++;
+        const before = JSON.stringify([c.fame, c.trust, c.morale, c.xp, c.points, c.cash, c.rel]);
+        answerEvent(w, 0);
+        expect(c.event).toBeUndefined();
+        expect(JSON.stringify([c.fame, c.trust, c.morale, c.xp, c.points, c.cash, c.rel])).not.toBe(before);
+      }
+    }
+    expect(seen).toBeGreaterThan(1);
+  }, 60_000);
+});

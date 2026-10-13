@@ -35,6 +35,21 @@ export function CareerHq() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
       <div className="grid gap-4 content-start">
+        {c.event && (
+          <section className="panel border-l-4 border-sky-400 p-4 grid gap-2">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">This week</div>
+            <h2 className="font-display text-2xl font-bold uppercase leading-none">{c.event.title}</h2>
+            <p className="text-sm text-slate-300">{c.event.text}</p>
+            <div className="grid sm:grid-cols-3 gap-1.5">
+              {c.event.opts.map((o, i) => (
+                <button key={i} disabled={!!busy} onClick={() => run("answerEvent", i)} className="rounded-md bg-ink-800 px-2.5 py-1.5 text-left hover:bg-ink-700">
+                  <div className="text-sm font-semibold text-white">{o.label}</div>
+                  <div className="text-[11px] text-slate-400">{o.sub}</div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         <section className="panel p-5 grid gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <TeamBar color={t?.color ?? "#888"} className="!h-10 !w-1.5" />
@@ -57,14 +72,14 @@ export function CareerHq() {
                 <div className="text-xs uppercase tracking-wider text-slate-400">Round {next.round} · {circuit.gp}</div>
                 <div className="text-sm text-slate-300">{racesHere ? `${d.series} races this weekend.` : junior ? `No ${d.series} race this weekend. You test in the simulator (XP).` : "You're not racing this weekend."}</div>
                 <div className="flex flex-wrap gap-2">
-                  {racesHere && (
+                  {racesHere && !c.event && (
                     <Link className="btn-primary" to={`${base}/live`}>
                       Race it
                     </Link>
                   )}
                   <button
                     className="btn-ghost"
-                    disabled={!!busy}
+                    disabled={!!busy || !!c.event}
                     onClick={async () => {
                       await simRounds(1);
                       if (!junior && racesHere) nav(`${base}/race/${next.round}`);
@@ -91,7 +106,7 @@ export function CareerHq() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Stat label={`${d.series} standings`} value={pos ? `P${pos}` : "-"} sub={`${pts} pts`} />
           <Stat label="Team trust" value={Math.round(c.trust)} tone={c.trust >= 60 ? "good" : c.trust < 30 ? "bad" : undefined} />
-          <Stat label="Fame" value={Math.round(c.fame)} />
+          <Stat label="Fame" value={Math.round(c.fame)} sub={`morale ${Math.round(c.morale ?? 60)}`} />
           <Stat label="Bank" value={fmtM(c.cash)} />
         </div>
 
