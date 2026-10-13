@@ -60,6 +60,10 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 - Winter: `managerSeasonEnd` (position bonuses, cap breach fines and ATR cut, board review and the sack after 2+ seasons, sponsor renewals/break clauses, staff contracts and ageing), `managerMarket` (our seats: expiring deals leave, pre-contracts arrive, `ensureSeats`), the AI market skips our team, `managerWinter` (next-year car work lands, new targets/ATR/offers). The player's team gets no automatic AI development.
 - Actions (actions.ts, run in the worker via `act`): sponsors, projects, facilities, staff hire/poach/renew/release, drivers renew/release/sign/pre-contract/reserve, inbox, take a job after the sack. Race help: pit crew (stop time, slow stops), strategy (plan choice), engineers + simulator (pace) via `raceBoost` -> `Entry.pit/strat/form`. Team orders: `Command.letBy`.
 
+## Junior ladder and academy
+- F2 (14 rounds) and F3 (10) race on F1 weekends with the same engine (`season/juniors.ts`: spec cars at 0.6 of the spread, longer base lap, feature distance), standings, FIA super licence points (`Driver.sl`; 40 over 3 seasons = licence; the first winter seeds earlier points by level). F3 to F2 promotion by standings, F4 = prospect pool (15-18, not raced) feeding F3. F1 seats (AI market and the player) need a licence.
+- Manager academy (`manager/academy.ts`): up to 6 academy drivers (yearly fee), scouts (focus F4/F3/F2) raise `knowledge` so the potential estimate (`potEstimate`, fixed per-driver bias) narrows, buy one F2 and one F3 team (your academy drivers get its seats), pay for seats elsewhere, programme level speeds their development every winter, academy graduates ask half the F1 salary.
+
 ## UI rules
 - No gradients, glass, emoji in headings, badge-above-headline, three-icon rows, fade-on-hover or fade-in-on-scroll, buzzword copy. Solid colours, high contrast, one spacing scale, plain labels.
 

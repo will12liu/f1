@@ -1,7 +1,10 @@
 // Runs the simulation off the main thread so the UI stays responsive.
 import * as Comlink from "comlink";
 import { endSeason } from "./season/offseason";
-import * as A from "./manager/actions";
+import * as Act from "./manager/actions";
+import * as Acad from "./manager/academy";
+
+const A = { ...Act, hireScout: Acad.hireScout, fireScout: Acad.fireScout, setScoutFocus: Acad.setScoutFocus, signAcademy: Acad.signAcademy, releaseAcademy: Acad.releaseAcademy, buyJuniorTeam: Acad.buyJuniorTeam, placeDriver: Acad.placeDriver, upgradeProgram: Acad.upgradeProgram, scoutMarket: (w: Parameters<typeof Acad.scoutMarket>[0]) => (Acad.scoutMarket(w), { ok: true, msg: "" }) };
 import { startManager } from "./manager/manager";
 import type { Command } from "./race/dials";
 import { prepareNextRound, seasonOver, simNextRound } from "./season/season";
@@ -33,7 +36,7 @@ const api = {
   },
   /** Any team-principal action by name (see manager/actions.ts). */
   act<K extends keyof typeof A>(world: World, name: K, args: unknown[]) {
-    const fn = A[name] as unknown as (w: World, ...a: unknown[]) => A.Answer;
+    const fn = A[name] as unknown as (w: World, ...a: unknown[]) => Act.Answer;
     const answer = fn(world, ...args);
     return { world, answer };
   },

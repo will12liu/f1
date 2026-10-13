@@ -9,7 +9,7 @@ export interface PitLoss {
 }
 /** A circuit in the world: the hand facts plus the measured pit-lane loss. */
 export type Circuit = CircuitDef & { pitLoss: PitLoss };
-export type Series = "F1" | "F2" | "F3";
+export type Series = "F1" | "F2" | "F3" | "F4"; // F4 = the prospect pool (not raced)
 export type Compound = "S" | "M" | "H" | "I" | "W";
 
 /** Driver attributes, 25-99 like the NBA game's. */
@@ -57,6 +57,7 @@ export interface Driver {
   real?: boolean; // from real data (vs generated)
   licence?: { season: number; round: number; pts: number; spent?: boolean }[]; // penalty points (12 in 12 months = a race ban)
   bannedFor?: { season: number; round: number }; // sits out this round
+  sl?: { season: number; series: string; pos: number; pts: number }[]; // super licence points by season
 }
 
 /** The car: most of the result in F1. 0-100 scale; reliability is a separate risk number. */
@@ -142,6 +143,8 @@ export interface SeasonRecord {
   champion: string;
   championTeam: string;
   constructors: string;
+  f2Champion?: string;
+  f3Champion?: string;
   standings: { driverId: string; teamId: string; points: number; wins: number }[];
   teamStandings: { teamId: string; points: number }[];
 }
@@ -166,6 +169,8 @@ export interface World {
   manager?: import("./manager/state").Manager;
   staff?: import("./manager/state").Staff[]; // key people of every F1 team, and free agents
   reads?: import("./race/moments").Reads; // what the player has learned of each driver's habits in duels
+  juniorResults?: import("./season/juniors").JuniorResult[]; // this season's F2/F3 races
+  slSeeded?: boolean;
   version: number;
   seed: number;
   season: number;

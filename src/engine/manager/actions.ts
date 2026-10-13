@@ -6,6 +6,7 @@ import { hashString, makeRng } from "../rng";
 import { ageOf } from "../season/development";
 import { driverValue, salaryFor } from "../season/offseason";
 import { driverMap, f1Teams } from "../season/season";
+import { hasLicence, JUNIOR, licencePointsSL } from "../season/juniors";
 import type { Driver, World } from "../types";
 import { activeManager, efficiency, MANAGER_RULES, myTeam, NAMES, PROJECT, prestigeOf, slotsFree, staffAsk, startManager } from "./manager";
 import { book, fmtM, message, nextId, type Area, type FacilityKey, type Manager, type Size } from "./state";
@@ -152,7 +153,8 @@ export function driverAsk(w: World, d: Driver): number {
   const base = salaryFor(d.ovr);
   const p = prestigeOf(w, m.teamId);
   const star = d.ovr >= 88 ? 1 + (1.2 - p) * 0.6 : 1;
-  return Math.round((base * (1.25 - 0.25 * p) * Math.max(1, star)) / 1e5) * 1e5;
+  const academy = m.academy?.some((a) => a.driverId === d.id) ? 0.5 : 1; // he owes you his career
+  return Math.round((base * (1.25 - 0.25 * p) * Math.max(1, star) * academy) / 1e5) * 1e5;
 }
 
 /** Would he even consider us? Stars don't join backmarkers. */
@@ -194,6 +196,7 @@ export function signDriver(w: World, driverId: string, salary: number, years: nu
   if (!d || d.retired) return no("Not available.");
   if (d.teamId === m.teamId) return no("Already yours.");
   if (!driverWilling(w, d)) return no(`${d.last} isn't interested in ${team.name} right now.`);
+  if (!hasLicence(w, d)) return no(`${d.last} doesn't have a super licence yet (${licencePointsSL(d, w.season)} of ${JUNIOR.licence} points).`);
   const ask = driverAsk(w, d);
   if (salary < ask * 0.95) return no(`${d.last} wants ${fmtM(ask)} a season.`);
   const f1Seat = f1Teams(w).find((t) => t.drivers.includes(d.id));

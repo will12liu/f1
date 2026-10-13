@@ -115,6 +115,29 @@ export interface Manager {
   capPenalty?: number; // ATR cut next season after a breach
   fired?: { season: number; offers: string[] }; // sacked: teams that would hire you
   seq: number;
+  // the academy (junior drivers you back), scouts, junior teams you own
+  academy?: AcademyDriver[];
+  scouts?: Scout[];
+  knowledge?: Record<string, number>; // driverId -> 0-100, how well your scouts know his potential
+  juniorTeams?: string[];
+  program?: number; // academy programme level 1-5 (coaching, simulator time)
+}
+
+export interface AcademyDriver {
+  driverId: string;
+  since: number;
+  fee: number; // yearly support ($)
+}
+
+export interface Scout {
+  id: string;
+  first: string;
+  last: string;
+  nat: string;
+  rating: number;
+  salary: number;
+  focus: "F4" | "F3" | "F2";
+  hired: boolean; // false = available to hire
 }
 
 export const mgrRng = (w: World, tag: string): Rng => makeRng(hashString(`${w.seed}:mgr:${w.season}:${w.results.length}:${tag}`));

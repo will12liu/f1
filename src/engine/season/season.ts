@@ -8,6 +8,7 @@ import type { MomentChoice } from "../race/moments";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
+import { simJuniorRound } from "./juniors";
 import { ensureSeats, managerAfterRound, raceBoost } from "../manager/manager";
 
 export const f1Teams = (w: World) => w.teams.filter((t) => t.series === "F1");
@@ -171,6 +172,7 @@ export function simNextRound(w: World, commands?: Command[], live?: { choices: M
   w.results.push(summary);
   w.replays[r.round] = replay;
   developCarsAfterRound(w, makeRng(seed ^ 0xdee));
+  simJuniorRound(w, r.round, circuit);
   managerAfterRound(w, summary);
   return summary;
 }

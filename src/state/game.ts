@@ -7,11 +7,13 @@ import type { Command } from "../engine/race/dials";
 import type { MomentChoice } from "../engine/race/moments";
 import type { PreparedRound } from "../engine/season/season";
 import type * as Actions from "../engine/manager/actions";
+import type * as Academy from "../engine/manager/academy";
 import type { World } from "../engine/types";
 
 /** Team-principal actions the UI can call: name + the arguments after `world`. */
-export type ActName = Exclude<keyof typeof Actions, "Answer" | "projectQuote" | "driverAsk" | "driverWilling">;
-type ActArgs<K extends ActName> = (typeof Actions)[K] extends (w: World, ...a: infer P) => unknown ? P : never;
+type AllActions = typeof Actions & Pick<typeof Academy, "hireScout" | "fireScout" | "setScoutFocus" | "signAcademy" | "releaseAcademy" | "buyJuniorTeam" | "placeDriver" | "upgradeProgram" | "scoutMarket">;
+export type ActName = Exclude<keyof AllActions, "Answer" | "projectQuote" | "driverAsk" | "driverWilling">;
+type ActArgs<K extends ActName> = AllActions[K] extends (w: World, ...a: infer P) => unknown ? P : never;
 
 let worker: Comlink.Remote<WorkerApi> | null = null;
 const api = () => (worker ??= Comlink.wrap<WorkerApi>(new Worker(new URL("../engine/worker.ts", import.meta.url), { type: "module" })));

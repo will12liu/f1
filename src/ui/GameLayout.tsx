@@ -8,6 +8,7 @@ const NAV = [
   ["standings", "Standings"],
   ["teams", "Teams"],
   ["drivers", "Drivers"],
+  ["juniors", "Juniors"],
   ["history", "History"],
 ] as const;
 
@@ -15,6 +16,7 @@ const TEAM_NAV = [
   ["", "HQ"],
   ["rnd", "Car & R&D"],
   ["people", "People"],
+  ["academy", "Academy"],
   ["partners", "Partners"],
   ["finance", "Finance"],
   ["inbox", "Inbox"],
@@ -22,6 +24,7 @@ const TEAM_NAV = [
   ["standings", "Standings"],
   ["teams", "Teams"],
   ["drivers", "Drivers"],
+  ["juniors", "Juniors"],
   ["history", "History"],
 ] as const;
 

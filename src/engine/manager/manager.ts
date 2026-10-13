@@ -3,6 +3,7 @@
 // The AI keeps running the other ten teams exactly as in the sandbox.
 import { ATR, FACILITIES, FINANCE, SPONSOR_BRANDS, SPONSOR_TIERS, STAFF_ROLES, WORKS } from "../../../data/manual/manager";
 import { personName } from "../generate";
+import { academyAfterRound } from "./academy";
 import type { Rng } from "../rng";
 import { salaryFor } from "../season/offseason";
 import { driverMap, f1Teams, teamStandings } from "../season/season";
@@ -228,6 +229,7 @@ function teamPointsIn(s: RaceSummary, teamId: string) {
 export function managerAfterRound(w: World, s: RaceSummary) {
   const m = activeManager(w);
   if (!m) return;
+  academyAfterRound(w);
   const rng = mgrRng(w, "round");
   const team = myTeam(w)!;
   const R = w.calendar.length;
