@@ -165,6 +165,7 @@ export interface World {
   mode?: "sandbox" | "manager"; // sandbox = run the whole grid; manager = you run one team
   manager?: import("./manager/state").Manager;
   staff?: import("./manager/state").Staff[]; // key people of every F1 team, and free agents
+  reads?: import("./race/moments").Reads; // what the player has learned of each driver's habits in duels
   version: number;
   seed: number;
   season: number;

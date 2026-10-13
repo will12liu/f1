@@ -3,10 +3,14 @@
 // road order resolved front to back (a car that would cross the line ahead of the car in front must pass
 // it; failing leaves him stuck behind) -> retirements, contact, safety cars -> tyres, fuel, records.
 // The replay (race/replay.ts) rebuilds positions from `lapEnd` and `events`.
-import { makeRng, type Rng } from "../rng";
+import { hashString, makeRng, type Rng } from "../rng";
 import type { CircuitDef, Compound, DnfReason, DriverRatings, PitLoss } from "../types";
 import { DIAL, dialFx, NEUTRAL, type Command, type DialFx, type Dials, type Forecast } from "./dials";
 import { POINTS, RACE, tyreCost, tyreLife } from "./model";
+import {
+  ATTACK_LABEL, chooseSit, CONTACT, DEFEND_LABEL, fill, PAYOFF, pickWeighted, readText, tendencies,
+  type AttackMove, type DefendMove, type DuelRecord, type MCtx, type MomentChoice, type PendingMoment, type Reads,
+} from "./moments";
 import { plans, type Stint, type WearRate } from "./strategy";
 
 export interface Entry {
@@ -17,6 +21,7 @@ export interface Entry {
   reliability: number;
   r: DriverRatings;
   form?: number; // pace on the day, fraction of the lap (dayForms)
+  name?: string; // driver's last name (for moment texts)
   pit?: number; // pit crew 0-100 (team-principal mode; undefined = the standard AI crew)
   strat?: number; // strategy department 0-100 (undefined = standard)
 }
@@ -28,6 +33,10 @@ export interface RaceInput {
   entries: Entry[];
   laps?: number; // override (tests)
   commands?: Command[]; // dial changes and pit calls, each applied at the start of its lap (replays a live race)
+  focus?: number[]; // the player's cars: they get key moments (duels, calls)
+  moments?: "off" | "key" | "all";
+  choices?: MomentChoice[]; // answers to moments (replay); when set, the race never waits for an answer
+  reads?: Reads; // what the player knows of other drivers' habits
 }
 
 export type Flag = "green" | "sc" | "vsc" | "red";
@@ -40,7 +49,8 @@ export type RaceEventKind =
   | "yellow" // local yellow (info = sector 1-3)
   | "served" // drive-through / stop-go served (x = seconds in the pit lane)
   | "restart" // standing restart after a red flag
-  | "teamorder"; // a = the car letting its team-mate (b) through
+  | "teamorder" // a = the car letting its team-mate (b) through
+  | "duel"; // a player's duel: info = attackMove|defendMove|passed|playerCar
 
 export interface RaceEvent {
   lap: number;
@@ -114,6 +124,9 @@ export interface RaceState {
   fastest: { car: number; time: number; lap: number } | null;
   flagLog: { lap: number; flag: Flag }[]; // flag in force on each lap that wasn't green
   commands: Command[]; // every command applied so far (feed back as input.commands to replay the race)
+  choices: MomentChoice[]; // every moment answered (feed back as input.choices)
+  duels: DuelRecord[];
+  seen: { driverId: string; role: "def" | "att"; move: string }[]; // habits shown in duels (merged into the reads)
 }
 
 export interface RaceRunner {
@@ -126,6 +139,9 @@ export interface RaceRunner {
   command(cmd: Omit<Command, "lap">): void;
   /** What the car's current dials lead to: tyres, battery, fuel, next stop. */
   forecast(idx: number): Forecast;
+  /** A key moment waiting for the player (the race doesn't move until `choose`). */
+  pending(): PendingMoment | null;
+  choose(opt: string): void;
 }
 
 export interface ResultRow {
@@ -259,6 +275,9 @@ export function createRace(input: RaceInput): RaceRunner {
     fastest: null,
     flagLog: [],
     commands: [],
+    choices: [],
+    duels: [],
+    seen: [],
   };
   const queue: Command[] = (input.commands ?? []).map((x) => ({ ...x }));
 
@@ -286,10 +305,10 @@ export function createRace(input: RaceInput): RaceRunner {
     if (!pendingFlag || rank[f] > rank[pendingFlag]) pendingFlag = f;
   };
   /** After a crash or a car stopped on track: red flag (rare), safety car or VSC. */
-  const neutralise = (scChance: number, vscChance: number, red = 0) => {
-    if (red && rng.chance(red)) callFlag("red");
-    else if (rng.chance(clamp(scChance, 0, 0.95))) callFlag("sc");
-    else if (rng.chance(vscChance)) callFlag("vsc");
+  const neutralise = (scChance: number, vscChance: number, red = 0, r: Rng = rng) => {
+    if (red && r.chance(red)) callFlag("red");
+    else if (r.chance(clamp(scChance, 0, 0.95))) callFlag("sc");
+    else if (r.chance(vscChance)) callFlag("vsc");
   };
 
   /** A penalty from the stewards: time ("5s"/"10s", served at a stop or added at the end), a drive-through
@@ -303,9 +322,9 @@ export function createRace(input: RaceInput): RaceRunner {
     ev({ lap, t, kind: "penalty", a: car.idx, info: `${what}|${why}${pp ? `|${pp}` : ""}` });
   }
 
-  function contact(att: CarState, def: CarState, L: number, t: number) {
+  function contact(att: CarState, def: CarState, L: number, t: number, r: Rng = rng) {
     ev({ lap: L, t, kind: "contact", a: att.idx, b: def.idx });
-    const x = rng.next();
+    const x = r.next();
     let dnfs = 0;
     if (x < 0.35) {
       att.damage += 0.5;
@@ -327,15 +346,125 @@ export function createRace(input: RaceInput): RaceRunner {
     } else {
       lose(att, 8); // spun, kept going
     }
-    if (!att.out && (def.out || x < 0.55) && rng.chance(0.6)) {
-      const y = rng.next();
+    if (!att.out && (def.out || x < 0.55) && r.chance(0.6)) {
+      const y = r.next();
       const serious = def.out || x < 0.2;
       if (y < 0.08 && laps - L > 3) penalise(att, "drive-through", "causing a collision", L, t, serious ? 3 : 2);
       else if (y < 0.33) penalise(att, "10s", "causing a collision", L, t, serious ? 2 : 1);
       else penalise(att, "5s", "causing a collision", L, t, serious && y < 0.6 ? 1 : 0);
     }
-    if (dnfs) neutralise(RACE.scAfterCrash * (0.5 + c.sc), 0.22, RACE.redAfterCrash * c.sc * dnfs);
+    if (dnfs) neutralise(RACE.scAfterCrash * (0.5 + c.sc), 0.22, RACE.redAfterCrash * c.sc * dnfs, r);
     else yellow(att, L, t);
+  }
+
+  // ---- key moments (player's cars only) ----
+  const focus = new Set(input.focus ?? []);
+  const momentMode = input.moments ?? "off";
+  const replaying = !!input.choices;
+  const lastMoment = new Map<number, number>(); // car -> lap of its last moment
+  const seenSits = new Map<string, number>();
+  const shown = new Map<number, number>();
+  const nameOf = (car: CarState) => car.e.name ?? car.e.driverId;
+  const mrngFor = (tag: string) => makeRng(hashString(`${input.seed}:moment:${tag}`));
+
+  /** May this car get a moment now? (spacing and a cap per race, more often late on) */
+  function momentOk(car: CarState, L: number, kind: "call" | "duel"): boolean {
+    if (!focus.has(car.idx) || momentMode === "off") return false;
+    const since = L - (lastMoment.get(car.idx) ?? -99);
+    if (momentMode === "all") return kind === "duel" ? since >= 1 : since >= 3;
+    return since >= (laps - L < 6 ? 1 : 3) && (shown.get(car.idx) ?? 0) < 9;
+  }
+
+  function ctxFor(me: CarState, opp: CarState | null, L: number, flag: Flag, restart: boolean): MCtx {
+    const pos = state.order.indexOf(me.idx) + 1;
+    const ahead = pos > 1 ? cars[state.order[pos - 2]] : null;
+    const behind = pos < state.order.length ? cars[state.order[pos]] : null;
+    const fx = dialFx(me.dials, me.battery);
+    const burn = RACE.fuelPerLapKg * fx.burn;
+    const mate = cars.find((x) => x !== me && x.e.teamId === me.e.teamId && !x.out);
+    const mateBehind = !!mate && behind === mate && mate.cum - me.cum < 1.2 && mate.age + 4 < me.age;
+    return {
+      lap: L,
+      laps,
+      left: laps - L + 1,
+      pos,
+      me: nameOf(me),
+      opp: opp ? nameOf(opp) : ahead ? nameOf(ahead) : "",
+      gap: opp ? Math.abs(opp.cum - me.cum) : ahead ? me.cum - ahead.cum : 99,
+      behindGap: behind ? behind.cum - me.cum : 99,
+      flag,
+      restart,
+      wear: me.wear,
+      tyreLapsLeft: Math.max(0, (1 - me.wear) / (wearRate(me.e.r)[me.compound] * fx.wear)),
+      stopDue: me.plan.length > 1 ? me.plan[0].until - L : null,
+      battery: me.battery,
+      fuelShort: me.fuel - burn * (laps - L + 1) < -0.3,
+      strikes: me.strikes,
+      mateBehindFaster: mateBehind,
+      mate: mate ? nameOf(mate) : "",
+      forLead: pos === 2,
+      forPodium: pos >= 2 && pos <= 4,
+      forPoints: pos >= 2 && pos <= 11,
+      teammateFight: !!opp && opp.e.teamId === me.e.teamId,
+    };
+  }
+
+  /** Ask the player (or read the stored answer). Records every answer. */
+  function* ask(m: PendingMoment): Generator<PendingMoment, string, string | undefined> {
+    let opt: string;
+    if (replaying) opt = input.choices!.find((x) => x.lap === m.lap && x.car === m.car && x.sit === m.sit)?.opt ?? "auto";
+    else opt = (yield m) ?? "auto";
+    if (!m.opts.some((o) => o.id === opt && !o.disabled)) opt = "auto";
+    state.choices.push({ lap: m.lap, car: m.car, sit: m.sit, opt });
+    lastMoment.set(m.car, m.lap);
+    shown.set(m.car, (shown.get(m.car) ?? 0) + 1);
+    seenSits.set(m.sit, (seenSits.get(m.sit) ?? 0) + 1);
+    return opt;
+  }
+  const pen = (id: string) => 1 / (1 + (seenSits.get(id) ?? 0) * 0.8);
+
+  /** Resolve a duel the player answered: the other driver picks by habit, the payoff table shifts the odds. */
+  function duel(x: CarState, y: CarState, me: CarState, opt: string, p0: number, pc0: number, dr: Rng, L: number) {
+    let attMove: AttackMove;
+    let defMove: DefendMove;
+    if (me === x) {
+      attMove = opt as AttackMove;
+      const tw = tendencies(y.e.driverId, y.e.r.aggression).def;
+      defMove = y.battery > 0.4 && dr.chance(0.18) ? "ersDef" : pickWeighted(tw, dr);
+      state.seen.push({ driverId: y.e.driverId, role: "def", move: defMove });
+    } else {
+      defMove = opt as DefendMove;
+      const tw = tendencies(x.e.driverId, x.e.r.aggression).att;
+      attMove = x.battery > 0.4 && dr.chance(0.18) ? "ers" : pickWeighted(tw, dr);
+      state.seen.push({ driverId: x.e.driverId, role: "att", move: attMove });
+    }
+    if (attMove === "ers") {
+      x.battery = Math.max(0, x.battery - 0.25);
+      x.ctl = true;
+    }
+    if (defMove === "ersDef") {
+      y.battery = Math.max(0, y.battery - 0.2);
+      y.ctl = true;
+    }
+    let passed = false;
+    let hit = false;
+    let wait = false;
+    if (attMove === "wait") wait = true;
+    else if (defMove === "yield") {
+      passed = true;
+      y.wear = Math.max(0, y.wear - 0.01);
+    } else {
+      const m = PAYOFF[attMove][defMove];
+      const odds = (m / (1 - m)) * (p0 / (1 - p0));
+      const p = clamp(odds / (1 + odds), 0.03, 0.97);
+      hit = dr.chance(Math.min(0.5, pc0 * CONTACT[attMove][defMove] * 1.6));
+      passed = !hit && dr.chance(p);
+      if (attMove === "late" && !passed && !hit && dr.chance(0.12)) lose(x, 0.8 + dr.next()); // locked up
+      if (defMove === "lateDef" && !passed && dr.chance(0.14)) penalise(y, "5s", "moving under braking", L, x.cum + (y.cum - x.cum), 0);
+    }
+    state.duels.push({ lap: L, att: x.idx, def: y.idx, attMove, defMove, passed, contact: hit, player: me.idx });
+    ev({ lap: L, t: x.cum + 1, kind: "duel", a: x.idx, b: y.idx, info: `${attMove}|${defMove}|${passed ? 1 : 0}|${me.idx}` });
+    return { passed, hit, wait };
   }
 
   /** A local yellow where something happened (the viewer shows the sector). */
@@ -344,7 +473,7 @@ export function createRace(input: RaceInput): RaceRunner {
     ev({ lap: L, t, kind: "yellow", a: car.idx, info: String(1 + Math.floor(frac * 3)) });
   }
 
-  function step() {
+  function* lap(): Generator<PendingMoment, void, string | undefined> {
     if (state.lap >= laps) return;
     const L = state.lap + 1;
     const flag = state.flag;
@@ -368,6 +497,33 @@ export function createRace(input: RaceInput): RaceRunner {
       if (cmd.pit === "stay") car.hold = true;
       if (cmd.letBy) letBy.add(car.idx);
     }
+    // strategy and radio calls for the player's cars
+    for (const car of running) {
+      if (!momentOk(car, L, "call") || L >= laps) continue;
+      const cx = ctxFor(car, null, L, flag, restart);
+      const mr = mrngFor(`call:${L}:${car.idx}`);
+      const s = chooseSit(cx, "call", mr, pen);
+      if (!s?.calls) continue;
+      if (momentMode === "key" && !mr.chance(Math.min(0.85, s.w(cx) / 16 + 0.1))) continue;
+      const ahead = cx.pos > 1 ? cars[state.order[cx.pos - 2]] : null;
+      const behind = cars[state.order[cx.pos]];
+      const extra = { behind: behind ? nameOf(behind) : "the car behind", opp: ahead ? nameOf(ahead) : "the car ahead" };
+      const opt = yield* ask({
+        id: `${L}:${car.idx}:${s.id}`, kind: "call", sit: s.id, car: car.idx, lap: L, t: car.cum,
+        title: fill(mr.pick(s.title), cx, extra), text: fill(mr.pick(s.text), cx, extra),
+        opts: s.calls.map((o) => ({ id: o.id, label: o.label, hint: o.hint })),
+      });
+      const o = s.calls.find((x) => x.id === opt);
+      if (!o) continue;
+      if (o.dials) {
+        car.ctl = true;
+        car.dials = { ...car.dials, ...o.dials };
+      }
+      if (o.pit === "box") car.box = "auto";
+      if (o.pit === "stay") car.hold = true;
+      if (o.letBy) letBy.add(car.idx);
+    }
+
     // what each touched car's dials do this lap
     const fxs = new Map<number, DialFx>();
     for (const car of running) if (car.ctl) fxs.set(car.idx, dialFx(car.dials, car.battery));
@@ -531,6 +687,7 @@ export function createRace(input: RaceInput): RaceRunner {
             continue;
           }
           // a real fight
+          let duelRng: Rng | null = null;
           const n = fights.get(x.idx) ?? 0;
           const canFight = flag === "green" && n < 2 && !(L === 1 && f >= fy);
           let ok = false;
@@ -546,16 +703,60 @@ export function createRace(input: RaceInput): RaceRunner {
             const z = (adv - T) / (0.25 * T + 0.1) + skill * RACE.passSkill;
             const p = 1 / (1 + Math.exp(-z));
             const pc = RACE.contact * (0.6 + x.e.r.aggression / 125) * (1.45 - x.e.r.racecraft / 200) * (L === 1 ? 2.2 : 1);
-            if (rng.chance(pc)) {
-              contact(x, y, L, x.cum + (f - x.cum) * 0.5);
-              if (x.out) break;
-              f = Math.max(f, fy + RACE.minGap) + (x.damage ? 1.5 : 0);
-              break;
+            // a duel for the player's car?
+            const me = focus.has(x.idx) ? x : focus.has(y.idx) ? y : null;
+            let ans = "auto";
+            if (me && L > 1 && momentOk(me, L, "duel")) {
+              const opp = me === x ? y : x;
+              const cx = ctxFor(me, opp, L, flag, restart);
+              const mr = mrngFor(`duel:${L}:${x.idx}:${y.idx}`);
+              const role = me === x ? "attack" : "defend";
+              const s = chooseSit(cx, "duel", mr, (id) => (id.startsWith(role === "attack" ? "att-" : "def-") ? pen(id) : 0));
+              if (s && (momentMode === "all" || mr.chance(Math.min(0.9, s.w(cx) / 14 + 0.12)))) {
+                const extra = { target: role === "attack" ? cx.pos - 1 : cx.pos };
+                const moves = role === "attack" ? (Object.keys(ATTACK_LABEL) as AttackMove[]) : (Object.keys(DEFEND_LABEL) as DefendMove[]);
+                ans = yield* ask({
+                  id: `${L}:${me.idx}:${s.id}`, kind: role, sit: s.id, car: me.idx, vs: opp.idx, lap: L, t: Math.min(x.cum, y.cum),
+                  title: fill(mr.pick(s.title), cx, extra), text: fill(mr.pick(s.text), cx, extra),
+                  read: readText(input.reads, opp.e.driverId, role === "attack" ? "def" : "att"),
+                  opts: moves.map((mv) => {
+                    const [label, hint] = role === "attack" ? ATTACK_LABEL[mv as AttackMove] : DEFEND_LABEL[mv as DefendMove];
+                    const disabled = (mv === "ers" && me.battery < 0.25) || (mv === "ersDef" && me.battery < 0.2);
+                    return { id: mv, label, hint, disabled };
+                  }),
+                });
+              }
             }
-            ok = rng.chance(p);
+            if (ans !== "auto" && me) {
+              const dr = makeRng(hashString(`${input.seed}:duel:${L}:${x.idx}:${y.idx}`));
+              duelRng = dr;
+              const res = duel(x, y, me, ans, p, pc, dr, L);
+              if (res.hit) {
+                contact(x, y, L, x.cum + (f - x.cum) * 0.5, dr);
+                if (x.out) break;
+                f = Math.max(f, fy + RACE.minGap) + (x.damage ? 1.5 : 0);
+                break;
+              }
+              if (res.wait) {
+                f = fy + RACE.minGap + dr.next() * 0.3;
+                x.wear = Math.max(0, x.wear - 0.004);
+                break;
+              }
+              ok = res.passed;
+            } else {
+              if (rng.chance(pc)) {
+                contact(x, y, L, x.cum + (f - x.cum) * 0.5);
+                if (x.out) break;
+                f = Math.max(f, fy + RACE.minGap) + (x.damage ? 1.5 : 0);
+                break;
+              }
+              ok = rng.chance(p);
+            }
           }
+          const rr = duelRng ?? rng;
+          duelRng = null;
           if (ok) {
-            const t = x.cum + (f - x.cum) * (0.3 + rng.next() * 0.6);
+            const t = x.cum + (f - x.cum) * (0.3 + rr.next() * 0.6);
             ev({ lap: L, t, kind: "pass", a: x.idx, b: y.idx });
             x.passes++;
             state.passes++;
@@ -565,7 +766,7 @@ export function createRace(input: RaceInput): RaceRunner {
             continue;
           }
           // can't get by: drop back a little to cool the tyres and try again later
-          f = fy + RACE.minGap + rng.next() * 0.9;
+          f = fy + RACE.minGap + rr.next() * 0.9;
           break;
         }
         if (x.out) continue;
@@ -782,11 +983,39 @@ export function createRace(input: RaceInput): RaceRunner {
     };
   }
 
-  return { state, input, step, done: () => state.lap >= laps, result, command, forecast };
+  // the runner: a lap is a generator that can stop at a moment until the player answers
+  let gen: Generator<PendingMoment, void, string | undefined> | null = null;
+  let waiting: PendingMoment | null = null;
+  let answer: string | undefined;
+  function step() {
+    if (!gen) {
+      if (state.lap >= laps) return;
+      gen = lap();
+      answer = undefined;
+    }
+    if (waiting && answer === undefined) return;
+    const r = gen.next(answer);
+    answer = undefined;
+    if (r.done) {
+      gen = null;
+      waiting = null;
+    } else waiting = r.value;
+  }
+
+  return {
+    state, input, step, done: () => state.lap >= laps && !gen, result, command, forecast,
+    pending: () => waiting,
+    choose: (opt: string) => {
+      if (waiting) answer = opt;
+    },
+  };
 }
 
 export function simRace(input: RaceInput): { result: RaceResult; state: RaceState } {
   const r = createRace(input);
-  while (!r.done()) r.step();
+  while (!r.done()) {
+    r.step();
+    if (r.pending()) r.choose("auto");
+  }
   return { result: r.result(), state: r.state };
 }

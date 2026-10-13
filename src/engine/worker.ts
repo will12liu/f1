@@ -22,8 +22,8 @@ const api = {
     return prepareNextRound(world);
   },
   /** Records the next round as driven live: the same race replayed with the player's commands. */
-  commitRound(world: World, commands: Command[]) {
-    const summary = simNextRound(world, commands);
+  commitRound(world: World, commands: Command[], live?: Parameters<typeof simNextRound>[2]) {
+    const summary = simNextRound(world, commands, live);
     return { world, summary };
   },
   /** Team-principal mode: take over a team. */

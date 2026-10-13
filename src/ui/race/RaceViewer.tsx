@@ -2,6 +2,7 @@
 // Replay at a chosen speed. The engine already decided everything; this only asks `viewAt(t)`.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { COMPOUNDS } from "../../engine/race/model";
+import { ATTACK_LABEL, DEFEND_LABEL } from "../../engine/race/moments";
 import { indexReplay, trackPoint, viewAt, type RaceView } from "../../engine/race/replay";
 import type { Replay, World } from "../../engine/types";
 import { gap as fmtGap, lapTime } from "../../lib/format";
@@ -16,7 +17,23 @@ export interface LiveSource {
   finish(): void; // run to the flag at the current dials
 }
 
-export function RaceViewer({ world, replay, live, side, follow0 = null }: { world: World; replay: Replay; live?: LiveSource; side?: ReactNode; follow0?: number | null }) {
+export function RaceViewer({
+  world,
+  replay,
+  live,
+  side,
+  follow0 = null,
+  overlay,
+  marks,
+}: {
+  world: World;
+  replay: Replay;
+  live?: LiveSource;
+  side?: ReactNode;
+  follow0?: number | null;
+  overlay?: ReactNode; // a moment card over the track (the race is frozen while it shows)
+  marks?: { a: number; b?: number; role?: "attack" | "defend" } | null;
+}) {
   const track = useTrack(replay.circuitId);
   const ix = useMemo(() => indexReplay(replay, !!live), [replay, live]);
   const { drivers, teams } = useMaps(world);
@@ -100,7 +117,10 @@ export function RaceViewer({ world, replay, live, side, follow0 = null }: { worl
             </button>
           </div>
         </div>
-        <TrackCanvas track={track} view={view} cars={cars} follow={follow} />
+        <div className="relative">
+          <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} />
+        </div>
+        {overlay && <div className="border-t border-ink-800 p-3">{overlay}</div>}
         {!live && <div className="px-3 py-2 border-t border-ink-800">
           <input
             type="range"
@@ -214,6 +234,12 @@ function describe(e: Replay["events"][number], cars: { code: string }[]): string
       return `${a} slow stop (+${e.info}s)`;
     case "teamorder":
       return `Team orders: ${a} lets ${b} through`;
+    case "duel": {
+      const [am, dm, ok] = (e.info ?? "").split("|");
+      const att = ATTACK_LABEL[am as keyof typeof ATTACK_LABEL]?.[0].toLowerCase() ?? am;
+      const def = DEFEND_LABEL[dm as keyof typeof DEFEND_LABEL]?.[0].toLowerCase() ?? dm;
+      return `Duel: ${a} (${att}) against ${b} (${def}). ${ok === "1" ? `${a} is through` : `${b} keeps it`}`;
+    }
     default:
       return `${e.kind} ${a}`;
   }
@@ -271,7 +297,19 @@ function drawCar(g: CanvasRenderingContext2D, x: number, y: number, ang: number,
   g.restore();
 }
 
-function TrackCanvas({ track, view, cars, follow }: { track: TrackFile | null; view: RaceView; cars: { code: string; color: string; color2: string }[]; follow: number | null }) {
+function TrackCanvas({
+  track,
+  view,
+  cars,
+  follow,
+  marks,
+}: {
+  track: TrackFile | null;
+  view: RaceView;
+  cars: { code: string; color: string; color2: string }[];
+  follow: number | null;
+  marks: { a: number; b?: number; role?: "attack" | "defend" } | null;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 520 });
@@ -447,7 +485,46 @@ function TrackCanvas({ track, view, cars, follow }: { track: TrackFile | null; v
       }
       g.globalAlpha = 1;
     }
-  }, [track, view, cars, size, follow]);
+
+    // a duel: rings on both cars, and the two lines (inside / outside) ahead of the attacker
+    if (marks) {
+      const at = (idx: number) => view.cars.find((c) => c.idx === idx);
+      const ca = at(marks.a);
+      const cb = marks.b !== undefined ? at(marks.b) : undefined;
+      for (const c of [ca, cb]) {
+        if (!c) continue;
+        const [x, y] = offset(c.frac, 0);
+        g.beginPath();
+        g.arc(x, y, 15, 0, Math.PI * 2);
+        g.strokeStyle = c === ca ? "#ffffff" : "#f59e0b";
+        g.lineWidth = 2;
+        g.stroke();
+      }
+      if (ca && cb) {
+        const attacker = marks.role === "defend" ? cb : ca;
+        const f0 = attacker.frac;
+        for (const [side, label] of [
+          [-14, "IN"],
+          [14, "OUT"],
+        ] as const) {
+          g.beginPath();
+          for (let k = 0; k <= 10; k++) {
+            const [x, y] = offset(f0 + 0.004 + k * 0.0018, side * (k / 10));
+            if (k === 0) g.moveTo(x, y);
+            else g.lineTo(x, y);
+          }
+          g.strokeStyle = side < 0 ? "#38bdf8" : "#a3e635";
+          g.lineWidth = 2.5;
+          g.stroke();
+          const [lx, ly] = offset(f0 + 0.024, side * 1.4);
+          g.font = "700 10px ui-sans-serif, system-ui, sans-serif";
+          g.fillStyle = side < 0 ? "#38bdf8" : "#a3e635";
+          g.textAlign = "center";
+          g.fillText(label, lx, ly);
+        }
+      }
+    }
+  }, [track, view, cars, size, follow, marks]);
 
   return (
     <div ref={wrap} className="w-full bg-ink-950" style={{ height: size.h }}>

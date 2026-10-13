@@ -8,10 +8,22 @@ import type { PreparedRound } from "../../engine/season/season";
 import type { Replay } from "../../engine/types";
 import { useGame } from "../../state/game";
 import { PitWall } from "../race/PitWall";
+import { MomentCard } from "../race/MomentCard";
+import type { PendingMoment } from "../../engine/race/moments";
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
 import { TeamBar, useMaps } from "../components/bits";
 
 const PICK_KEY = "paddock.liveDriver";
+const MOMENTS_KEY = "paddock.moments";
+type MomentMode = "off" | "key" | "all";
+const readMode = (): MomentMode => {
+  try {
+    const v = localStorage.getItem(MOMENTS_KEY);
+    return v === "off" || v === "all" ? v : "key";
+  } catch {
+    return "key";
+  }
+};
 const readPick = () => {
   try {
     return localStorage.getItem(PICK_KEY);
@@ -68,12 +80,20 @@ export function LiveRace() {
   const myTeamId = world?.manager && !world.manager.fired ? world.manager.teamId : null;
   const mine = myTeamId ? entries.map((e, i) => (e.teamId === myTeamId ? i : -1)).filter((i) => i >= 0) : [];
   const [tab, setTab] = useState(0);
+  const [mode, setMode] = useState<MomentMode>(readMode);
+  const [pend, setPend] = useState<PendingMoment | null>(null);
+  const focus = myTeamId ? mine : [entries.findIndex((e) => e.driverId === pick)].filter((i) => i >= 0);
   const chosen = myTeamId ? (mine[0] ?? -1) : entries.findIndex((e) => e.driverId === pick);
   const season = world?.season ?? 0;
 
   const start = () => {
     if (!prep || chosen < 0) return;
-    const r = createRace(prep.input);
+    try {
+      localStorage.setItem(MOMENTS_KEY, mode);
+    } catch {
+      /* private mode */
+    }
+    const r = createRace({ ...prep.input, focus, moments: mode, reads: world?.reads });
     runnerRef.current = r;
     setRunner(r);
     setReplay(snapshot(r, prep, season));
@@ -94,15 +114,22 @@ export function LiveRace() {
       advance(t) {
         let stepped = false;
         // stay one lap ahead of what's on screen, so a dial change counts from the next lap
-        while (!runner.done() && leadEnd() - 1 < t) {
+        // stop at a key moment: the picture freezes until the player answers
+        while (!runner.done() && !runner.pending() && leadEnd() - 1 < t) {
           runner.step();
           stepped = true;
         }
+        const m = runner.pending();
+        setPend((p) => (p?.id === m?.id ? p : m));
         if (stepped) refresh();
         return runner.done() ? Infinity : leadEnd() - 0.5;
       },
       finish() {
-        while (!runner.done()) runner.step();
+        while (!runner.done()) {
+          runner.step();
+          if (runner.pending()) runner.choose("auto");
+        }
+        setPend(null);
         refresh();
       },
     };
@@ -154,6 +181,22 @@ export function LiveRace() {
             })}
           </ol>
         </div>
+        <div className="grid gap-1">
+          <div className="text-xs text-slate-400">Key moments (duels within a second, strategy calls)</div>
+          <div className="flex gap-1">
+            {(
+              [
+                ["off", "Off"],
+                ["key", "Key moments"],
+                ["all", "Every fight"],
+              ] as const
+            ).map(([k, label]) => (
+              <button key={k} onClick={() => setMode(k)} className={`btn !px-2.5 !py-1 ${mode === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex gap-2">
           <button className="btn-primary" disabled={chosen < 0} onClick={start}>
             Start the race{myTeamId ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""}
@@ -201,7 +244,7 @@ export function LiveRace() {
               className="btn-primary"
               disabled={!!busy}
               onClick={async () => {
-                const round = await commitLive(runner.state.commands);
+                const round = await commitLive(runner.state.commands, { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off" });
                 if (round) nav(`${base}/race/${round}`);
               }}
             >
@@ -213,7 +256,28 @@ export function LiveRace() {
           </Link>
         </div>
       </div>
-      <RaceViewer world={world} replay={replay} live={live} follow0={mine.length === 2 ? mine[tab] : chosen} side={wall} />
+      <RaceViewer
+        world={world}
+        replay={replay}
+        live={live}
+        follow0={mine.length === 2 ? mine[tab] : chosen}
+        side={wall}
+        marks={pend ? { a: pend.car, b: pend.vs, role: pend.kind === "defend" ? "defend" : "attack" } : null}
+        overlay={
+          pend ? (
+            <MomentCard
+              m={pend}
+              who={codeOf(pend.car)}
+              onPick={(opt) => {
+                runner.choose(opt);
+                runner.step();
+                refresh();
+                setPend(runner.pending());
+              }}
+            />
+          ) : null
+        }
+      />
     </div>
   );
 }

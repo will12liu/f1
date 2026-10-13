@@ -4,6 +4,7 @@ import { carPace } from "../ratings";
 import { dayForms } from "../race/model";
 import { qualify } from "../race/qualifying";
 import type { Command } from "../race/dials";
+import type { MomentChoice } from "../race/moments";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
@@ -86,6 +87,7 @@ export function prepareNextRound(w: World): PreparedRound | null {
       car: carPace(team.car, circuit),
       reliability: team.car.reliability,
       r: driver.ratings,
+      name: driver.last,
       form: form[i],
       pit: boost.get(team.id)!.pit,
       strat: boost.get(team.id)!.strat,
@@ -97,7 +99,7 @@ export function prepareNextRound(w: World): PreparedRound | null {
 
 /** Qualifying + race for the next round. Records the summary and the replay on the world.
  *  `commands` replays a race the player drove live (same input + same commands = same race). */
-export function simNextRound(w: World, commands?: Command[]): RaceSummary | null {
+export function simNextRound(w: World, commands?: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }): RaceSummary | null {
   const prep = prepareNextRound(w);
   if (!prep) return null;
   const { quali, input } = prep;
@@ -105,7 +107,12 @@ export function simNextRound(w: World, commands?: Command[]): RaceSummary | null
   const circuit = circuitOf(w, input.circuit.id);
   const seed = input.seed;
   const entries = input.entries;
-  const { result, state } = simRace({ ...input, commands });
+  const { result, state } = simRace({ ...input, commands, ...(live ? { choices: live.choices, focus: live.focus, moments: live.moments, reads: w.reads } : {}) });
+  // what the player learned of other drivers' habits
+  for (const x of state.seen) {
+    const r = ((w.reads ??= {})[x.driverId] ??= { def: {}, att: {} });
+    r[x.role][x.move] = (r[x.role][x.move] ?? 0) + 1;
+  }
 
   const summary: RaceSummary = {
     round: r.round,

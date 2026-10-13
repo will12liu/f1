@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { readSave, writeSave, type SaveMeta } from "../db/db";
 import type { WorkerApi } from "../engine/worker";
 import type { Command } from "../engine/race/dials";
+import type { MomentChoice } from "../engine/race/moments";
 import type { PreparedRound } from "../engine/season/season";
 import type * as Actions from "../engine/manager/actions";
 import type { World } from "../engine/types";
@@ -29,7 +30,7 @@ interface GameState {
   /** Qualifying and the race input for the next round, to drive it live. */
   prepareLive(): Promise<PreparedRound | null>;
   /** Saves the live race (replayed from its commands, so it comes out the same). */
-  commitLive(commands: Command[]): Promise<number | null>;
+  commitLive(commands: Command[], live?: { choices: MomentChoice[]; focus: number[]; moments: "off" | "key" | "all" }): Promise<number | null>;
 }
 
 async function persist(meta: SaveMeta, world: World) {
@@ -90,11 +91,11 @@ export const useGame = create<GameState>((set, get) => ({
     if (!world) return null;
     return api().prepareRound(world);
   },
-  async commitLive(commands) {
+  async commitLive(commands, live) {
     const { world, meta } = get();
     if (!world || !meta) return null;
     set({ busy: "Saving the race…" });
-    const res = await api().commitRound(world, commands);
+    const res = await api().commitRound(world, commands, live);
     const m = await persist(meta, res.world);
     set({ world: res.world, meta: m, busy: null });
     return res.summary?.round ?? null;
