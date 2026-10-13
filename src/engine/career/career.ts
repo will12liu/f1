@@ -11,6 +11,7 @@ import { driverValue, salaryFor } from "../season/offseason";
 import { driverStandings, f1Teams } from "../season/season";
 import type { Driver, DriverRatings, RatingKey, Series, Team, World } from "../types";
 import { drawEvent } from "./events";
+import { shopAfterRound } from "./shop";
 
 // ───────────── who you are ─────────────
 
@@ -61,6 +62,8 @@ export interface EndorseOffer extends Omit<Endorsement, "until"> {
 }
 export interface SeatOffer {
   id: string;
+  talks?: number; // negotiation rounds used
+  clauses?: { release?: boolean; lead?: boolean };
   teamId: string;
   series: Series;
   role: "race" | "reserve";
@@ -119,6 +122,8 @@ export interface CareerState {
   event?: { id: string; title: string; text: string; opts: { label: string; sub: string }[] };
   lastEvents?: Record<string, number>;
   lastBeatMate?: boolean;
+  owned?: string[]; // shop items
+  clauses?: { release?: boolean; lead?: boolean }; // in the current contract
 }
 
 /** Pace from morale for the player's car (fraction of a lap; negative = quicker). */
@@ -373,6 +378,7 @@ export function careerAfterRound(w: World) {
     note(w, c, t.name, `Join the ${t.name} junior programme`, `We've watched your results. ${t.name} wants you in its academy: support, simulator time, and a path to an F1 seat. (You're in.)`);
     c.trust = Math.min(100, c.trust + 3);
   }
+  shopAfterRound(w);
   if (round === R) seasonEndOffers(w, c, d);
   else drawEvent(w);
 }
@@ -426,8 +432,8 @@ function seasonEndOffers(w: World, c: CareerState, d: Driver) {
     const reserveTeam = (c.academyOf && w.teams.find((t) => t.id === c.academyOf)) || rng.pick(f1Teams(w));
     add({ teamId: reserveTeam.id, series: "F1", role: "reserve", salary: 0.5e6, years: 1, note: "Reserve driver: simulator work, Friday runs, and you're first in line if a seat opens. No racing." });
   }
-  if (d.series === "F1") {
-    // other F1 teams want a strong driver
+  if (d.series === "F1" && ((d.contract?.until ?? 0) <= w.season || c.clauses?.release)) {
+    // other F1 teams want a strong driver (when your deal ends, or a release clause lets you go)
     for (const t of f1Teams(w).filter((t) => t.id !== d.teamId)) {
       const worst = t.drivers.map((x) => w.drivers.find((y) => y.id === x)!).filter((x) => (x.contract?.until ?? 0) <= w.season).sort((a, b) => driverValue(a, w.season + 1) - driverValue(b, w.season + 1))[0];
       if (worst && v > driverValue(worst, w.season + 1) + 1 && rng.chance(0.6)) add({ teamId: t.id, series: "F1", role: "race", salary: Math.round(salaryFor(d.ovr) * 1.1), years: 2, note: `${t.name} wants you.` });
@@ -477,8 +483,40 @@ export function careerMarket(w: World, next: number) {
   }
   takeSeat(w, d, team);
   d.contract = { teamId: team.id, until: next + o.years - 1, salary: Math.max(0, o.salary) };
-  c.trust = 55;
+  c.clauses = o.clauses;
+  c.trust = o.clauses?.lead ? 65 : 55;
   note(w, c, team.name, `${team.name} for ${next}`, `You race in ${team.series} for ${team.name} in ${next}.`);
+}
+
+/** Contract talks: ask for more money, a different length, or a clause. The team says yes, counters, or walks. */
+export function negotiateSeat(w: World, offerId: string, ask: number, years: number, clause?: "release" | "lead"): { ok: boolean; msg: string } {
+  const c = careerOf(w);
+  const d = meOf(w);
+  if (!c || !d) return { ok: false, msg: "" };
+  const o = c.seatOffers.find((x) => x.id === offerId);
+  if (!o) return { ok: false, msg: "That offer is gone." };
+  if ((o.talks ?? 0) >= 2) return { ok: false, msg: "They've made their final offer." };
+  o.talks = (o.talks ?? 0) + 1;
+  const team = w.teams.find((t) => t.id === o.teamId)!;
+  const r = makeRng(hashString(`${w.seed}:talks:${o.id}:${o.talks}`));
+  const want = o.series === "F1" ? (driverValue(d, w.season + 1) - 75) / 25 : 0.4; // how badly they want you
+  const agent = (c.rel?.agent ?? 50) / 100;
+  let p = 0.85 - Math.max(0, ask - 1) * 1.8 + want * 0.4 + c.fame / 250 + (agent - 0.5) * 0.3 - (clause ? 0.18 : 0) - Math.abs(years - o.years) * 0.06;
+  if (o.salary <= 0 && ask > 1) p -= 0.3; // a junior seat doesn't pay; asking for money is a stretch
+  p = Math.max(0.05, Math.min(0.95, p));
+  const base = o.salary === 0 && ask > 1 ? 150_000 : o.salary;
+  if (r.chance(p)) {
+    o.salary = o.salary < 0 ? Math.round((o.salary / ask) / 1e4) * 1e4 : Math.round((base * ask) / 1e4) * 1e4;
+    o.years = years;
+    if (clause) o.clauses = { ...o.clauses, [clause]: true };
+    return { ok: true, msg: `${team.name} agrees.` };
+  }
+  if (r.chance(0.4)) {
+    c.seatOffers = c.seatOffers.filter((x) => x !== o);
+    return { ok: false, msg: `${team.name} pulls the offer.` };
+  }
+  if (o.salary > 0) o.salary = Math.round((o.salary * (1 + Math.max(0, ask - 1) * 0.3)) / 1e4) * 1e4;
+  return { ok: false, msg: `${team.name} won't go that far. They improve the offer a little${o.talks >= 2 ? ", and that's final" : ""}.` };
 }
 
 // ───────────── endorsements ─────────────

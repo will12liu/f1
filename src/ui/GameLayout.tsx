@@ -16,6 +16,7 @@ const CAREER_NAV = [
   ["", "My career"],
   ["training", "Training"],
   ["deals", "Deals"],
+  ["life", "Life"],
   ["juniors", "Juniors"],
   ["calendar", "Calendar"],
   ["standings", "Standings"],

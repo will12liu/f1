@@ -62,3 +62,26 @@ describe("life between races", () => {
     expect(seen).toBeGreaterThan(1);
   }, 60_000);
 });
+
+import { buyItem, ITEMS } from "./shop";
+import { negotiateSeat } from "./career";
+describe("career money", () => {
+  it("negotiation changes the offer or ends it; the shop costs money and gives perks", () => {
+    const w = loadWorld(49);
+    startCareer(w, { first: "Max", last: "Money", nat: "German", archetype: "racer", tier: "self", start: "F2", difficulty: "pro" });
+    const c = careerOf(w)!;
+    const cash0 = c.cash;
+    expect(buyItem(w, "rig").ok).toBe(true);
+    expect(c.cash).toBeLessThan(cash0);
+    expect(buyItem(w, "rig").ok).toBe(false);
+    expect(ITEMS.length).toBeGreaterThan(8);
+    while (!seasonOver(w)) simNextRound(w);
+    const o = c.seatOffers[0];
+    const before = JSON.stringify(o);
+    const res = negotiateSeat(w, o.id, 1.5, 3, "lead");
+    const after = c.seatOffers.find((x) => x.id === o.id);
+    if (res.ok) expect(after!.years).toBe(3);
+    else expect(!after || JSON.stringify(after) !== before).toBe(true);
+    expect(c.owned).toContain("rig");
+  }, 60_000);
+});

@@ -4,12 +4,13 @@ import { endSeason } from "./season/offseason";
 import * as Act from "./manager/actions";
 import * as Acad from "./manager/academy";
 
-const A = { ...Act, answerEvent: Ev.answerEvent, spendPoint: Car.spendPoint, autoSpend: Car.autoSpend, signDeal: Car.signDeal, acceptSeat: Car.acceptSeat, markCareerRead: (w: World) => { for (const m of w.careerState?.inbox ?? []) m.read = true; return { ok: true, msg: "" }; }, hireScout: Acad.hireScout, fireScout: Acad.fireScout, setScoutFocus: Acad.setScoutFocus, signAcademy: Acad.signAcademy, releaseAcademy: Acad.releaseAcademy, buyJuniorTeam: Acad.buyJuniorTeam, placeDriver: Acad.placeDriver, upgradeProgram: Acad.upgradeProgram, scoutMarket: (w: Parameters<typeof Acad.scoutMarket>[0]) => (Acad.scoutMarket(w), { ok: true, msg: "" }) };
+const A = { ...Act, answerEvent: Ev.answerEvent, negotiateSeat: Car.negotiateSeat, buyItem: Shop.buyItem, sellItem: Shop.sellItem, spendPoint: Car.spendPoint, autoSpend: Car.autoSpend, signDeal: Car.signDeal, acceptSeat: Car.acceptSeat, markCareerRead: (w: World) => { for (const m of w.careerState?.inbox ?? []) m.read = true; return { ok: true, msg: "" }; }, hireScout: Acad.hireScout, fireScout: Acad.fireScout, setScoutFocus: Acad.setScoutFocus, signAcademy: Acad.signAcademy, releaseAcademy: Acad.releaseAcademy, buyJuniorTeam: Acad.buyJuniorTeam, placeDriver: Acad.placeDriver, upgradeProgram: Acad.upgradeProgram, scoutMarket: (w: Parameters<typeof Acad.scoutMarket>[0]) => (Acad.scoutMarket(w), { ok: true, msg: "" }) };
 import { startManager } from "./manager/manager";
 import type { Command } from "./race/dials";
 import { circuitOf, nextRound, prepareNextRound, seasonOver, simNextRound } from "./season/season";
 import * as Car from "./career/career";
 import * as Ev from "./career/events";
+import * as Shop from "./career/shop";
 import { meOf, startCareer, type NewDriver } from "./career/career";
 import { isJuniorRound, juniorInput } from "./season/juniors";
 import type { WeekendPlan } from "./race/weekend";

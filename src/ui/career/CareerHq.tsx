@@ -1,5 +1,7 @@
 // My career: the driver, the next race, the season so far, progression, money and fame, offers, mail.
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { Negotiate } from "./Negotiate";
 import { ARCHETYPES, careerOf, meOf, TIERS, XP_PER_POINT } from "../../engine/career/career";
 import { fmtM } from "../../engine/manager/state";
 import { ageOf } from "../../engine/season/development";
@@ -15,6 +17,7 @@ export function CareerHq() {
   const nav = useNavigate();
   const { world, busy, simRounds, nextSeason } = useGame();
   const { run, answer } = useAct();
+  const [talk, setTalk] = useState<string | null>(null);
   if (!world) return null;
   const c = careerOf(world);
   const d = meOf(world);
@@ -141,9 +144,24 @@ export function CareerHq() {
                   {c.next?.id === o.id ? (
                     <span className="text-xs font-semibold text-emerald-300">Agreed</span>
                   ) : (
-                    <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={!!busy} onClick={() => run("acceptSeat", o.id)}>
-                      Accept
-                    </button>
+                    <>
+                      <button className="text-xs text-slate-400 hover:text-white" onClick={() => setTalk(talk === o.id ? null : o.id)}>
+                        Negotiate
+                      </button>
+                      <button className="btn-ghost !px-2.5 !py-1 text-xs" disabled={!!busy} onClick={() => run("acceptSeat", o.id)}>
+                        Accept
+                      </button>
+                    </>
+                  )}
+                  {o.clauses && (o.clauses.release || o.clauses.lead) && (
+                    <div className="w-full text-[11px] text-sky-300">
+                      {[o.clauses.release ? "release clause" : "", o.clauses.lead ? "number-one driver" : ""].filter(Boolean).join(", ")}
+                    </div>
+                  )}
+                  {talk === o.id && (
+                    <div className="w-full">
+                      <Negotiate o={o} busy={!!busy} onPropose={(ask, years, clause) => run("negotiateSeat", o.id, ask, years, clause)} />
+                    </div>
                   )}
                 </div>
               ))}
