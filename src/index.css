@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --font-display: "Barlow Condensed", "Inter", ui-sans-serif, sans-serif;
+  --font-display: "Barlow Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
   --color-ink-950: #08090c;
   --color-ink-900: #0e1015;
   --color-ink-850: #13161c;

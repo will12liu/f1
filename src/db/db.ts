@@ -48,3 +48,20 @@ export async function deleteSave(id: string) {
     await db.worlds.delete(id);
   });
 }
+
+/** A save as a file (JSON), for backups or moving to another browser. */
+export async function exportSave(id: string): Promise<Blob | null> {
+  const s = await readSave(id);
+  if (!s) return null;
+  return new Blob([JSON.stringify({ format: "paddock-save", version: 1, meta: s.meta, world: s.world })], { type: "application/json" });
+}
+
+/** Load a save file as a new save (new id, so it never overwrites one). */
+export async function importSave(text: string): Promise<SaveMeta> {
+  const data = JSON.parse(text) as { format?: string; meta?: SaveMeta; world?: World };
+  if (data.format !== "paddock-save" || !data.meta || !data.world) throw new Error("That isn't a Paddock save file.");
+  const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const meta: SaveMeta = { ...data.meta, id, name: `${data.meta.name} (imported)`, updatedAt: Date.now() };
+  await writeSave(meta, data.world);
+  return meta;
+}

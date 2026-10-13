@@ -113,7 +113,7 @@ export function RaceViewer({
               +1 lap
             </button>
             <button className="btn-ghost !px-2 !py-1" onClick={() => { if (live) { live.finish(); setT(Infinity); } else setT(ix.end); setPlaying(false); }} title={live ? "Sim the rest at the current dials" : "Skip to the flag"}>
-              ⏭
+              Flag
             </button>
           </div>
         </div>
@@ -406,7 +406,7 @@ function TrackCanvas({
     line(2 / 3, "#e10600", 2);
 
     // corner numbers
-    g.font = "600 10px Inter, sans-serif";
+    g.font = "600 10px 'IBM Plex Sans', sans-serif";
     g.fillStyle = "#64748b";
     g.textAlign = "center";
     g.textBaseline = "middle";

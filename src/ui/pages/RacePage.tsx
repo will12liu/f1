@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { COMPOUNDS } from "../../engine/race/model";
 import { circuitOf } from "../../engine/season/season";
-import { COUNTRY_FLAGS, gap, lapTime, raceTime } from "../../lib/format";
+import { gap, lapTime, raceTime } from "../../lib/format";
 import { useGame } from "../../state/game";
 import { RaceViewer } from "../race/RaceViewer";
 import { DriverLink, Section, TeamBar, useMaps } from "../components/bits";
@@ -29,7 +29,7 @@ export function RacePage() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <div className="text-xs uppercase tracking-wider text-slate-400">Round {res.round} · {world.season}</div>
-          <h1 className="font-display text-3xl font-black uppercase leading-none">{COUNTRY_FLAGS[c.country]} {c.gp}</h1>
+          <h1 className="font-display text-3xl font-black uppercase leading-none">{c.gp}</h1>
         </div>
         <div className="ml-auto flex gap-1">
           {tabs.map(([k, label]) => (

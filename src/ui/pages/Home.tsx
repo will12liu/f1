@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { deleteSave, listSaves, type SaveMeta } from "../../db/db";
+import { deleteSave, exportSave, importSave, listSaves, type SaveMeta } from "../../db/db";
 import { useGame } from "../../state/game";
 import type { World } from "../../engine/types";
 import { ARCHETYPES, DIFFICULTY, TIERS, type NewDriver } from "../../engine/career/career";
@@ -161,6 +161,25 @@ export function Home() {
         </div>
         {error && <div className="text-sm text-rose-400">{error}</div>}
       </div>
+      <label className="flex items-center gap-2 text-xs text-slate-400">
+        <span className="btn-ghost !px-2.5 !py-1 cursor-pointer">Import a save file</span>
+        <input
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            try {
+              await importSave(await f.text());
+              refresh();
+            } catch (err) {
+              alert((err as Error).message);
+            }
+            e.target.value = "";
+          }}
+        />
+      </label>
       {saves.length > 0 && (
         <div className="panel divide-y divide-ink-800">
           {saves.map((s) => (
@@ -171,6 +190,20 @@ export function Home() {
                   {s.season} season · round {s.round} · {new Date(s.updatedAt).toLocaleString()}
                 </div>
               </Link>
+              <button
+                className="text-xs text-slate-400 hover:text-white"
+                onClick={async () => {
+                  const blob = await exportSave(s.id);
+                  if (!blob) return;
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `${s.name.replace(/[^\w-]+/g, "-")}-${s.season}.paddock.json`;
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                }}
+              >
+                Export
+              </button>
               <button
                 className="text-xs text-slate-500 hover:text-rose-400"
                 onClick={async () => {

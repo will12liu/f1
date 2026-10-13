@@ -1,6 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { circuitOf, driverStandings, nextRound, teamStandings } from "../../engine/season/season";
-import { COUNTRY_FLAGS } from "../../lib/format";
 import { useGame } from "../../state/game";
 import { DriverLink, Section, TeamBar, TrackOutline, useMaps } from "../components/bits";
 import { Hq } from "../manager/Hq";
@@ -32,7 +31,7 @@ export function Dashboard() {
                 Round {next.round} of {world.calendar.length} · {new Date(next.date + "T12:00:00Z").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </div>
               <h1 className="font-display text-4xl font-black uppercase leading-none">
-                {COUNTRY_FLAGS[circuit.country] ?? ""} {circuit.gp}
+                {circuit.gp}
               </h1>
               <div className="text-sm text-slate-400">
                 {circuit.name} · {circuit.laps} laps · {(circuit.laps * circuit.km).toFixed(1)} km · overtaking {["easy", "fair", "average", "hard", "very hard"][circuit.overtake - 1]}
@@ -66,7 +65,7 @@ export function Dashboard() {
             <div className="text-xs uppercase tracking-wider text-slate-400">{world.season} season complete</div>
             {champ && (
               <h1 className="font-display text-4xl font-black uppercase">
-                🏆 <DriverLink d={drivers.get(champ.driverId)} base={base} full /> is world champion
+                <DriverLink d={drivers.get(champ.driverId)} base={base} full /> is world champion
               </h1>
             )}
             <div className="text-sm text-slate-400">Constructors' champions: {team(ts[0]?.teamId)?.name}</div>

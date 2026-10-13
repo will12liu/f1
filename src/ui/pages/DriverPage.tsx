@@ -31,7 +31,7 @@ export function DriverPage() {
                 {d.retired ? `Retired after ${d.retired}` : t ? `${t.name} (${d.series})` : `Free agent (${d.series})`}
                 {d.contract && ` · contract to ${d.contract.until}, ${money(d.contract.salary)} a year`}
               </div>
-              {titles.length > 0 && <div className="text-sm text-amber-300 mt-1">🏆 World champion {titles.join(", ")}</div>}
+              {titles.length > 0 && <div className="text-sm text-amber-300 mt-1">World champion {titles.join(", ")}</div>}
             </div>
             <div className="text-center">
               <Ovr v={d.ovr} />
