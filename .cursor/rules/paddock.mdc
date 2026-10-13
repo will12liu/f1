@@ -1,0 +1,15 @@
+---
+description: Paddock (F1 career sim) project rules
+alwaysApply: true
+---
+
+Follow `AGENTS.md`, `CLAUDE.md` and `docs/NEXT.md` in this repo.
+
+- Determinism first: everything random goes through `src/engine/rng.ts`; player inputs may change odds/times but
+  never the number of random draws. Mini-game scores (0-1) are stored in `MomentChoice.q`, `Command.crew/unsafe`,
+  `RaceInput.launch`, `CarPlan.laps` and carried by `LiveAnswers` so the saved re-sim matches the live race.
+- After each batch: `npx tsc --noEmit -p . && npm test`, commit (one plain sentence) and push to `main`.
+- UI: big, solid colours, high contrast, plain labels, NBA GM style. Never gradients, glass, emoji in headings,
+  Inter, coloured-border cards, three-icon rows, fade-on-hover/fade-in-on-scroll, em dashes in UI copy.
+- `/Users/williamliu/Coding/nba-gm` is a reference: read it, never edit it.
+- Update `CLAUDE.md` / `docs/NEXT.md` when a feature lands.
