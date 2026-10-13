@@ -5,6 +5,7 @@ import type { Dials, EngineMode, ErsMode, FuelMix } from "../../engine/race/dial
 import { engineerAccepts, engineerCalls } from "../../engine/race/engineer";
 import { COMPOUNDS } from "../../engine/race/model";
 import type { RaceRunner } from "../../engine/race/race";
+import { PitStop } from "./PitStop";
 
 export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: number; code: string; mate?: { idx: number; code: string } }) {
   const car = runner.state.cars[idx];
@@ -23,9 +24,10 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
     setWant((w) => ({ ...w, [k]: v }));
     runner.command({ car: idx, dials: { [k]: v } });
   };
-  const box = (c: "S" | "M" | "H") => {
+  const [stop, setStop] = useState<"S" | "M" | "H" | null>(null); // the pit-stop mini-game is open for this tyre
+  const box = (c: "S" | "M" | "H", crew?: { q: number; unsafe: boolean }) => {
     if (over || !engineerAccepts()) return;
-    runner.command({ car: idx, pit: "box", compound: c });
+    runner.command({ car: idx, pit: "box", compound: c, ...(crew ? { crew: crew.q, unsafe: crew.unsafe } : {}) });
     setReq({ lap: nextLap, c, text: `Box, box: ${COMPOUNDS[c].name.toLowerCase()}s at the end of lap ${nextLap}.` });
   };
   const stay = () => {
@@ -49,6 +51,13 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
 
   return (
     <div className="panel text-base">
+      {stop && (
+        <PitStop
+          title={`${code} · ${COMPOUNDS[stop].name}s`}
+          onSkip={() => (box(stop), setStop(null))}
+          onDone={(q, unsafe) => (box(stop, { q, unsafe }), setStop(null))}
+        />
+      )}
       <div className="flex items-center justify-between px-4 py-3 border-b border-ink-800">
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pit wall · {code}</span>
         <span className="font-mono text-sm text-slate-400">{over ? (car.out ? car.out : "Finished") : pending ? `Changes from lap ${nextLap}` : `Lap ${nextLap}/${s.laps}`}</span>
@@ -91,7 +100,7 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="text-sm text-slate-400">Box for</span>
                 {(["S", "M", "H"] as const).map((c) => (
-                  <button key={c} className={`btn !px-3 !py-2 ${boxFor === c ? "bg-white text-black" : "bg-ink-800 text-slate-200 hover:bg-ink-700"}`} onClick={() => box(c)}>
+                  <button key={c} className={`btn !px-3 !py-2 ${boxFor === c ? "bg-white text-black" : "bg-ink-800 text-slate-200 hover:bg-ink-700"}`} onClick={() => setStop(c)}>
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: COMPOUNDS[c].color }} />
                     {COMPOUNDS[c].name}
                   </button>

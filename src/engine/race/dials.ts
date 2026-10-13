@@ -79,6 +79,8 @@ export interface Command {
   pit?: "box" | "stay"; // box at the end of this lap / skip a planned stop this lap
   letBy?: boolean; // team orders: let the team-mate behind through this lap
   compound?: "S" | "M" | "H"; // tyre wanted at a requested stop
+  crew?: number; // the pit-stop mini-game: how well the stop went (0-1)
+  unsafe?: boolean; // released into the path of another car (mini-game)
 }
 
 export interface Forecast {

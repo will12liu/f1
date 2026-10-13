@@ -71,6 +71,20 @@ describe("key moments", () => {
     expect(good.state.cars[3].cum).toBe(slow.state.cars[3].cum);
   });
 
+  it("the pit-stop mini-game: a perfect stop is quicker than a botched one, an unsafe release is five seconds", () => {
+    const stopAt = (crew: number, unsafe = false) => {
+      const r = simRace(input(25, { commands: [{ lap: 12, car: 9, pit: "box", compound: "H", crew, unsafe }] }));
+      const pit = r.state.events.find((e) => e.kind === "pit" && e.a === 9 && e.lap === 12)!;
+      return { x: pit.x!, pens: r.result.rows.find((row) => row.idx === 9)!.pens.join(" "), r };
+    };
+    const good = stopAt(1);
+    const bad = stopAt(0);
+    expect(good.x).toBeLessThan(bad.x - 1);
+    expect(stopAt(0.8, true).pens).toContain("unsafe");
+    const again = simRace(input(25, { commands: good.r.state.commands }));
+    expect(JSON.stringify(again.result)).toBe(JSON.stringify(good.r.result));
+  });
+
   it("answering every moment with instinct gives exactly the race nobody played", () => {
     const { r } = play(22, [5], () => "auto");
     const plain = simRace(input(22));

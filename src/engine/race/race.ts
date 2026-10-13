@@ -98,6 +98,7 @@ export interface CarState {
   ctl: boolean; // someone has touched this car's dials or pit calls (untouched cars skip the dial maths)
   battery: number; // ERS charge 0-1
   box: "S" | "M" | "H" | "auto" | null; // requested stop at the end of this lap
+  crew?: { q: number; unsafe: boolean }; // the player's pit-stop mini-game for the requested stop
   hold: boolean; // skip a planned stop this lap
   lift: boolean; // lifting and coasting this lap (tank short)
   strikes: number; // track-limits strikes
@@ -513,7 +514,10 @@ export function createRace(input: RaceInput): RaceRunner {
       if (!car || car.out) continue;
       car.ctl = true;
       if (cmd.dials) car.dials = { ...car.dials, ...cmd.dials };
-      if (cmd.pit === "box") car.box = cmd.compound ?? "auto";
+      if (cmd.pit === "box") {
+        car.box = cmd.compound ?? "auto";
+        car.crew = cmd.crew === undefined ? undefined : { q: Math.max(0, Math.min(1, cmd.crew)), unsafe: !!cmd.unsafe };
+      }
       if (cmd.pit === "stay") car.hold = true;
       if (cmd.letBy) letBy.add(car.idx);
     }
@@ -624,7 +628,10 @@ export function createRace(input: RaceInput): RaceRunner {
         let loss = flag === "sc" ? pitLoss.sc : flag === "vsc" ? pitLoss.vsc : pitLoss.normal;
         loss += rng.normal(0, 0.4);
         if (car.e.pit !== undefined) loss += (70 - car.e.pit) * 0.012; // a better crew is quicker
-        if (rng.chance(RACE.slowStop * (car.e.pit === undefined ? 1 : Math.max(0.3, 1.8 - car.e.pit / 60)))) {
+        const cq = car.crew; // the player worked the stop (same draws either way)
+        if (cq) loss += (RACE.crewMid - cq.q) * RACE.crewSpread;
+        const slowMult = cq ? (cq.q >= 0.8 ? 0.2 : cq.q < 0.3 ? 2.5 : 1) : 1;
+        if (rng.chance(RACE.slowStop * slowMult * (car.e.pit === undefined ? 1 : Math.max(0.3, 1.8 - car.e.pit / 60)))) {
           const extra = 2 + rng.next() * 7;
           loss += extra;
           ev({ lap: L, t: car.cum + t, kind: "slowstop", a: car.idx, info: extra.toFixed(1) });
@@ -637,8 +644,12 @@ export function createRace(input: RaceInput): RaceRunner {
           loss += car.penalty; // served at the stop
           car.penalty = 0;
         }
-        if (rng.chance(RACE.unsafeRelease)) penalise(car, "5s", "unsafe release", L, car.cum + t + loss, 0);
-        else if (rng.chance(RACE.pitSpeeding)) penalise(car, "5s", "speeding in the pit lane", L, car.cum + t + loss, 0);
+        const unsafe = rng.chance(RACE.unsafeRelease);
+        if (unsafe || cq?.unsafe) {
+          if (!unsafe) rng.chance(RACE.pitSpeeding); // keep the draws the same as an AI stop
+          penalise(car, "5s", "unsafe release", L, car.cum + t + loss, 0);
+        } else if (rng.chance(RACE.pitSpeeding)) penalise(car, "5s", "speeding in the pit lane", L, car.cum + t + loss, 0);
+        car.crew = undefined;
         t += loss;
         pitTime.set(car.idx, loss);
       }
