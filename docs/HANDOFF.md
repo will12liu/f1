@@ -49,8 +49,13 @@ DNF/race 3.5 (real 2.6 all years, 4.2 in 2026) · stops/finisher 1.65 (1.6) · S
 ## Added on 2026-10-13
 - Phase 6 key moments (duels + calls), F2/F3 races and super licences, manager academy and scouts, driver career mode (creator, XP and training, fame, endorsements, trust, silly-season offers, F1 path).
 
+Also done on 2026-10-13: Phase 7 (practice programmes, setup vs a hidden ideal, qualifying calls), the career life layer (event deck, morale, relationships, rivals), contract negotiation with clauses, the paddock life shop, career balance (`npm run check:career`), IBM Plex Sans instead of Inter, save export/import.
+
 ## Next
-- Phase 7 (qualifying and practice decisions), Phase 11 (life layer: events, rivals, relationships, press), contract negotiation depth (Phase 10), Phase 12-13.
+- Phase 12 optional layers (investing, property, relationships, casino) if wanted.
+- Phase 13: tutorial hints for dials/duels/weekend, a phone-width pass over the new pages, accessibility.
+- Deeper AI for the other ten teams in manager mode (they still develop automatically), engine-component penalties, weather.
+- Hosting is still blocked on a GitHub repo + Cloudflare Pages (see Blocked).
 
 ## Next: Phase 6 (duels) [done]
 Phase 5 is done (see the table). Open points from it: AI cars always run neutral dials; the trust stub always accepts; the live race needs a driver picked each time (no career yet).
