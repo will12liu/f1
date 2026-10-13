@@ -99,6 +99,7 @@ export interface CareerState {
   archetype: string;
   tier: Tier;
   difficulty: Difficulty;
+  helmet?: string; // helmet colour from the creator
   xp: number; // toward the next point
   points: number; // upgrade points to spend
   trust: number; // team trust 0-100
@@ -155,6 +156,8 @@ export interface NewDriver {
   tier: Tier;
   start: Junior;
   difficulty: Difficulty;
+  num?: number; // car number (2-99)
+  helmet?: string; // helmet colour
 }
 
 export function startCareer(w: World, o: NewDriver) {
@@ -166,6 +169,7 @@ export function startCareer(w: World, o: NewDriver) {
   d.first = o.first;
   d.last = o.last;
   d.nat = o.nat;
+  if (o.num && o.num >= 1 && o.num <= 99) d.num = Math.round(o.num);
   d.code = o.last.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase().padEnd(3, "X");
   const r = { ...d.ratings };
   for (const k of RATING_KEYS) r[k] = clampRating(tier.ovr[o.start] + rng.normal(0, 2));
@@ -192,6 +196,7 @@ export function startCareer(w: World, o: NewDriver) {
     archetype: arch.id,
     tier: o.tier,
     difficulty: o.difficulty,
+    helmet: o.helmet,
     xp: 0,
     points: 3,
     trust: 55,

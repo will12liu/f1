@@ -20,7 +20,7 @@ import { PitWall } from "../race/PitWall";
 import { MomentCard } from "../race/MomentCard";
 import type { PendingMoment } from "../../engine/race/moments";
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
-import { TeamBar, useMaps } from "../components/bits";
+import { TeamBar, TrackOutline, useMaps } from "../components/bits";
 
 const PICK_KEY = "paddock.liveDriver";
 const MOMENTS_KEY = "paddock.moments";
@@ -166,21 +166,24 @@ export function LiveRace() {
     const seed = junior ? hashString(`${world.seed}:${world.season}:${r.round}:${meSeries}`) : roundSeed(world, r.round);
     const engineer = career ? 40 + (career.rel?.engineer ?? 50) * 0.4 : (teamStaff(world, world.manager!.teamId).engineer?.rating ?? 50);
     return (
-      <div className="grid gap-4 max-w-3xl">
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-400">Round {r.round} · {junior ? `${meSeries} weekend` : "race weekend"}</div>
-          <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
+      <div className="mx-auto grid max-w-6xl gap-6">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="min-w-0 flex-1">
+            <Link className="text-base text-slate-400 hover:text-white" to={base}>
+              ‹ Back
+            </Link>
+            <div className="kicker mt-4">
+              Round {r.round} · {junior ? `${meSeries} weekend` : "race weekend"} · {circuit.name}
+            </div>
+            <h1 className="headline mt-2 text-6xl sm:text-7xl">{circuit.gp}</h1>
+          </div>
+          <TrackOutline id={circuit.id} className="h-36 w-56" stroke="#e2e8f0" />
         </div>
         <Weekend seed={seed} circuit={circuit} driverId={planIds[0] ?? ""} engineer={engineer} onRun={runQuali} busy={!!busy} />
-        <div>
-          <Link className="btn-ghost" to={base}>
-            Back
-          </Link>
-        </div>
       </div>
     );
   }
-  if (prep === undefined) return <div className="text-slate-500">Qualifying…</div>;
+  if (prep === undefined) return <div className="grid h-96 place-items-center font-display text-4xl font-black uppercase text-slate-500">Qualifying…</div>;
   if (prep === null)
     return (
       <div className="text-slate-400">
@@ -191,17 +194,20 @@ export function LiveRace() {
   const circuit = prep.input.circuit;
   if (!runner || !replay) {
     return (
-      <div className="grid gap-4 max-w-3xl">
+      <div className="mx-auto grid max-w-6xl gap-6">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · {prep.series ? `${prep.series} feature race` : "drive it live"}</div>
-          <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <Link className="text-base text-slate-400 hover:text-white" to={base}>
+            ‹ Back
+          </Link>
+          <div className="kicker mt-4">Round {prep.round} · {prep.series ? `${prep.series} feature race` : "drive it live"}</div>
+          <h1 className="headline mt-2 text-6xl sm:text-7xl">{circuit.gp}</h1>
+          <p className="mt-3 max-w-3xl text-lg text-slate-400">
             {career ? "You drive. Set your dials, call your stops, and fight when it's close." : myTeamId ? `You run both ${team(myTeamId)?.name} cars from the pit wall: dials, stops and team orders.` : "Pick the car you run from the pit wall."} Everyone else races on their own. Dial changes count from the next lap.
           </p>
         </div>
-        <div className="panel overflow-hidden">
-          <div className="px-3 py-2 border-b border-ink-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Grid</div>
-          <ol className="grid sm:grid-cols-2 text-sm">
+        <div className="overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
+          <div className="border-b border-ink-700 px-5 py-3 font-display text-2xl font-extrabold uppercase text-white">Starting grid</div>
+          <ol className="grid text-base sm:grid-cols-2">
             {entries.map((e, i) => {
               const d = drivers.get(e.driverId);
               const sel = career ? e.driverId === meId : myTeamId ? e.teamId === myTeamId : e.driverId === pick;
@@ -213,21 +219,22 @@ export function LiveRace() {
                       setPick(e.driverId);
                       savePick(e.driverId);
                     }}
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left border-b border-ink-800 ${sel ? "bg-ink-700 text-white" : "hover:bg-ink-800"}`}
+                    className={`flex w-full items-center gap-3 border-b border-ink-800 px-5 py-2.5 text-left ${sel ? "bg-race/20 text-white" : "hover:bg-ink-800"}`}
                   >
-                    <span className="w-6 text-right font-mono text-xs text-slate-400">{i + 1}</span>
+                    <span className="w-8 text-right font-display text-xl font-black text-slate-500">{i + 1}</span>
                     <TeamBar color={team(e.teamId)?.color ?? "#888"} />
                     <span className="font-semibold">{d ? `${d.first} ${d.last}` : e.driverId}</span>
-                    <span className="ml-auto text-xs text-slate-500">{team(e.teamId)?.name}</span>
+                    <span className="ml-auto text-sm text-slate-500">{team(e.teamId)?.name}</span>
                   </button>
                 </li>
               );
             })}
           </ol>
         </div>
-        <div className="grid gap-1">
-          <div className="text-xs text-slate-400">Key moments (duels within a second, strategy calls)</div>
-          <div className="flex gap-1">
+        <div className="grid gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
+          <div className="font-display text-2xl font-extrabold uppercase text-white">Key moments</div>
+          <div className="text-base text-slate-400">The race stops for duels within a second and for strategy calls.</div>
+          <div className="grid grid-cols-3 gap-2">
             {(
               [
                 ["off", "Off"],
@@ -235,19 +242,16 @@ export function LiveRace() {
                 ["all", "Every fight"],
               ] as const
             ).map(([k, label]) => (
-              <button key={k} onClick={() => setMode(k)} className={`btn !px-2.5 !py-1 ${mode === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+              <button key={k} onClick={() => setMode(k)} className={`rounded-lg px-4 py-4 font-display text-xl font-bold uppercase ${mode === k ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
                 {label}
               </button>
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="btn-primary" disabled={chosen < 0} onClick={start}>
-            Start the race{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""}
+        <div>
+          <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={chosen < 0} onClick={start}>
+            Lights out{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""} ›
           </button>
-          <Link className="btn-ghost" to={base}>
-            Back
-          </Link>
         </div>
       </div>
     );
@@ -279,13 +283,13 @@ export function LiveRace() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-400">Round {prep.round} · {prep.series ? `${prep.series} feature race · ` : ""}live</div>
-          <h1 className="font-display text-3xl font-black uppercase leading-none">{circuit.gp}</h1>
+          <div className="kicker">Round {prep.round} · {prep.series ? `${prep.series} feature race · ` : ""}live</div>
+          <h1 className="headline mt-1 text-4xl sm:text-5xl">{circuit.gp}</h1>
         </div>
         <div className="ml-auto flex gap-2">
           {finished && (
             <button
-              className="btn-primary"
+              className="btn-xl bg-race !py-3 !text-xl text-white hover:bg-red-500"
               disabled={!!busy}
               onClick={async () => {
                 const live = { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off" };

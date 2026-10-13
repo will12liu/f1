@@ -48,13 +48,13 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
   const stopNext = f.nextStop && f.nextStop.lap === s.lap + 1;
 
   return (
-    <div className="panel text-sm">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-ink-800">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Pit wall · {code}</span>
-        <span className="font-mono text-xs text-slate-400">{over ? (car.out ? car.out : "Finished") : pending ? `Changes from lap ${nextLap}` : `Lap ${nextLap}/${s.laps}`}</span>
+    <div className="panel text-base">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-ink-800">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Pit wall · {code}</span>
+        <span className="font-mono text-sm text-slate-400">{over ? (car.out ? car.out : "Finished") : pending ? `Changes from lap ${nextLap}` : `Lap ${nextLap}/${s.laps}`}</span>
       </div>
 
-      <div className="grid gap-3 p-3">
+      <div className="grid gap-4 p-4">
         <Gauge label="Tyres" value={tyreLeft} color={COMPOUNDS[car.compound].color} right={`${COMPOUNDS[car.compound].name}, ${car.age} laps · ${f.tyreLapsLeft >= 60 ? "60+" : Math.floor(f.tyreLapsLeft)} left`} warn={f.tyreLapsLeft < 3} />
         <Gauge label="Battery" value={f.battery} color="#38bdf8" right={`${Math.round(f.battery * 100)}%${f.batteryEmptyLap ? ` · empty lap ${f.batteryEmptyLap}` : ""}`} warn={f.battery < 0.1} />
         <Gauge
@@ -73,13 +73,13 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
           <Seg<EngineMode> label="Engine" value={want.engine} options={[["low", "Low"], ["std", "Std"], ["high", "High"]]} onPick={(v) => set("engine", v)} />
         </div>
 
-        <div className="font-mono text-xs text-slate-400">
+        <div className="font-mono text-sm text-slate-400">
           {f.lapDelta === 0 ? "Neutral settings." : `${f.lapDelta < 0 ? "" : "+"}${f.lapDelta.toFixed(2)}s a lap vs neutral.`}
         </div>
 
         {!over && (
           <div className="grid gap-2 border-t border-ink-800 pt-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Engineer</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Engineer</div>
             {calls.length === 0 && <div className="text-slate-500">Nothing from the engineer.</div>}
             {calls.map((c) => (
               <div key={c.id} className={c.tone === "warn" ? "text-amber-300" : c.tone === "plan" ? "text-white" : "text-slate-300"}>
@@ -89,20 +89,20 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
             {active && <div className="text-sky-300">{active.text}</div>}
             {left > 1 && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <span className="text-xs text-slate-400">Box for</span>
+                <span className="text-sm text-slate-400">Box for</span>
                 {(["S", "M", "H"] as const).map((c) => (
-                  <button key={c} className={`btn !px-2.5 !py-1 ${boxFor === c ? "bg-white text-black" : "bg-ink-800 text-slate-200 hover:bg-ink-700"}`} onClick={() => box(c)}>
+                  <button key={c} className={`btn !px-3 !py-2 ${boxFor === c ? "bg-white text-black" : "bg-ink-800 text-slate-200 hover:bg-ink-700"}`} onClick={() => box(c)}>
                     <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: COMPOUNDS[c].color }} />
                     {COMPOUNDS[c].name}
                   </button>
                 ))}
                 {mateBehind && !active && (
-                  <button className="btn bg-ink-800 text-slate-200 hover:bg-ink-700 !px-2.5 !py-1" onClick={orders}>
+                  <button className="btn bg-ink-800 text-slate-200 hover:bg-ink-700 !px-3 !py-2" onClick={orders}>
                     Let {mate!.code} through
                   </button>
                 )}
                 {stopNext && !active && (
-                  <button className="btn bg-ink-800 text-slate-200 hover:bg-ink-700 !px-2.5 !py-1" onClick={stay}>
+                  <button className="btn bg-ink-800 text-slate-200 hover:bg-ink-700 !px-3 !py-2" onClick={stay}>
                     Stay out a lap
                   </button>
                 )}
@@ -118,12 +118,12 @@ export function PitWall({ runner, idx, code, mate }: { runner: RaceRunner; idx: 
 function Gauge({ label, value, color, right, warn }: { label: string; value: number; color: string; right: string; warn?: boolean }) {
   return (
     <div className="grid gap-1">
-      <div className="flex justify-between text-xs">
+      <div className="flex justify-between text-sm">
         <span className="text-slate-400">{label}</span>
         <span className={`font-mono ${warn ? "text-amber-300" : "text-slate-300"}`}>{right}</span>
       </div>
-      <div className="h-2 rounded-sm bg-ink-800">
-        <div className="h-2 rounded-sm" style={{ width: `${Math.round(value * 100)}%`, background: warn ? "#f59e0b" : color }} />
+      <div className="h-2.5 rounded-sm bg-ink-800">
+        <div className="h-2.5 rounded-sm" style={{ width: `${Math.round(value * 100)}%`, background: warn ? "#f59e0b" : color }} />
       </div>
     </div>
   );
@@ -131,11 +131,11 @@ function Gauge({ label, value, color, right, warn }: { label: string; value: num
 
 function Seg<T extends string | number>({ label, value, options, onPick }: { label: string; value: T; options: readonly (readonly [T, string])[]; onPick: (v: T) => void }) {
   return (
-    <div className="grid grid-cols-[72px_1fr] items-center gap-2">
-      <span className="text-xs text-slate-400">{label}</span>
+    <div className="grid grid-cols-[84px_1fr] items-center gap-2">
+      <span className="text-sm text-slate-400">{label}</span>
       <div className="flex rounded-md bg-ink-850 p-0.5">
         {options.map(([v, text]) => (
-          <button key={String(v)} onClick={() => onPick(v)} className={`flex-1 rounded px-1 py-1 text-xs font-semibold ${v === value ? "bg-race text-white" : "text-slate-300 hover:bg-ink-700"}`}>
+          <button key={String(v)} onClick={() => onPick(v)} className={`flex-1 rounded px-1 py-2 text-sm font-semibold ${v === value ? "bg-race text-white" : "text-slate-300 hover:bg-ink-700"}`}>
             {text}
           </button>
         ))}

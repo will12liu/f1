@@ -3,11 +3,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { useGame } from "../../state/game";
 import type { World } from "../../engine/types";
-import { ARCHETYPES, DIFFICULTY, TIERS, type NewDriver } from "../../engine/career/career";
 
-const NATS = ["British", "Italian", "French", "German", "Dutch", "Spanish", "Brazilian", "Japanese", "Australian", "American", "Chinese", "Indian", "Swedish", "Argentine", "Mexican", "Belgian", "Danish", "Polish", "Estonian", "New Zealander", "Canadian", "Finnish", "Monegasque", "Thai"];
-
-const TITLE = { career: "New career", manager: "Take over a team", sandbox: "New sandbox" } as const;
+const TITLE = { manager: "Take over a team", sandbox: "New sandbox" } as const;
 
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
@@ -21,7 +18,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-function Choice({ on, onClick, title, text, right }: { on: boolean; onClick: () => void; title: ReactNode; text?: ReactNode; right?: ReactNode }) {
+export function Choice({ on, onClick, title, text, right }: { on: boolean; onClick: () => void; title: ReactNode; text?: ReactNode; right?: ReactNode }) {
   return (
     <button onClick={onClick} className={`flex items-start gap-3 rounded-lg border-2 p-5 text-left ${on ? "border-white bg-ink-800" : "border-ink-700 bg-ink-900 hover:border-ink-600 hover:bg-ink-850"}`}>
       <div className="min-w-0 flex-1">
@@ -40,7 +37,6 @@ export function NewGame() {
   const nav = useNavigate();
   const { create, busy, error } = useGame();
   const [name, setName] = useState("My F1 world");
-  const [drv, setDrv] = useState<NewDriver>({ first: "", last: "", nat: "British", archetype: "racer", tier: "mid", start: "F3", difficulty: "pro" });
   const [principal, setPrincipal] = useState("");
   const [teamId, setTeamId] = useState<string | null>(null);
   const [teams, setTeams] = useState<{ id: string; name: string; color: string; budget: number; rank: number; drivers: string }[]>([]);
@@ -56,16 +52,13 @@ export function NewGame() {
       })
       .catch(() => setTeams([]));
   }, []);
-  if (mode !== "career" && mode !== "manager" && mode !== "sandbox") return <Navigate to="/" replace />;
+  if (mode !== "manager" && mode !== "sandbox") return <Navigate to="/" replace />;
 
-  const ready = !!name.trim() && (mode !== "manager" || (!!teamId && !!principal.trim())) && (mode !== "career" || (!!drv.first.trim() && !!drv.last.trim()));
-  const start = async () =>
-    nav(`/g/${await create(name.trim(), mode === "manager" ? { teamId: teamId!, principal: principal.trim() } : undefined, mode === "career" ? { ...drv, first: drv.first.trim(), last: drv.last.trim() } : undefined)}`);
+  const ready = !!name.trim() && (mode !== "manager" || (!!teamId && !!principal.trim()));
+  const start = async () => nav(`/g/${await create(name.trim(), mode === "manager" ? { teamId: teamId!, principal: principal.trim() } : undefined)}`);
   const team = teams.find((t) => t.id === teamId);
   const summary =
-    mode === "career"
-      ? `${drv.first || "Your"} ${drv.last || "driver"} · ${ARCHETYPES.find((a) => a.id === drv.archetype)?.label} · ${drv.start}`
-      : mode === "manager"
+    mode === "manager"
         ? team
           ? `${principal || "You"} at ${team.name}`
           : "Pick a team"
@@ -84,58 +77,6 @@ export function NewGame() {
       </header>
       <div className="mx-auto max-w-6xl px-6 sm:px-10">
         <h1 className="headline pb-8 pt-10 text-6xl sm:text-8xl">{TITLE[mode]}</h1>
-
-        {mode === "career" && (
-          <>
-            <Step n={++n} title="Your driver">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="grid gap-1.5 text-sm text-slate-400">
-                  First name
-                  <input className={field} value={drv.first} onChange={(e) => setDrv({ ...drv, first: e.target.value })} />
-                </label>
-                <label className="grid gap-1.5 text-sm text-slate-400">
-                  Last name
-                  <input className={field} value={drv.last} onChange={(e) => setDrv({ ...drv, last: e.target.value })} />
-                </label>
-                <label className="grid gap-1.5 text-sm text-slate-400">
-                  Nationality
-                  <select className={field} value={drv.nat} onChange={(e) => setDrv({ ...drv, nat: e.target.value })}>
-                    {NATS.map((x) => (
-                      <option key={x}>{x}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </Step>
-            <Step n={++n} title="Driving style">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {ARCHETYPES.map((a) => (
-                  <Choice key={a.id} on={drv.archetype === a.id} onClick={() => setDrv({ ...drv, archetype: a.id })} title={a.label} text={a.blurb} />
-                ))}
-              </div>
-            </Step>
-            <Step n={++n} title="Background">
-              <div className="grid gap-3 sm:grid-cols-3">
-                {(Object.keys(TIERS) as (keyof typeof TIERS)[]).map((k) => (
-                  <Choice key={k} on={drv.tier === k} onClick={() => setDrv({ ...drv, tier: k })} title={TIERS[k].label} text={TIERS[k].blurb} />
-                ))}
-              </div>
-            </Step>
-            <Step n={++n} title="Start in">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Choice on={drv.start === "F3"} onClick={() => setDrv({ ...drv, start: "F3" })} title="Formula 3" text="Age 17. The longest road, the most time to grow." right={<span className="font-display text-5xl font-black leading-none text-ink-600">F3</span>} />
-                <Choice on={drv.start === "F2"} onClick={() => setDrv({ ...drv, start: "F2" })} title="Formula 2" text="Age 19. One step from F1, and the paddock is watching." right={<span className="font-display text-5xl font-black leading-none text-ink-600">F2</span>} />
-              </div>
-            </Step>
-            <Step n={++n} title="Difficulty">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {(Object.keys(DIFFICULTY) as (keyof typeof DIFFICULTY)[]).map((k) => (
-                  <Choice key={k} on={drv.difficulty === k} onClick={() => setDrv({ ...drv, difficulty: k })} title={DIFFICULTY[k].label} text={`${Math.round(DIFFICULTY[k].xp * 100)}% XP`} />
-                ))}
-              </div>
-            </Step>
-          </>
-        )}
 
         {mode === "manager" && (
           <>
@@ -173,7 +114,7 @@ export function NewGame() {
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-ink-700 bg-ink-900">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-4 sm:px-10">
           <div className="min-w-0 flex-1">
-            <div className="kicker">{mode === "career" ? "Driver career" : mode === "manager" ? "Team principal" : "Sandbox"}</div>
+            <div className="kicker">{mode === "manager" ? "Team principal" : "Sandbox"}</div>
             <div className="truncate text-lg font-semibold text-white">{summary}</div>
             {error && <div className="text-sm text-rose-400">{error}</div>}
           </div>

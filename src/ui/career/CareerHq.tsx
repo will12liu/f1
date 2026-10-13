@@ -8,7 +8,8 @@ import { ageOf } from "../../engine/season/development";
 import { hasLicence, isJuniorRound, juniorStandings, licencePointsSL } from "../../engine/season/juniors";
 import { circuitOf, driverStandings, nextRound } from "../../engine/season/season";
 import { useGame } from "../../state/game";
-import { onColor, Section, TeamBar, useMaps } from "../components/bits";
+import { Section, TeamBar, useMaps } from "../components/bits";
+import { Helmet } from "../components/Helmet";
 import { BigStat, HubButton, NextRace, Tile, TileGroup } from "../components/hub";
 import { Answer, Meter, useAct } from "../manager/kit";
 
@@ -77,8 +78,9 @@ export function CareerHq() {
       )}
 
       <section className="flex flex-wrap items-stretch overflow-hidden rounded-lg border border-ink-700 bg-ink-900">
-        <div className="flex w-24 items-center justify-center font-display text-6xl font-black sm:w-36 sm:text-7xl" style={{ background: color, color: onColor(color) }}>
-          {d.num}
+        <div className="relative flex w-32 items-center justify-center bg-ink-850 px-3 pb-3 sm:w-48">
+          <Helmet color={c.helmet ?? color} num={d.num} className="w-full" />
+          <span className="absolute inset-x-0 bottom-0 h-2" style={{ background: color }} />
         </div>
         <div className="min-w-0 flex-1 px-6 py-5">
           <div className="kicker">{role}</div>
