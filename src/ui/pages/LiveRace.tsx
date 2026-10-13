@@ -1,7 +1,7 @@
 // Drive the next round live: pick a car, then the race runs lap by lap as you watch, with the pit wall for
 // your car. Saving replays the race in the worker from the same input and your commands, so it comes out
 // exactly as you saw it.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { createRace, type RaceRunner } from "../../engine/race/race";
 import type { RaceInput } from "../../engine/race/race";
@@ -10,6 +10,7 @@ import { Weekend } from "../race/Weekend";
 import type { CarPlan, WeekendPlan } from "../../engine/race/weekend";
 import { circuitOf, nextRound, roundSeed } from "../../engine/season/season";
 import { hashString } from "../../engine/rng";
+import { isJuniorRound } from "../../engine/season/juniors";
 import { teamStaff } from "../../engine/manager/manager";
 
 /** What the live page races: the F1 race, or the player's junior race in career mode. */
@@ -18,6 +19,7 @@ import type { Replay } from "../../engine/types";
 import { useGame } from "../../state/game";
 import { PitWall } from "../race/PitWall";
 import { MomentCard } from "../race/MomentCard";
+import { verdict, verdictColor } from "../race/BrakeBar";
 import { Reaction } from "../career/SimGames";
 import type { PendingMoment } from "../../engine/race/moments";
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
@@ -105,6 +107,8 @@ export function LiveRace() {
   const [tab, setTab] = useState(0);
   const [mode, setMode] = useState<MomentMode>(readMode);
   const [pend, setPend] = useState<PendingMoment | null>(null);
+  const [zoomAt, setZoomAt] = useState<{ t: number; cars: number[]; until?: number } | null>(null); // the last moment: 1x + zoom
+  const [banner, setBanner] = useState<{ t: number; node: ReactNode } | null>(null); // how it went
   const focus = career ? [entries.findIndex((e) => e.driverId === meId)].filter((i) => i >= 0) : myTeamId ? mine : [entries.findIndex((e) => e.driverId === pick)].filter((i) => i >= 0);
   const chosen = career ? entries.findIndex((e) => e.driverId === meId) : myTeamId ? (mine[0] ?? -1) : entries.findIndex((e) => e.driverId === pick);
   const season = world?.season ?? 0;
@@ -145,6 +149,7 @@ export function LiveRace() {
         }
         const m = runner.pending();
         setPend((p) => (p?.id === m?.id ? p : m));
+        if (m) setZoomAt((f) => (f?.t === m.t ? f : { t: m.t, cars: m.vs !== undefined ? [m.car, m.vs] : [m.car] }));
         if (stepped) refresh();
         return runner.done() ? Infinity : leadEnd() - 0.5;
       },
@@ -163,6 +168,12 @@ export function LiveRace() {
   if (planned && !plan && world) {
     const r = nextRound(world);
     if (!r) return <div className="text-slate-400">No race left this season.</div>;
+    if (career && (meSeries === "F2" || meSeries === "F3") && !isJuniorRound(world, meSeries, r.round))
+      return (
+        <div className="text-lg text-slate-400">
+          No {meSeries} race this weekend. <Link className="text-white underline" to={base}>Back</Link>
+        </div>
+      );
     const circuit = circuitOf(world, r.circuitId);
     const junior = career && (meSeries === "F2" || meSeries === "F3");
     const seed = junior ? hashString(`${world.seed}:${world.season}:${r.round}:${meSeries}`) : roundSeed(world, r.round);
@@ -328,14 +339,25 @@ export function LiveRace() {
         follow0={mine.length === 2 ? mine[tab] : chosen}
         side={wall}
         marks={pend ? { a: pend.car, b: pend.vs, role: pend.kind === "defend" ? "defend" : "attack" } : null}
+        focus={zoomAt}
+        banner={banner}
         overlay={
           pend ? (
             <MomentCard
               m={pend}
               who={codeOf(pend.car)}
               onPick={(opt, q) => {
+                const m = pend;
+                const before = runner.state.order.indexOf(m.car) + 1;
                 runner.choose(opt, q);
                 runner.step();
+                const after = runner.state.order.indexOf(m.car) + 1;
+                const duel = runner.state.duels.find((x) => x.lap === m.lap && x.player === m.car);
+                const label = opt === "auto" ? "Instinct" : (m.opts.find((o) => o.id === opt)?.label ?? opt);
+                const dEv = runner.state.events.find((e) => e.kind === "duel" && e.lap === m.lap && (e.a === m.car || e.b === m.car));
+                const showAt = dEv ? dEv.t + 2 : runner.state.cars[m.car].cum;
+                setZoomAt((z) => (z ? { ...z, until: Math.max(z.t + 20, showAt + 10) } : z));
+                setBanner({ t: showAt, node: <Outcome m={m} label={label} q={q} before={before} after={after} duel={duel} other={m.vs !== undefined ? codeOf(m.vs) : undefined} /> });
                 refresh();
                 setPend(runner.pending());
               }}
@@ -343,6 +365,53 @@ export function LiveRace() {
           ) : null
         }
       />
+    </div>
+  );
+}
+
+/** How a key moment went, big and plain: did the move work, how well you executed it, places gained or lost. */
+function Outcome({ m, label, q, before, after, duel, other }: { m: PendingMoment; label: string; q?: number; before: number; after: number; duel?: { passed: boolean; contact: boolean }; other?: string }) {
+  const attack = m.kind !== "defend";
+  const [title, tone, line] = duel
+    ? duel.contact
+      ? ["Contact", "bg-rose-600", attack ? `You and ${other} touched.` : `${other} hit you.`]
+      : attack
+        ? duel.passed
+          ? ["Overtake done", "bg-emerald-500", `Past ${other}.`]
+          : ["Held up", "bg-amber-400", `${other} kept you behind.`]
+        : duel.passed
+          ? ["Passed", "bg-amber-400", `${other} got by.`]
+          : ["Defended", "bg-emerald-500", `${other} stays behind.`]
+    : after < before
+      ? ["It worked", "bg-emerald-500", `Up ${before - after} place${before - after > 1 ? "s" : ""} this lap.`]
+      : after > before
+        ? ["It cost you", "bg-rose-600", `Down ${after - before} place${after - before > 1 ? "s" : ""} this lap.`]
+        : ["Done", "bg-slate-300", "Position held this lap."];
+  return (
+    <div className="flex flex-wrap items-stretch overflow-hidden rounded-lg border border-ink-600 bg-ink-900">
+      <div className={`flex items-center px-6 py-4 ${tone}`}>
+        <div className="font-display text-4xl font-black uppercase leading-none text-ink-950 sm:text-5xl">{title}</div>
+      </div>
+      <div className="flex flex-1 flex-wrap items-center gap-x-8 gap-y-2 px-6 py-3">
+        <div>
+          <div className="kicker">{label}</div>
+          <div className="text-lg text-white">{line}</div>
+        </div>
+        {q !== undefined && (
+          <div>
+            <div className="kicker">Your braking</div>
+            <div className={`font-display text-3xl font-black ${verdictColor(q)}`}>
+              {verdict(q)} {Math.round(q * 100)}%
+            </div>
+          </div>
+        )}
+        <div>
+          <div className="kicker">Position</div>
+          <div className="font-display text-3xl font-black text-white">
+            P{before} <span className="text-slate-500">›</span> <span className={after < before ? "text-emerald-300" : after > before ? "text-rose-300" : ""}>P{after}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,8 @@ export function RaceViewer({
   follow0 = null,
   overlay,
   marks,
+  focus,
+  banner,
 }: {
   world: World;
   replay: Replay;
@@ -33,6 +35,8 @@ export function RaceViewer({
   follow0?: number | null;
   overlay?: ReactNode; // a moment card over the track (the race is frozen while it shows)
   marks?: { a: number; b?: number; role?: "attack" | "defend" } | null;
+  focus?: { t: number; cars: number[]; until?: number } | null; // a key moment: play it at 1x and zoom in on these cars
+  banner?: { t: number; node: ReactNode } | null; // how it went, shown once the screen gets there
 }) {
   const track = useTrack(replay.circuitId);
   const ix = useMemo(() => indexReplay(replay, !!live), [replay, live]);
@@ -53,6 +57,20 @@ export function RaceViewer({
   const [follow, setFollow] = useState<number | null>(follow0);
   const tRef = useRef(t);
   tRef.current = t;
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
+  const near = (x: number) => !!focus && x > focus.t - 30 && x < (focus.until ?? focus.t + 40); // race seconds around the moment
+  // the result stays up for a few real seconds, whatever the speed
+  const [shown, setShown] = useState<{ b: unknown; at: number } | null>(null);
+  useEffect(() => {
+    if (banner && t >= banner.t && shown?.b !== banner) setShown({ b: banner, at: performance.now() });
+  }, [banner, t, shown]);
+  useEffect(() => {
+    if (!shown) return;
+    const id = window.setTimeout(() => setShown((x) => (x === shown ? { ...x, at: -1e9 } : x)), 7000);
+    return () => clearTimeout(id);
+  }, [shown]);
+  const bannerOn = !!banner && shown?.b === banner && performance.now() - shown.at < 7000;
 
   // clock
   useEffect(() => {
@@ -64,7 +82,9 @@ export function RaceViewer({
       last = now;
       const v = viewAt(ix, Math.max(0, tRef.current));
       const slow = v.lap >= replay.laps - 1 && v.flag !== "chequered" ? 0.6 : 1; // the last laps play slower
-      let next = Math.min(ix.end, tRef.current + dt * BASE_RATE * speed * slow);
+      const f = focusRef.current;
+      const sp = f && tRef.current > f.t - 30 && tRef.current < (f.until ?? f.t + 40) ? Math.min(speed, 1) : speed; // a moment plays at 1x
+      let next = Math.min(ix.end, tRef.current + dt * BASE_RATE * sp * slow);
       if (live) next = Math.min(next, live.advance(next));
       setT(next);
       if (next >= ix.end) setPlaying(false);
@@ -153,7 +173,13 @@ export function RaceViewer({
           );
         })()}
         <div className="relative">
-          <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} />
+          <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} zoomOn={near(t) ? focus!.cars : null} />
+          {near(t) && !overlay && <div className="pointer-events-none absolute left-4 top-4 rounded-md bg-race px-3 py-1 font-display text-lg font-black uppercase tracking-wider text-white">Key moment · 1x</div>}
+          {bannerOn && !overlay && (
+            <div className="absolute inset-x-0 bottom-0 cursor-pointer p-3 sm:p-4" onClick={() => setShown((x) => (x ? { ...x, at: -1e9 } : x))}>
+              {banner!.node}
+            </div>
+          )}
           {overlay && <div className="absolute inset-x-0 bottom-0 max-h-full overflow-y-auto p-3 sm:p-4">{overlay}</div>}
         </div>
         {!live && <div className="px-3 py-2 border-t border-ink-800">
@@ -338,14 +364,38 @@ function TrackCanvas({
   cars,
   follow,
   marks,
+  zoomOn,
 }: {
   track: TrackFile | null;
   view: RaceView;
   cars: { code: string; color: string; color2: string }[];
   follow: number | null;
   marks: { a: number; b?: number; role?: "attack" | "defend" } | null;
+  zoomOn?: number[] | null;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // zoom eases in and out (its own frames, so it moves while the picture is frozen too)
+  const ZMAX = 2.8;
+  const [z, setZ] = useState(1);
+  const zRef = useRef(1);
+  const focusPt = useRef<[number, number] | null>(null);
+  const target = zoomOn?.length ? ZMAX : 1;
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const d = target - zRef.current;
+      if (Math.abs(d) < 0.01) {
+        zRef.current = target;
+        setZ(target);
+        return;
+      }
+      zRef.current += d * 0.08;
+      setZ(zRef.current);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 520 });
 
@@ -374,8 +424,19 @@ function TrackCanvas({
     const s = Math.min((size.w - pad * 2) / track.w, (size.h - pad * 2) / track.h);
     const ox = (size.w - track.w * s) / 2;
     const oy = (size.h - track.h * s) / 2;
-    const P = (p: [number, number]): [number, number] => [ox + p[0] * s, oy + p[1] * s];
     const pts = track.pts;
+    // zoom: the moment's cars move toward the middle as the picture grows
+    if (zoomOn?.length) {
+      const fs = zoomOn.map((i) => view.cars.find((c) => c.idx === i)).filter(Boolean).map((c) => trackPoint(pts, c!.frac));
+      if (fs.length) focusPt.current = [fs.reduce((a, p) => a + p[0], 0) / fs.length, fs.reduce((a, p) => a + p[1], 0) / fs.length];
+    }
+    const k = (z - 1) / (ZMAX - 1);
+    const F = focusPt.current ?? [track.w / 2, track.h / 2];
+    const Fx = ox + F[0] * s;
+    const Fy = oy + F[1] * s;
+    const Cx = Fx + (size.w / 2 - Fx) * k;
+    const Cy = Fy + (size.h * 0.3 - Fy) * k; // above the moment card
+    const P = (p: [number, number]): [number, number] => [Cx + (ox + p[0] * s - Fx) * z, Cy + (oy + p[1] * s - Fy) * z];
 
     // which side is "inside" (for the pit lane): the side toward the centroid
     const n = pts.length;
@@ -409,7 +470,7 @@ function TrackCanvas({
     });
     g.closePath();
     g.strokeStyle = "#2a303b";
-    g.lineWidth = Math.max(12, 16 * s * 2.1);
+    g.lineWidth = Math.max(12, 16 * s * 2.1) * z;
     g.stroke();
     g.strokeStyle = "#3a4250";
     g.lineWidth = 1.5;
@@ -471,7 +532,7 @@ function TrackCanvas({
       const b = offset(frac + 0.003, by);
       return Math.atan2(b[1] - a[1], b[0] - a[0]);
     };
-    const carScale = Math.max(0.9, Math.min(2, size.w / 520));
+    const carScale = Math.max(0.9, Math.min(2, size.w / 520)) * Math.sqrt(z);
 
     // safety car ahead of the leader
     if (view.flag === "sc" && view.cars[0]) {
@@ -560,7 +621,7 @@ function TrackCanvas({
         }
       }
     }
-  }, [track, view, cars, size, follow, marks]);
+  }, [track, view, cars, size, follow, marks, z, zoomOn]);
 
   return (
     <div ref={wrap} className="w-full bg-ink-950" style={{ height: size.h }}>
