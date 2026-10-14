@@ -558,7 +558,8 @@ function TrackCanvas({
       let lateral = 0;
       // side by side: nudge cars that sit on top of each other
       const near = drawn.filter((d) => Math.abs(d.f - c.frac) < 0.0035).length;
-      if (near) lateral = (near % 2 ? 1 : -1) * Math.ceil(near / 2) * 9 * carScale;
+      // in track units (the road is about 17 either side of the centre): fixed, so zooming never pushes a car off the road
+      if (near) lateral = (near % 2 ? 1 : -1) * Math.min(12, Math.ceil(near / 2) * 7);
       drawn.push({ f: c.frac });
       const by = c.pit ? 26 : lateral;
       const [x, y] = offset(c.frac, by);
