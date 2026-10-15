@@ -39,6 +39,44 @@ function Screen({ children, onClose, cta }: { children: ReactNode; onClose: () =
 
 const ratingTone = (r: number) => (r >= 8 ? "#34d399" : r >= 6.5 ? "#e2e8f0" : r >= 5 ? "#fbbf24" : "#fb7185");
 
+type ResultKind = "won" | "podium" | "points" | "none" | "dnf";
+const HOME_LINES: Record<ResultKind, { parent: string[]; partner: string[] }> = {
+  won: {
+    parent: ["We screamed at the TV!", "Your dad is crying. I am fine. Call us.", "That was beautiful. We are so proud."],
+    partner: ["I knew it. I knew it. Call me.", "I am shaking. You won.", "Come home a winner this week."],
+  },
+  podium: {
+    parent: ["A podium! We stood up in the living room.", "We do not mind which step. You were up there.", "Send us a photo with the trophy."],
+    partner: ["You looked so happy up there.", "Podium. I am proud of you.", "Save me a sip of the champagne."],
+  },
+  points: {
+    parent: ["Points! Your dad has told the neighbours already.", "We saw the flag. Well done, love.", "That is a proper result. Sleep well."],
+    partner: ["Points in the bag. Dinner is on me when you are back.", "I watched the last ten laps standing up.", "Good day. Text me when you are out of the car."],
+  },
+  none: {
+    parent: ["Are you alright? You looked cross at the end.", "Next week. We still love watching.", "Eat something. Then tell us about it."],
+    partner: ["Rough one. I am here when you want to talk.", "Forget the result. Call me later.", "I saw it. You drove well anyway."],
+  },
+  dnf: {
+    parent: ["We saw you get out. Are you hurt?", "Call us. We just need to hear your voice.", "The car stopped and we are worried. Phone home."],
+    partner: ["Tell me you are okay. Please.", "I do not care about the race. Are you alright?", "Watching you walk away was horrible. Call me."],
+  },
+};
+
+/** One text after the race, from a partner or a parent. The round picks the line, so a replay shows the same one. */
+function homeText(world: World, kind: ResultKind): { name: string; text: string } | null {
+  const people = careerOf(world)?.life?.people;
+  if (!people) return null;
+  const partner = people.find((p) => p.role === "partner");
+  const parent = people.find((p) => p.role === "mum") ?? people.find((p) => p.role === "dad");
+  const who = [partner, parent].filter((p) => !!p);
+  if (!who.length) return null;
+  const i = world.results.length;
+  const person = who[i % who.length];
+  const lines = HOME_LINES[kind][person.role === "partner" ? "partner" : "parent"];
+  return { name: person.name, text: lines[i % lines.length] };
+}
+
 function Debrief({ world, saveId }: { world: World; saveId: string }) {
   const c = careerOf(world);
   const d = meOf(world);
@@ -93,6 +131,17 @@ function Debrief({ world, saveId }: { world: World; saveId: string }) {
           </div>
         ))}
       </div>
+      {(() => {
+        const kind: ResultKind = !finished ? "dnf" : r.pos === 1 ? "won" : r.pos <= 3 ? "podium" : r.pos <= 10 ? "points" : "none";
+        const note = homeText(world, kind);
+        if (!note) return null;
+        return (
+          <div className="mt-8 max-w-md">
+            <div className="mb-1 text-sm font-bold uppercase tracking-wide text-slate-400">{note.name}</div>
+            <div className="inline-block max-w-full rounded-3xl rounded-bl-md bg-ink-800 px-4 py-2.5 text-lg leading-snug text-slate-100">{note.text}</div>
+          </div>
+        );
+      })()}
       {c.points > 0 && <p className="mt-6 text-lg text-slate-300">You have {c.points} upgrade point{c.points === 1 ? "" : "s"} to spend in Training.</p>}
     </Screen>
   );
