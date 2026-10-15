@@ -1,7 +1,7 @@
 // Drive the next round live: pick a car, then the race runs lap by lap as you watch, with the pit wall for
 // your car. Saving replays the race in the worker from the same input and your commands, so it comes out
 // exactly as you saw it.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { createRace, type RaceRunner } from "../../engine/race/race";
 import type { RaceInput } from "../../engine/race/race";
@@ -28,6 +28,7 @@ import { gripOf } from "../race/drive";
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
 import { TeamBar, TrackOutline, useMaps } from "../components/bits";
 
+const Start3D = lazy(() => import("../race/cockpit/Start3D")); // three.js only when the start opens in 3D
 const PICK_KEY = "paddock.liveDriver";
 const topHabit = (w: Record<string, number>) => Object.entries(w).sort((a, b) => b[1] - a[1])[0]?.[0];
 const MOMENTS_KEY = "paddock.moments";
@@ -111,6 +112,7 @@ export function LiveRace() {
   const [tab, setTab] = useState(0);
   const [mode, setMode] = useState<MomentMode>(readMode);
   const [view, setView] = useState<MomentsView>(readMomentsView);
+  const [flatStart, setFlatStart] = useState(false); // the 3D start's "Simple view"
   const [pend, setPend] = useState<PendingMoment | null>(null);
   const [zoomAt, setZoomAt] = useState<{ t: number; cars: number[]; until?: number } | null>(null); // the last moment: 1x + zoom
   const [banner, setBanner] = useState<{ t: number; node: ReactNode } | null>(null); // how it went
@@ -282,7 +284,21 @@ export function LiveRace() {
           )}
         </div>
         <div>
-          {startGame && (
+          {startGame && view === "cockpit" && !flatStart && (
+            <Suspense fallback={null}>
+              <Start3D
+                trackId={circuit.id}
+                km={circuit.km}
+                target={circuit.base - 0.4}
+                grid={entries.filter((e) => e.grid > 0).map((e) => ({ slot: e.grid, color: team(e.teamId)?.color ?? "#94a3b8" }))}
+                mySlot={entries[chosen]?.grid || entries.length}
+                myColor={team(entries[chosen]?.teamId ?? "")?.color ?? "#e10600"}
+                onSimple={() => setFlatStart(true)}
+                onDone={(q, jumped) => (setStartGame(false), start({ [chosen]: jumped ? -1 : q }))}
+              />
+            </Suspense>
+          )}
+          {startGame && (view !== "cockpit" || flatStart) && (
             <Reaction
               kicker={`${circuit.gp} · the start`}
               cta="Race ›"
