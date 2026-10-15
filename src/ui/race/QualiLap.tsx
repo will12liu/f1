@@ -548,6 +548,12 @@ export function QualiLap({
       <div className="relative min-h-0 flex-1 select-none overflow-hidden" style={{ touchAction: "none" }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
         <div ref={host} className="absolute inset-0" />
         <canvas ref={ref} className="relative h-full w-full" />
+        {onboard && (
+          <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 60" preserveAspectRatio="none">
+            <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
+            <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
+          </svg>
+        )}
         {phase === "wait" && (
           <div className="absolute inset-x-0 bottom-0 bg-ink-950/90 p-6 text-center">
             <div className="headline text-5xl">Drive the lap</div>
