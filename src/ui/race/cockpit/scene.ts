@@ -266,3 +266,69 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
     },
   };
 }
+
+/** The whole race from one car (the race view's "Onboard"): every car placed from the replay (lap fraction,
+ *  racing line, pairs that are close side by side), the camera in the followed car. */
+export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: string[]) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+  renderer.domElement.style.position = "absolute";
+  renderer.domElement.style.inset = "0";
+  el.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  sky(scene, trackId);
+  const size = Math.max(g.w, g.h) * g.m;
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(size * 3, size * 3), new THREE.MeshLambertMaterial({ color: groundOf(trackId) }));
+  grass.rotation.x = -Math.PI / 2;
+  grass.position.set((g.w / 2) * g.m, -0.03, (g.h / 2) * g.m);
+  scene.add(grass);
+  scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g), trackId));
+  const cars = colors.map((c) => {
+    const m = car(c);
+    scene.add(m);
+    return m;
+  });
+  const cam = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
+  let w = 0;
+  let h = 0;
+  let inside = -1;
+  return {
+    draw(list: { idx: number; frac: number; pit: boolean; out: boolean }[], follow: number) {
+      if (el.clientWidth !== w || el.clientHeight !== h) {
+        w = el.clientWidth;
+        h = el.clientHeight;
+        renderer.setSize(w, h);
+        cam.aspect = w / h;
+        cam.updateProjectionMatrix();
+      }
+      if (inside !== follow) {
+        for (const [i, m] of cars.entries()) for (const c of m.children) if (c.name === "halo") c.visible = i !== follow;
+        inside = follow;
+      }
+      // along the lap, then cars within a car length or two of the one ahead move across
+      const on = list.filter((c) => !c.pit).map((c) => ({ ...c, d: c.frac * g.len })).sort((a, b) => b.d - a.d);
+      let side = 1;
+      for (const [k, c] of on.entries()) {
+        const near = k > 0 && (on[k - 1].d - c.d) * g.m < 7;
+        side = near ? -side : 1;
+        const x = at(g, g.line, c.d) * 0.6 + (near ? side * 0.45 : 0);
+        const f = frame(g, c.d, Math.max(-1, Math.min(1, x)));
+        const m = cars[c.idx];
+        if (!m) continue;
+        m.visible = true;
+        m.position.set(f.px, 0, f.pz);
+        m.rotation.y = f.yaw;
+        if (c.idx === follow) {
+          cam.position.set(f.px + f.dx * 0.35, 1.0, f.pz + f.dz * 0.35);
+          cam.lookAt(f.px + f.dx * 30, 0.55, f.pz + f.dz * 30);
+        }
+      }
+      for (const c of list) if (c.pit && cars[c.idx]) cars[c.idx].visible = false;
+      renderer.render(scene, cam);
+    },
+    dispose() {
+      renderer.dispose();
+      renderer.domElement.remove();
+    },
+  };
+}

@@ -1,6 +1,6 @@
 // The 2D race: a canvas track with every car, a timing tower and an event feed, replayed from a
 // Replay at a chosen speed. The engine already decided everything; this only asks `viewAt(t)`.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { COMPOUNDS } from "../../engine/race/model";
 import { ATTACK_LABEL, DEFEND_LABEL } from "../../engine/race/moments";
 import { indexReplay, trackPoint, viewAt, type RaceView } from "../../engine/race/replay";
@@ -11,6 +11,7 @@ import { Radio } from "./Radio";
 import type { Forecast } from "../../engine/race/dials";
 
 const SPEEDS = [1, 2, 4, 8, 16];
+const RaceOnboard = lazy(() => import("./cockpit/RaceOnboard")); // three.js only once you ride onboard
 const BASE_RATE = 6; // race seconds per real second at 1x
 
 /** A race still being run: the viewer asks it to run far enough to show time `t`. */
@@ -58,6 +59,23 @@ export function RaceViewer({
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(4);
   const [showInterval, setShowInterval] = useState(false);
+  const [onboard, setOnboard] = useState(() => {
+    try {
+      return localStorage.getItem("paddock.raceOnboard") === "on";
+    } catch {
+      return false;
+    }
+  });
+  const toggleOnboard = () =>
+    setOnboard((v) => {
+      try {
+        localStorage.setItem("paddock.raceOnboard", v ? "off" : "on");
+      } catch {
+        /* private mode */
+      }
+      return !v;
+    });
+  const circ = world.circuits.find((c) => c.id === replay.circuitId);
   const [follow, setFollow] = useState<number | null>(follow0);
   const tRef = useRef(t);
   tRef.current = t;
@@ -133,6 +151,11 @@ export function RaceViewer({
                 {s}x
               </button>
             ))}
+            {follow !== null && circ && (
+              <button onClick={toggleOnboard} className={`btn !px-3 !py-2 !text-base ${onboard ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`} title="Ride along with the car you follow, in 3D">
+                Onboard
+              </button>
+            )}
             <button className="btn-ghost !px-3 !py-2 !text-base" onClick={() => jumpLap(1)} title="Next lap">
               +1 lap
             </button>
@@ -178,6 +201,11 @@ export function RaceViewer({
         })()}
         <div className="relative">
           <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} zoomOn={near(t) ? focus!.cars : null} />
+          {onboard && follow !== null && circ && (
+            <Suspense fallback={null}>
+              <RaceOnboard trackId={circ.id} km={circ.km} target={circ.base - 0.4} colors={cars.map((c) => c.color)} view={view} follow={follow} code={cars[follow]?.code ?? ""} />
+            </Suspense>
+          )}
           {radio && radio.car >= 0 && <Radio replay={replay} view={view} t={t} car={radio.car} code={cars[radio.car]?.code ?? ""} engineer={radio.engineer} forecast={radio.forecast} />}
           {near(t) && !overlay && !bannerOn && <div className="pointer-events-none absolute bottom-4 left-4 rounded-md bg-race px-3 py-1 font-display text-lg font-black uppercase tracking-wider text-white">Key moment · 1x</div>}
           {bannerOn && !overlay && (

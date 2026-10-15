@@ -89,4 +89,5 @@ Browser Formula 1 career game, built like the NBA GM game (`/Users/williamliu/Co
 ## 2D race view (src/ui/race/RaceViewer.tsx)
 - Tracks: evenly resampled polylines (index 0 = start/finish), corners as lap fractions. Positions come from each car's lap-end times (`lapEnd`) interpolated; pit laps spend their pit time in the pit lane at the end of the lap; retirements stop where they happened.
 - The track takes most of the screen (height from the viewport, cars scale with width); the followed car gets a TV-style strip (position, gap ahead/behind, tyre, stops); moment cards sit over the bottom of the track; live and watch pages go wider (2200px).
+- "Onboard" (shown once you follow a car, saved): rides along in 3D (`cockpit/RaceOnboard.tsx`, `scene.ts` `raceOnboard`, lazy three.js) over the map; every car placed from the view (lap fraction on the racing line, close pairs side by side, pit stops hidden).
 - Timing tower uses crossing times (gap to leader / interval), tyres, stops. Speeds 1x-16x (1x = 6 race seconds per second), last laps slow down, scrubber, +1 lap, skip to the flag, click a car to follow it.
