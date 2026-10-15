@@ -95,6 +95,10 @@ export default function Cockpit3D(p: CockpitProps) {
     let audio: AudioContext | null = null;
     let osc: OscillatorNode | null = null;
     let vol: GainNode | null = null;
+    let squeal: OscillatorNode | null = null;
+    let squealVol: GainNode | null = null;
+    let rumble: OscillatorNode | null = null;
+    let rumbleVol: GainNode | null = null;
     if (soundOn()) {
       try {
         audio = new AudioContext();
@@ -107,6 +111,21 @@ export default function Cockpit3D(p: CockpitProps) {
         vol.gain.value = 0.04;
         osc.connect(lp).connect(vol).connect(audio.destination);
         osc.start();
+        // the limit, heard: tyres squeal near the edge of grip, the kerbs rumble
+        squeal = audio.createOscillator();
+        squeal.type = "triangle";
+        squeal.frequency.value = 1150;
+        squealVol = audio.createGain();
+        squealVol.gain.value = 0;
+        squeal.connect(squealVol).connect(audio.destination);
+        squeal.start();
+        rumble = audio.createOscillator();
+        rumble.type = "square";
+        rumble.frequency.value = 38;
+        rumbleVol = audio.createGain();
+        rumbleVol.gain.value = 0;
+        rumble.connect(rumbleVol).connect(audio.destination);
+        rumble.start();
       } catch {
         audio = null;
       }
@@ -182,6 +201,8 @@ export default function Cockpit3D(p: CockpitProps) {
         renderer.setViewport(0, 0, w, h);
         renderer.render(scene, tv);
         osc?.frequency.setTargetAtTime(60, audio!.currentTime, 0.1);
+        squealVol?.gain.setTargetAtTime(0, audio!.currentTime, 0.05);
+        rumbleVol?.gain.setTargetAtTime(0, audio!.currentTime, 0.05);
         return;
       }
       // the driver's eyes: low, in front of the airbox, the nose and front wheels below
@@ -214,6 +235,9 @@ export default function Cockpit3D(p: CockpitProps) {
         const hi = GEARS[gr] ?? 345;
         const rev = Math.max(0, Math.min(1, (kmh - lo) / (hi - lo)));
         osc.frequency.setTargetAtTime(s.result ? 90 : 140 + 260 * rev + gr * 12, audio.currentTime, 0.03);
+        const live = !s.result && s.me.v > 8;
+        squealVol?.gain.setTargetAtTime(live ? Math.max(0, Math.min(1, (s.me.use - 0.88) / 0.12)) * 0.025 : 0, audio.currentTime, 0.05);
+        rumbleVol?.gain.setTargetAtTime(live && s.me.surface !== "track" ? 0.05 : 0, audio.currentTime, 0.03);
       }
       if (now - hudAt > 80) {
         hudAt = now;

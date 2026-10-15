@@ -27,6 +27,7 @@ export const RACE = {
   launchSd: 0.2,
   crewMid: 0.6, // pit-stop mini-game: a score of 0.6 is an average stop
   crewSpread: 1.5, // seconds per point of score: a perfect stop -0.6s, a botched one +0.9s
+  restartSkill: 0.8, // seconds between a perfect and a missed restart (the Go bar on the restart call): q 1 gains 0.4 s, q 0 loses 0.4 s
   launchSkill: 0.5, // the player's reaction start: a perfect launch gains 0.25s, a slow one loses 0.25s
   slowStop: 0.035,
   scLapFactor: 1.38,

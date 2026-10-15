@@ -85,6 +85,37 @@ describe("key moments", () => {
     expect(JSON.stringify(again.result)).toBe(JSON.stringify(good.r.result));
   });
 
+  it("the restart's Go bar: a sharp getaway is quicker that lap than a slow one, and it replays", () => {
+    // every moment on instinct except the restart call, answered with a Go score
+    const run = (seed: number, q: number) => {
+      const r = createRace(input(seed, { focus: [8, 9, 10, 11], moments: "all" }));
+      let hit: { lap: number; car: number } | null = null;
+      while (!r.done()) {
+        r.step();
+        const m = r.pending();
+        if (!m) continue;
+        if (m.sit === "restart" && !hit) {
+          hit = { lap: m.lap, car: m.car };
+          r.choose("neutral", q);
+        } else r.choose("auto");
+      }
+      return { r, hit };
+    };
+    let tested = 0;
+    for (let seed = 600; seed < 640 && tested < 3; seed++) {
+      const good = run(seed, 1);
+      if (!good.hit) continue;
+      const bad = run(seed, 0);
+      const { lap, car } = good.hit;
+      const lapTime = (x: typeof good) => x.r.state.lapEnd[car][lap] - x.r.state.lapEnd[car][lap - 1];
+      expect(lapTime(good)).toBeLessThan(lapTime(bad));
+      const again = simRace(input(seed, { focus: [8, 9, 10, 11], moments: "all", choices: good.r.state.choices, commands: good.r.state.commands }));
+      expect(JSON.stringify(again.result)).toBe(JSON.stringify(good.r.result()));
+      tested++;
+    }
+    expect(tested).toBeGreaterThan(0);
+  }, 30_000);
+
   it("answering every moment with instinct gives exactly the race nobody played", () => {
     const { r } = play(22, [5], () => "auto");
     const plain = simRace(input(22));

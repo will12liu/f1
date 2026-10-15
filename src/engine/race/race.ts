@@ -539,6 +539,8 @@ export function createRace(input: RaceInput): RaceRunner {
       });
       const o = s.calls.find((x) => x.id === opt);
       if (!o) continue;
+      // the restart's Go bar: a sharp getaway gains a little time on this lap, a slow one loses it (no draws)
+      if (s.id === "restart" && lastQ !== undefined) lose(car, (0.5 - lastQ) * RACE.restartSkill);
       if (o.dials) {
         car.ctl = true;
         car.dials = { ...car.dials, ...o.dials };

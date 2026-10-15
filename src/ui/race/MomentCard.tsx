@@ -29,7 +29,7 @@ export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPi
   const pick = (id: string) => {
     const o = m.opts.find((x) => x.id === id);
     if (!o || o.disabled) return;
-    const zone = m.kind === "call" ? null : zoneFor(id);
+    const zone = m.kind === "call" ? (m.sit === "restart" ? zoneFor("restart") : null) : zoneFor(id);
     if (zone) setExec({ id, label: o.label, zone });
     else onPick(id);
   };

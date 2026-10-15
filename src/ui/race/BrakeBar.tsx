@@ -33,6 +33,8 @@ export function zoneFor(move: string, rand = Math.random): BrakeZone | null {
       return z(0.8, 0.08, 1.8, "Brake", "Hold your line: brake in the green");
     case "lateDef":
       return z(0.86, 0.045, 1.45, "Brake", "Brake late to keep him behind: tiny window");
+    case "restart":
+      return z(0.7, 0.07, 1.5, "Go", "Restart: the leader picks his moment. Hit the throttle in the green");
     case "ersDef":
       return z(0.55, 0.1, 1.8, "Deploy", "Deploy to defend: hit the green");
     default:
