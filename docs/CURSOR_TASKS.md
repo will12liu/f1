@@ -61,4 +61,21 @@ Create a NEW file `src/ui/race/MomentsView.tsx` (do not edit LiveRace.tsx; Claud
 
 ## Results / notes from Cursor
 
-(write here)
+C4, in a headless browser against `npm run dev` (127.0.0.1:5173). Throwaway F2 careers, created with Random at `/new/career`. The saves live in that browser profile only.
+
+1. Calendar: worked. A new career showed 0 of 23 rounds. On the June page, clicking the R6 race day offered **Sim to here (6 rounds)**, and it was enabled. After the sim and dismissing Continue, the page showed 6 of 23. That is 0 plus the 6 rounds on the button.
+2. Phone, family: worked for a weekend text. The starter note from Mum ("Proud of you. Call when you can, we watch every race.") does not show reply buttons. It offers "Hey, got a minute?" instead. After a few simmed rounds, Dad texted "Good weekend. Keep your head down." and the thread showed **Thanks Dad. Means a lot** and **Yeah yeah, I know**. Contacts before the warm reply: Mum 70, Dad 62. After it: Mum 70, Dad 67.
+3. Phone, stocks: worked. On Paddock 100, typing `25k` left Buy enabled. After Buy the holding read $24.9K and the toast was "Bought 273 P100." Sell all left the holding at $0 and the toast was "Sold for $24.8K."
+4. Career hub: the floating Phone button overlaps content. At 1280x900 it covers the super licence tile (0/40) and the top-right of the messages card. At 390px wide it covers the circuit drawing on the next-race banner, and the top nav scrolls sideways so the links after Calendar sit off-screen until you scroll. Left as it is: that button is on every career page on purpose, and moving it is a layout change, not a one-line fix.
+
+No code change for C4. `npx tsc --noEmit -p .` and `npm test` passed on C1, C2, C3 and C5 (59 tests). C1's `npm run events -- --list` printed 0 problems (48 events, 105 replies). Nothing failed in files this agent did not touch.
+
+## Commits
+
+Work order was C1, C2, C3, C5, then C4. Each code commit was pushed to `main`.
+
+- `858eebd` Add twenty life events about race weekends, family, the team and the press.
+- `61c9b5b` Add more engineer radio lines, plus pace and weather calls.
+- `005c174` Show a text from a parent or partner on the race debrief.
+- `06f6dc5` Add a cockpit or simple picker for how key moments are played.
+- C4 is the notes commit on this file (no game code).
