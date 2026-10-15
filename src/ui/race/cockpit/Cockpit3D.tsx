@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
-import { build, GEARS, gearOf } from "../drive";
+import { build, GEARS, gearOf, HALF_M } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
 import { car, frame, road } from "./scene";
 
@@ -44,6 +44,9 @@ export default function Cockpit3D(p: CockpitProps) {
   const [hud, setHud] = useState({ kmh: 0, gear: 1, gap: 0, steer: 0, braked: false, go: false });
   const [res, setRes] = useState<{ q: number; why: string } | null>(null);
   const done = useRef(false);
+  const finished = useRef(false); // onResult sent
+  const replaying = useRef(false);
+  const [replay, setReplay] = useState(false);
   const [sound, setSound] = useState(soundOn); // takes effect next duel
 
   useEffect(() => {
@@ -116,6 +119,12 @@ export default function Cockpit3D(p: CockpitProps) {
     const t0 = last;
     let raf = 0;
     let hudAt = 0;
+    // a recording of both cars (60 a second) for the TV replay once it's decided
+    const rec: number[][] = [];
+    let n = 0;
+    let replayAt = 0;
+    const tv = new THREE.PerspectiveCamera(38, 1, 0.5, 1500);
+    const tvAt = frame(g, s.zone.apexD - 40 / g.m, -s.zone.turn * (1 + 26 / HALF_M)); // outside the corner, up on a gantry
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -132,22 +141,47 @@ export default function Cockpit3D(p: CockpitProps) {
           const brake = k.has("ArrowDown") || k.has("KeyS") || k.has("Space") || pd.brk ? 1 : 0;
           const throttle = !brake && (k.has("ArrowUp") || k.has("KeyW") || pd.gas) ? 1 : 0;
           stepDuel(s, { throttle, brake, steer }, STEP, p.grip ?? 1);
+          if (n++ % 2 === 0) rec.push([s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0, s.opp.d, s.opp.x]);
           if (s.result) break;
         }
         const r = s.result as Duel["result"]; // set inside stepDuel
         if (r && !done.current) {
           done.current = true;
           setRes(r);
-          const q = r.q;
-          window.setTimeout(() => p.onResult(q), 2200);
+          replayAt = now + 900; // a beat on the result, then the replay
         }
       }
-      const me = frame(g, s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0);
+      // the replay: the last five seconds from a TV camera at the corner, then back to the race
+      const rp = replayAt && now >= replayAt ? Math.floor(((now - replayAt) / 1000) * 60) : -1;
+      const from = Math.max(0, rec.length - 300);
+      if (rp >= 0 && from + rp >= rec.length + 60 && !finished.current) {
+        finished.current = true;
+        p.onResult(s.result!.q);
+      }
+      const at_ = rp >= 0 ? rec[Math.min(rec.length - 1, from + rp)] : null;
+      if (rp >= 0 && !replaying.current) {
+        replaying.current = true;
+        setReplay(true);
+      }
+      const me = at_ ? frame(g, at_[0], at_[1], at_[2]) : frame(g, s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0);
       mine.position.set(me.px, 0, me.pz);
       mine.rotation.y = me.yaw;
-      const o = frame(g, s.opp.d, s.opp.x);
+      const o = at_ ? frame(g, at_[3], at_[4]) : frame(g, s.opp.d, s.opp.x);
       opp.position.set(o.px, 0, o.pz);
       opp.rotation.y = o.yaw;
+      if (at_) {
+        const w = el.clientWidth;
+        const h = el.clientHeight;
+        tv.aspect = w / h;
+        tv.updateProjectionMatrix();
+        tv.position.set(tvAt.px, 9, tvAt.pz);
+        tv.lookAt((me.px + o.px) / 2, 0.5, (me.pz + o.pz) / 2);
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, w, h);
+        renderer.render(scene, tv);
+        osc?.frequency.setTargetAtTime(60, audio!.currentTime, 0.1);
+        return;
+      }
       // the driver's eyes: low, in front of the airbox, the nose and front wheels below
       cam.position.set(me.px + me.dx * 0.35, 1.0, me.pz + me.dz * 0.35);
       cam.lookAt(me.px + me.dx * 30, 0.55, me.pz + me.dz * 30);
@@ -223,6 +257,8 @@ export default function Cockpit3D(p: CockpitProps) {
     <div className="fixed inset-0 z-[60] bg-ink-950">
       <div ref={host} className="absolute inset-0" />
       {!track && <div className="absolute inset-0 grid place-items-center text-2xl text-slate-400">Loading the track...</div>}
+      {!replay && (
+        <>
       {/* halo */}
       <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 60" preserveAspectRatio="none">
         <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
@@ -254,6 +290,8 @@ export default function Cockpit3D(p: CockpitProps) {
         </div>
         <div className="mt-1 text-sm text-slate-400">Steer with A D or the arrows. Off the road or into him and it's over.</div>
       </div>
+        </>
+      )}
       <div className="absolute right-4 top-4 flex gap-2">
         <button
           onClick={() => {
@@ -273,7 +311,7 @@ export default function Cockpit3D(p: CockpitProps) {
         </button>
       </div>
       {!hud.go && track && <div className="pointer-events-none absolute inset-x-0 top-[38%] text-center font-display text-7xl font-black uppercase text-white">Ready</div>}
-      <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-between gap-3 md:hidden">
+      <div className={`pointer-events-none absolute inset-x-3 bottom-3 justify-between gap-3 md:hidden ${replay ? "hidden" : "flex"}`}>
         <div className="flex gap-2">
           {pad("l", "‹", "h-20 w-20")}
           {pad("r", "›", "h-20 w-20")}
@@ -283,11 +321,26 @@ export default function Cockpit3D(p: CockpitProps) {
           {pad("gas", "Gas", "h-20 w-20")}
         </div>
       </div>
+      {replay && (
+        <div className="absolute left-4 top-4 rounded-md bg-white px-3 py-1 font-display text-2xl font-black uppercase text-ink-950">Replay</div>
+      )}
       {res && (
-        <div className="absolute inset-x-0 top-[30%] mx-auto w-fit rounded-lg bg-ink-950/95 px-10 py-6 text-center">
+        <div className={`absolute inset-x-0 mx-auto w-fit rounded-lg bg-ink-950/95 px-10 py-6 text-center ${replay ? "bottom-6" : "top-[30%]"}`}>
           <div className={`font-display text-6xl font-black uppercase ${verdictColor(res.q)}`}>{verdict(res.q)}</div>
           <div className="mt-2 text-2xl font-bold text-white">{res.why}</div>
           <div className="mt-1 text-base text-slate-400">Score {Math.round(res.q * 100)}</div>
+          {replay && (
+            <button
+              className="btn-xl mt-4 bg-race text-white hover:bg-red-500"
+              onClick={() => {
+                if (finished.current) return;
+                finished.current = true;
+                p.onResult(res.q);
+              }}
+            >
+              Back to the race ›
+            </button>
+          )}
         </div>
       )}
     </div>
