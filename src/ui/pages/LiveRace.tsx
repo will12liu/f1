@@ -447,7 +447,7 @@ function Outcome({ m, label, q, before, after, duel, other }: { m: PendingMoment
         </div>
         {q !== undefined && (
           <div>
-            <div className="kicker">Your braking</div>
+            <div className="kicker">Your drive</div>
             <div className={`font-display text-3xl font-black ${verdictColor(q)}`}>
               {verdict(q)} {Math.round(q * 100)}%
             </div>

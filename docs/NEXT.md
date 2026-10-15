@@ -82,9 +82,11 @@ Duel moments open `MomentCard` -> pick a move -> `BrakeBar` (a flat timing bar).
 Built 2026-10-16 (Claude, see CLAUDE.md "Cockpit duels"): `src/ui/race/cockpit/` (`duel.ts` pure + tested at
 every circuit, `scene.ts` road/cars/sky/onboard, `Cockpit3D.tsx`), the TV replay after each duel, sound, mirrors,
 night races, phone pads + tilt, the moments-view picker on the pre-race screen, duel practice on the Training
-page, and an "Onboard" view for the qualifying lap. Still open: tune `duelScore` from real play (the user hasn't
-driven it yet), the 3D start (grid + lights gantry instead of the flat Reaction game), a better car model,
-scenery per circuit (walls at street tracks, trees), the duel at the corner where the fight actually is.
+page, and an "Onboard" view for the qualifying lap. Also built: the 3D start (`Start3D.tsx`: grid slot, field, gantry), the
+race view's "Onboard" ride-along (`RaceOnboard.tsx`), street-circuit scenery, the guide painted on the road in
+onboard qualifying. Still open: tune `duelScore` from real play (the user hasn't driven it yet), trees and
+landmarks per circuit, a better car model (wheels that turn, a livery stripe), the duel at the corner where the
+fight actually is, cars in the race onboard using real lateral positions (now: racing line + side-by-side nudge).
 
 ### 3. More skill in the race itself
 
