@@ -22,6 +22,7 @@ export interface CockpitProps {
   oppColor: string;
   onResult: (q: number) => void;
   onSimple: () => void; // fall back to the braking bar
+  simpleLabel?: string; // that button's text ("Quit" in practice)
   habit?: string; // the other driver's favourite duel move
   grip?: number; // from your driver's ratings (drive.ts gripOf)
 }
@@ -308,7 +309,7 @@ export default function Cockpit3D(p: CockpitProps) {
           {sound ? "Sound on" : "Sound off"}
         </button>
         <button onClick={p.onSimple} className="rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800">
-          Simple controls
+          {p.simpleLabel ?? "Simple controls"}
         </button>
       </div>
       {!hud.go && track && <div className="pointer-events-none absolute inset-x-0 top-[38%] text-center font-display text-7xl font-black uppercase text-white">Ready</div>}
