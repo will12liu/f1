@@ -8,7 +8,7 @@ import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
-import { car, frame, road } from "./scene";
+import { car, frame, road, sky } from "./scene";
 
 export interface CockpitProps {
   trackId: string;
@@ -64,12 +64,7 @@ export default function Cockpit3D(p: CockpitProps) {
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#9cc3e6");
-    scene.fog = new THREE.Fog("#9cc3e6", 180, 900);
-    scene.add(new THREE.HemisphereLight("#ffffff", "#4a6b3a", 1.6));
-    const sun = new THREE.DirectionalLight("#ffffff", 1.4);
-    sun.position.set(80, 200, 40);
-    scene.add(sun);
+    sky(scene, p.trackId);
     const f0 = frame(g, s.zone.brakeD, 0);
     const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: "#3f7a36", side: THREE.DoubleSide }));
     grass.rotation.x = -Math.PI / 2;

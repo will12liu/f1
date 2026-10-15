@@ -18,6 +18,21 @@ export function frame(g: Geo, d: number, x: number, slip = 0) {
   return { px, pz, nx, ny, dx, dz, yaw: Math.atan2(-dx, -dz) };
 }
 
+// races run under lights
+const NIGHT = new Set(["bahrain", "jeddah", "marina_bay", "vegas", "losail", "yas_marina"]);
+
+/** Sky, fog and light: day, or a floodlit night race. */
+export function sky(scene: THREE.Scene, trackId: string): void {
+  const night = NIGHT.has(trackId);
+  const air = night ? "#0b1220" : "#9cc3e6";
+  scene.background = new THREE.Color(air);
+  scene.fog = new THREE.Fog(air, night ? 120 : 180, night ? 600 : 900);
+  scene.add(new THREE.HemisphereLight(night ? "#c7d2fe" : "#ffffff", night ? "#1f2937" : "#4a6b3a", night ? 1.1 : 1.6));
+  const sun = new THREE.DirectionalLight(night ? "#fef3c7" : "#ffffff", night ? 1.0 : 1.4);
+  sun.position.set(80, 200, 40);
+  scene.add(sun);
+}
+
 /** A low-poly F1 car facing -z. The halo's meshes are named "halo" so an onboard camera can hide its own. */
 export function car(color: string, halo = true): THREE.Group {
   const grp = new THREE.Group();
@@ -151,19 +166,14 @@ export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn:
 
 /** An onboard view of a whole lap for the qualifying game: call draw() each frame with the car (and the
  *  ghost of your best lap, drawn see-through). */
-export function onboard(el: HTMLElement, g: Geo, color: string) {
+export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
   renderer.domElement.style.position = "absolute";
   renderer.domElement.style.inset = "0";
   el.prepend(renderer.domElement);
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#9cc3e6");
-  scene.fog = new THREE.Fog("#9cc3e6", 180, 900);
-  scene.add(new THREE.HemisphereLight("#ffffff", "#4a6b3a", 1.6));
-  const sun = new THREE.DirectionalLight("#ffffff", 1.4);
-  sun.position.set(80, 200, 40);
-  scene.add(sun);
+  sky(scene, trackId);
   const size = Math.max(g.w, g.h) * g.m;
   const grass = new THREE.Mesh(new THREE.PlaneGeometry(size * 3, size * 3), new THREE.MeshLambertMaterial({ color: "#3f7a36" }));
   grass.rotation.x = -Math.PI / 2;

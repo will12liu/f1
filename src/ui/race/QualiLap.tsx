@@ -106,7 +106,7 @@ export function QualiLap({
     const el = host.current;
     import("./cockpit/scene")
       .then(({ onboard: make }) => {
-        if (live) w3d.current = make(el, geo, color);
+        if (live) w3d.current = make(el, geo, color, trackId);
       })
       .catch(() => live && setOnboard(false));
     return () => {
