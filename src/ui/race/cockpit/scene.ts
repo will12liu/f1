@@ -174,6 +174,36 @@ export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn:
   return grp;
 }
 
+/** The guide for the qualifying lap: the racing line painted on the road, red where the reference lap brakes. */
+function guideMesh(g: Geo): THREE.Mesh {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const red = new THREE.Color("#ef4444");
+  const go = new THREE.Color("#a3e635");
+  const step = 3 / g.m;
+  for (let d = 0; d < g.len; d += step) {
+    const a = frame(g, d, at(g, g.line, d));
+    const b = frame(g, d + step, at(g, g.line, d + step));
+    const w = 0.35;
+    const v = [
+      [a.px + a.nx * w, 0.02, a.pz + a.ny * w],
+      [a.px - a.nx * w, 0.02, a.pz - a.ny * w],
+      [b.px - b.nx * w, 0.02, b.pz - b.ny * w],
+      [b.px + b.nx * w, 0.02, b.pz + b.ny * w],
+    ];
+    const i = Math.floor((d / g.len) * g.n) % g.n;
+    const c = g.ref.brake[i] ? red : go;
+    for (const k of [0, 1, 2, 0, 2, 3]) {
+      pos.push(...v[k]);
+      col.push(c.r, c.g, c.b);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+}
+
 /** An onboard view of a whole lap for the qualifying game: call draw() each frame with the car (and the
  *  ghost of your best lap, drawn see-through). */
 export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
@@ -202,11 +232,14 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
     }
   });
   scene.add(mine, ghost);
+  const guide = guideMesh(g);
+  scene.add(guide);
   const cam = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
   let w = 0;
   let h = 0;
   return {
-    draw(s: CarState, gp: { d: number; x: number } | null) {
+    draw(s: CarState, gp: { d: number; x: number } | null, showGuide = true) {
+      guide.visible = showGuide;
       if (el.clientWidth !== w || el.clientHeight !== h) {
         w = el.clientWidth;
         h = el.clientHeight;

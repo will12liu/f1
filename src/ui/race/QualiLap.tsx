@@ -95,7 +95,7 @@ export function QualiLap({
   const onboardRef = useRef(onboard);
   onboardRef.current = onboard;
   const host = useRef<HTMLDivElement>(null);
-  const w3d = useRef<{ draw: (s: CarState, gp: { d: number; x: number } | null) => void; dispose: () => void } | null>(null);
+  const w3d = useRef<{ draw: (s: CarState, gp: { d: number; x: number } | null, guide?: boolean) => void; dispose: () => void } | null>(null);
   const guideRef = useRef(true);
   guideRef.current = guide;
   const ctl = useRef(new Controls());
@@ -297,7 +297,7 @@ export function QualiLap({
         // onboard: three.js draws the world underneath, this canvas only the HUD
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, W, H);
-        w3.draw(s, gp);
+        w3.draw(s, gp, guideRef.current);
       } else {
       const view = 130 + kmh * 0.36;
       const scale = Math.min(W, H) / view;
