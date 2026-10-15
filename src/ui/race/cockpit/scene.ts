@@ -18,7 +18,8 @@ export function frame(g: Geo, d: number, x: number, slip = 0) {
   return { px, pz, nx, ny, dx, dz, yaw: Math.atan2(-dx, -dz) };
 }
 
-export function car(color: string): THREE.Group {
+/** A low-poly F1 car facing -z. The halo's meshes are named "halo" so an onboard camera can hide its own. */
+export function car(color: string, halo = true): THREE.Group {
   const grp = new THREE.Group();
   // double-sided: the mirrors render through a flipped camera
   const body = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
@@ -37,6 +38,23 @@ export function car(color: string): THREE.Group {
   box(1.0, 0.07, 0.45, 0, 0.95, 2.25, dark); // rear wing
   box(0.05, 0.6, 0.55, 0.5, 0.7, 2.25, dark);
   box(0.05, 0.6, 0.55, -0.5, 0.7, 2.25, dark);
+  box(1.4, 0.05, 3.6, 0, 0.07, 0.2, dark); // floor
+  box(0.04, 0.32, 1.3, 0, 1.0, 1.35, body); // engine cover fin
+  box(0.05, 0.22, 0.6, 0.95, 0.2, -3.1, dark); // front wing endplates
+  box(0.05, 0.22, 0.6, -0.95, 0.2, -3.1, dark);
+  const light = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.04), new THREE.MeshBasicMaterial({ color: "#ff2a2a" }));
+  light.position.set(0, 0.55, 2.5);
+  grp.add(light);
+  if (halo) {
+    // the halo: a hoop over the cockpit and the centre pillar
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.045, 6, 18, Math.PI), dark);
+    hoop.rotation.x = -Math.PI / 2;
+    hoop.position.set(0, 0.92, -0.25);
+    hoop.name = "halo";
+    grp.add(hoop);
+    box(0.07, 0.3, 0.07, 0, 0.78, -0.68, dark);
+    grp.children[grp.children.length - 1].name = "halo";
+  }
   for (const [x, z, r] of [[0.85, -1.75, 0.33], [-0.85, -1.75, 0.33], [0.85, 1.6, 0.36], [-0.85, 1.6, 0.36]]) {
     const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.4, 16), tyre);
     w.rotation.z = Math.PI / 2;
@@ -152,7 +170,7 @@ export function onboard(el: HTMLElement, g: Geo, color: string) {
   grass.position.set((g.w / 2) * g.m, -0.03, (g.h / 2) * g.m);
   scene.add(grass);
   scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g)));
-  const mine = car(color);
+  const mine = car(color, false);
   const ghost = car("#e2e8f0");
   ghost.traverse((o) => {
     const m = (o as THREE.Mesh).material as THREE.MeshLambertMaterial | undefined;

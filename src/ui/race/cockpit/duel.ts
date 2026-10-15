@@ -127,7 +127,7 @@ export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {
   const now = gapM(s);
   if (Math.abs(now) < Math.abs(s.minGap)) s.minGap = now;
   if (Math.abs(now) < LEN && Math.abs(s.me.x - o.x) * HALF_M < WIDE) s.contact = true;
-  if (s.contact || s.me.d >= s.endD || s.t > 22 || (s.braked && s.me.v < 4)) s.result = duelScore(s);
+  if (s.contact || s.me.deleted || s.me.d >= s.endD || s.t > 22 || (s.braked && s.me.v < 4)) s.result = duelScore(s);
 }
 
 /** On the road to the engine's 0-1. */

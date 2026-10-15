@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
-import { build, GEARS, gearOf, HALF_M } from "../drive";
+import { build, GEARS, gearOf } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
 import { car, frame, road } from "./scene";
 
@@ -77,6 +77,8 @@ export default function Cockpit3D(p: CockpitProps) {
     scene.add(grass);
     scene.add(road(g, s.me.d - 60 / g.m, s.endD + 500 / g.m, [s.zone]));
     const mine = car(p.myColor);
+    const ownHalo = mine.children.filter((c) => c.name === "halo");
+    for (const c of ownHalo) c.visible = false; // the overlay draws it from inside
     const opp = car(p.oppColor);
     scene.add(mine, opp);
     const cam = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
@@ -124,7 +126,6 @@ export default function Cockpit3D(p: CockpitProps) {
     let n = 0;
     let replayAt = 0;
     const tv = new THREE.PerspectiveCamera(38, 1, 0.5, 1500);
-    const tvAt = frame(g, s.zone.apexD - 40 / g.m, -s.zone.turn * (1 + 26 / HALF_M)); // outside the corner, up on a gantry
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -161,6 +162,7 @@ export default function Cockpit3D(p: CockpitProps) {
       const at_ = rp >= 0 ? rec[Math.min(rec.length - 1, from + rp)] : null;
       if (rp >= 0 && !replaying.current) {
         replaying.current = true;
+        for (const c of ownHalo) c.visible = true;
         setReplay(true);
       }
       const me = at_ ? frame(g, at_[0], at_[1], at_[2]) : frame(g, s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0);
@@ -174,8 +176,12 @@ export default function Cockpit3D(p: CockpitProps) {
         const h = el.clientHeight;
         tv.aspect = w / h;
         tv.updateProjectionMatrix();
-        tv.position.set(tvAt.px, 9, tvAt.pz);
-        tv.lookAt((me.px + o.px) / 2, 0.5, (me.pz + o.pz) / 2);
+        // a helicopter shot: behind and to the outside of the pair, looking down at them
+        const mx = (me.px + o.px) / 2;
+        const mz = (me.pz + o.pz) / 2;
+        const out = s.zone.turn; // + = left of the road, the outside of a right-hander
+        tv.position.set(mx - me.dx * 22 + me.nx * out * 14, 11, mz - me.dz * 22 + me.ny * out * 14);
+        tv.lookAt(mx, 0.5, mz);
         renderer.setScissorTest(false);
         renderer.setViewport(0, 0, w, h);
         renderer.render(scene, tv);
@@ -325,7 +331,7 @@ export default function Cockpit3D(p: CockpitProps) {
         <div className="absolute left-4 top-4 rounded-md bg-white px-3 py-1 font-display text-2xl font-black uppercase text-ink-950">Replay</div>
       )}
       {res && (
-        <div className={`absolute inset-x-0 mx-auto w-fit rounded-lg bg-ink-950/95 px-10 py-6 text-center ${replay ? "bottom-6" : "top-[30%]"}`}>
+        <div className={`absolute w-fit rounded-lg bg-ink-950/95 px-10 py-6 text-center ${replay ? "bottom-6 right-6" : "inset-x-0 top-[30%] mx-auto"}`}>
           <div className={`font-display text-6xl font-black uppercase ${verdictColor(res.q)}`}>{verdict(res.q)}</div>
           <div className="mt-2 text-2xl font-bold text-white">{res.why}</div>
           <div className="mt-1 text-base text-slate-400">Score {Math.round(res.q * 100)}</div>
