@@ -307,6 +307,7 @@ export function createRace(input: RaceInput): RaceRunner {
   let leadChanges = 0;
   let lapExtra = new Map<number, number>(); // time lost in incidents this lap (added when the lap is committed)
   const lose = (car: CarState, s: number) => lapExtra.set(car.idx, (lapExtra.get(car.idx) ?? 0) + s);
+  const nurse = new Map<number, { until: number; mul: number }>(); // the tyre-saving game: wear multiplier until a lap
   const rank: Record<Flag, number> = { green: 0, vsc: 1, sc: 2, red: 3 };
   const callFlag = (f: Flag) => {
     if (state.lap >= laps - 1) return; // too late to matter
@@ -541,6 +542,8 @@ export function createRace(input: RaceInput): RaceRunner {
       if (!o) continue;
       // the restart's Go bar: a sharp getaway gains a little time on this lap, a slow one loses it (no draws)
       if (s.id === "restart" && lastQ !== undefined) lose(car, (0.5 - lastQ) * RACE.restartSkill);
+      // nursing the tyres through the needle game: wear x1.15 (missed) .. x0.7 (held it) for five laps
+      if (s.id === "tyres-gone" && opt === "nurse" && lastQ !== undefined) nurse.set(car.idx, { until: L + 4, mul: 1.15 - 0.45 * lastQ });
       if (o.dials) {
         car.ctl = true;
         car.dials = { ...car.dials, ...o.dials };
@@ -885,7 +888,7 @@ export function createRace(input: RaceInput): RaceRunner {
       const r = car.e.r;
       const neutral = flag !== "green";
       const fx = fxs.get(car.idx);
-      car.wear += wearRate(r)[car.compound] * (neutral ? 0.3 : 1) * (car.dirty ? RACE.dirtyWear : 1) * (1 + (0.08 * car.fuel) / (laps * RACE.fuelPerLapKg)) * (fx && !neutral ? fx.wear : 1);
+      car.wear += wearRate(r)[car.compound] * (neutral ? 0.3 : 1) * (car.dirty ? RACE.dirtyWear : 1) * (1 + (0.08 * car.fuel) / (laps * RACE.fuelPerLapKg)) * (fx && !neutral ? fx.wear : 1) * (L <= (nurse.get(car.idx)?.until ?? 0) ? nurse.get(car.idx)!.mul : 1);
       car.age++;
       car.fuel = Math.max(0, car.fuel - RACE.fuelPerLapKg * (neutral ? 0.55 : 1) * (fx && !neutral ? fx.burn * (car.lift ? 0.75 : 1) : 1));
       if (fx) car.battery = clamp(car.battery + (neutral ? 0.06 : fx.flow), 0, 1); // the battery refills behind the safety car

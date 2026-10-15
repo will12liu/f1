@@ -116,6 +116,37 @@ describe("key moments", () => {
     expect(tested).toBeGreaterThan(0);
   }, 30_000);
 
+  it("nursing the tyres: holding the needle wears them less over the next laps than missing it, and it replays", () => {
+    const run = (seed: number, q: number) => {
+      const r = createRace(input(seed, { focus: [8, 9, 10, 11], moments: "all" }));
+      let hit: { lap: number; car: number } | null = null;
+      let wear: number | null = null;
+      while (!r.done()) {
+        r.step();
+        if (hit && wear === null && r.state.lap === hit.lap + 2) wear = r.state.cars[hit.car].wear;
+        const m = r.pending();
+        if (!m) continue;
+        if (m.sit === "tyres-gone" && !hit && m.opts.some((o) => o.id === "nurse")) {
+          hit = { lap: m.lap, car: m.car };
+          r.choose("nurse", q);
+        } else r.choose("auto");
+      }
+      return { r, hit, wear };
+    };
+    let tested = 0;
+    for (let seed = 700; seed < 760 && tested < 2; seed++) {
+      const good = run(seed, 1);
+      if (!good.hit || good.wear === null) continue;
+      const bad = run(seed, 0);
+      if (bad.wear === null || bad.r.state.cars[good.hit.car].compound !== good.r.state.cars[good.hit.car].compound) continue;
+      expect(good.wear).toBeLessThan(bad.wear);
+      const again = simRace(input(seed, { focus: [8, 9, 10, 11], moments: "all", choices: good.r.state.choices, commands: good.r.state.commands }));
+      expect(JSON.stringify(again.result)).toBe(JSON.stringify(good.r.result()));
+      tested++;
+    }
+    expect(tested).toBeGreaterThan(0);
+  }, 30_000);
+
   it("answering every moment with instinct gives exactly the race nobody played", () => {
     const { r } = play(22, [5], () => "auto");
     const plain = simRace(input(22));

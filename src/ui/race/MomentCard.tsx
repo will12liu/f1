@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import type { PendingMoment } from "../../engine/race/moments";
 import { BrakeBar, zoneFor, type BrakeZone } from "./BrakeBar";
 import { readMomentsView } from "./MomentsView";
+import { TyreSave } from "./TyreSave";
 
 // the 3D cockpit (three.js) loads only when a duel opens in it
 const Cockpit3D = lazy(() => import("./cockpit/Cockpit3D"));
@@ -19,7 +20,7 @@ export interface CockpitTrack {
 }
 
 export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string; cockpit?: CockpitTrack }) {
-  const [exec, setExec] = useState<{ id: string; label: string; zone: BrakeZone } | null>(null);
+  const [exec, setExec] = useState<{ id: string; label: string; zone: BrakeZone | null } | null>(null);
   const [simple, setSimple] = useState(false);
   useEffect(() => {
     setExec(null);
@@ -31,6 +32,7 @@ export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPi
     if (!o || o.disabled) return;
     const zone = m.kind === "call" ? (m.sit === "restart" ? zoneFor("restart") : null) : zoneFor(id);
     if (zone) setExec({ id, label: o.label, zone });
+    else if (m.sit === "tyres-gone" && id === "nurse") setExec({ id, label: o.label, zone: null }); // the needle game
     else onPick(id);
   };
   useEffect(() => {
@@ -63,8 +65,10 @@ export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPi
             <Suspense fallback={<div className="text-lg text-slate-400">Loading the cockpit...</div>}>
               <Cockpit3D {...cockpit!} side={m.kind === "defend" ? "defend" : "attack"} move={exec.id} label={exec.label} pick={m.lap} onResult={(q) => onPick(exec.id, q)} onSimple={() => setSimple(true)} />
             </Suspense>
-          ) : (
+          ) : exec.zone ? (
             <BrakeBar zone={exec.zone} onResult={(q) => onPick(exec.id, q)} />
+          ) : (
+            <TyreSave onResult={(q) => onPick(exec.id, q)} />
           )}
         </div>
       ) : (
