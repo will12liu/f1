@@ -35,12 +35,12 @@ export function Radio({ replay, view, t, car, code, engineer = "Engineer", forec
     if (!e) return;
     const k = Math.round(e.t);
     let text: string | null = null;
-    if (e.kind === "pass" && e.a === car) text = pick([`Good move! That's P${pos}.`, `Mega. P${pos}, keep it clean.`, "Lovely. Now the next one."], k);
-    else if (e.kind === "pass" && e.b === car) text = pick([`He's through. P${pos}. Let's get him back.`, "Lost one. Head down, it's a long race.", "Okay, okay. Reset. Go again."], k);
-    else if (e.kind === "pit" && e.a === car) text = pick(["Box, box. Box, box.", "Good stop. Push now, push.", "Tyres on, go go go."], k);
+    if (e.kind === "pass" && e.a === car) text = pick([`Good move! That's P${pos}.`, `Mega. P${pos}, keep it clean.`, "Lovely. Now the next one.", `That's the place. P${pos}. Well done.`, "Clean. Eyes forward now.", "Yes! Through. Don't give it back."], k);
+    else if (e.kind === "pass" && e.b === car) text = pick([`He's through. P${pos}. Let's get him back.`, "Lost one. Head down, it's a long race.", "Okay, okay. Reset. Go again.", `He got us. P${pos}. Stay with him.`, "Copy. We'll have another look.", "Not to worry. The tyres will come."], k);
+    else if (e.kind === "pit" && e.a === car) text = pick(["Box, box. Box, box.", "Good stop. Push now, push.", "Tyres on, go go go.", "In the box. In the box.", "Stop looks good. Out we go.", "Released. The gap is fine. Push."], k);
     else if (e.kind === "fastest" && e.a === car) text = "Purple! Fastest lap. Lovely.";
     else if (e.kind === "penalty" && e.a === car) text = `We've got a ${e.info ?? ""} penalty. Sorry mate. Keep pushing.`;
-    else if (e.kind === "contact") text = pick(["Contact! Are you okay? Check the car.", "Ooh. Talk to me, any damage?"], k);
+    else if (e.kind === "contact") text = pick(["Contact! Are you okay? Check the car.", "Ooh. Talk to me, any damage?", "We saw that. Any warning lights?", "Keep the car straight. Tell me what you feel.", "Noted. We'll talk to the stewards later."], k);
     else if (e.kind === "dnf" && e.a === car) text = "Stop the car, stop the car. Sorry. It's over.";
     else if (e.kind === "limits" && e.a === car && e.info === "3") text = "That's three for track limits. One more and it's a penalty.";
     else if (e.kind === "slowstop" && e.a === car) text = "Sorry, slow stop. Problem on the front left.";
@@ -68,6 +68,15 @@ export function Radio({ replay, view, t, car, code, engineer = "Engineer", forec
       fuel: ["Fuel okay?", f ? (f.fuelMargin >= 0 ? "Fuel's fine, we're on target. Just drive." : "We're a bit short. The car's on lean, you'll feel it.") : "Fuel's fine."],
       plan: ["What's the plan?", f?.nextStop ? `Plan is box lap ${f.nextStop.lap}${f.nextStop.compound !== "?" ? ` for ${COMPOUNDS[f.nextStop.compound as keyof typeof COMPOUNDS]?.name.toLowerCase() ?? "new tyres"}` : ""}.` : "No more stops. Bring it home."],
       faster: ["I'm faster than him!", ahead ? pick(["Copy. Use the battery on the straight.", "Understood. Be patient, he'll make a mistake.", "We know. Get it done then."], k) : "Mate, you're leading."],
+      pace: [
+        "How's my pace?",
+        me.pos === 1
+          ? pick(["You're leading. The pace is good. Just bring it home.", "Nobody ahead of you. Keep doing this.", "P1. Your pace is the pace."], k)
+          : me.interval !== null && me.interval < 1.2
+            ? pick([`You're closing. ${gap(me.interval)} to the car ahead.`, `The pace is there. ${gap(me.interval)} and coming.`, "You're quicker. Stay patient and take it."], k)
+            : pick([`About the same as the car ahead. ${gap(me.interval)} back.`, "Matched for pace. No need to force it yet.", `Even with him. The gap is ${gap(me.interval)}.`], k),
+      ],
+      weather: ["Weather?", "Dry all race."],
       alone: ["Leave me alone, I know what I'm doing.", pick(["...Understood.", "Copy. Radio silence.", "Okay, okay."], k)],
     };
     const [mine, reply] = answers[q];
@@ -109,6 +118,8 @@ export function Radio({ replay, view, t, car, code, engineer = "Engineer", forec
               ["fuel", "Fuel okay?"],
               ["plan", "What's the plan?"],
               ["faster", "I'm faster than him!"],
+              ["pace", "How's my pace?"],
+              ["weather", "Weather?"],
               ["alone", "Leave me alone..."],
             ].map(([k, label]) => (
               <button key={k} onClick={() => ask(k)} className="rounded px-3 py-2 text-left text-base text-white hover:bg-ink-800">
