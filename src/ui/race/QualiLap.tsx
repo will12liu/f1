@@ -49,6 +49,23 @@ class Controls {
   }
 }
 
+const VIEW_KEY = "paddock.qualiView";
+const readOnboard = () => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "onboard";
+  } catch {
+    return false;
+  }
+};
+const saveOnboard = (v: boolean) => {
+  try {
+    localStorage.setItem(VIEW_KEY, v ? "onboard" : "chase");
+  } catch {
+    /* private mode */
+  }
+  return v;
+};
+
 export function QualiLap({
   session,
   trackId,
@@ -74,9 +91,30 @@ export function QualiLap({
   const [sectors, setSectors] = useState<number[]>([]);
   const [result, setResult] = useState<Result | null>(null);
   const [guide, setGuide] = useState(true);
+  const [onboard, setOnboard] = useState(readOnboard); // the 3D onboard view instead of the chase cam
+  const onboardRef = useRef(onboard);
+  onboardRef.current = onboard;
+  const host = useRef<HTMLDivElement>(null);
+  const w3d = useRef<{ draw: (s: CarState, gp: { d: number; x: number } | null) => void; dispose: () => void } | null>(null);
   const guideRef = useRef(true);
   guideRef.current = guide;
   const ctl = useRef(new Controls());
+  // the onboard view loads three.js only when it's switched on
+  useEffect(() => {
+    if (!onboard || !geo || !host.current) return;
+    let live = true;
+    const el = host.current;
+    import("./cockpit/scene")
+      .then(({ onboard: make }) => {
+        if (live) w3d.current = make(el, geo, color);
+      })
+      .catch(() => live && setOnboard(false));
+    return () => {
+      live = false;
+      w3d.current?.dispose();
+      w3d.current = null;
+    };
+  }, [onboard, geo]); // eslint-disable-line react-hooks/exhaustive-deps
   const ghostRef = useRef<Ghost | null>(null);
   const [ghost, setGhost] = useState<Ghost | null>(null);
   const car = useRef<CarState | null>(null);
@@ -109,6 +147,7 @@ export function QualiLap({
     const c = ctl.current;
     const down = (e: KeyboardEvent) => {
       if (e.code === "KeyG" && !e.repeat) setGuide((v) => !v);
+      if (e.code === "KeyV" && !e.repeat) setOnboard((v) => saveOnboard(!v));
       if ((e.code === "Enter" || e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && phase === "wait" && geo) start();
       c.keys.add(e.code);
       if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
@@ -251,6 +290,15 @@ export function QualiLap({
       head += dh * Math.min(1, dt * 6);
       const carX = at(g, g.px, s.d) + at(g, g.nx, s.d) * s.x * HALF;
       const carY = at(g, g.py, s.d) + at(g, g.ny, s.d) * s.x * HALF;
+      const gh = ghostRef.current;
+      const gp = gh && s.started ? ghostAt(gh, s.t) : null;
+      const w3 = onboardRef.current ? w3d.current : null;
+      if (w3) {
+        // onboard: three.js draws the world underneath, this canvas only the HUD
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        w3.draw(s, gp);
+      } else {
       const view = 130 + kmh * 0.36;
       const scale = Math.min(W, H) / view;
       const spriteU = Math.max(0.8, Math.min(1.7, scale * 0.24)); // car size on screen: about a third of the road wide
@@ -339,8 +387,6 @@ export function QualiLap({
         ctx.stroke();
       }
       // the ghost: your best lap, where it was at this time (world space, same apparent size as the car)
-      const gh = ghostRef.current;
-      const gp = gh && s.started ? ghostAt(gh, s.t) : null;
       if (gp) {
         const gx = at(g, g.px, gp.d) + at(g, g.nx, gp.d) * gp.x * HALF;
         const gy = at(g, g.py, gp.d) + at(g, g.ny, gp.d) * gp.x * HALF;
@@ -352,6 +398,7 @@ export function QualiLap({
       const slip = Math.atan2(s.vlat, Math.max(5, s.v));
       const offTrack = s.surface !== "track";
       carSprite(W / 2, H * 0.74, spriteU, -slip, s.deleted ? "#fb7185" : offTrack ? "#fbbf24" : color, 1, c.brake > 0.3);
+      }
 
       // HUD: speed and gear, the clock and the delta, pedals and grip
       const kick = (txt: string, x: number, y: number, size: number, col: string, align: CanvasTextAlign = "left", weight = 900) => {
@@ -481,6 +528,9 @@ export function QualiLap({
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <button className={`rounded-md px-3 py-2 font-display text-base font-bold uppercase ${onboard ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300"}`} onClick={() => setOnboard((v) => saveOnboard(!v))}>
+            {onboard ? "Onboard" : "Chase cam"}
+          </button>
           <button className={`rounded-md px-3 py-2 font-display text-base font-bold uppercase ${guide ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300"}`} onClick={() => setGuide((v) => !v)}>
             Guide {guide ? "on" : "off"}
           </button>
@@ -496,7 +546,8 @@ export function QualiLap({
         </div>
       </div>
       <div className="relative min-h-0 flex-1 select-none overflow-hidden" style={{ touchAction: "none" }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
-        <canvas ref={ref} className="h-full w-full" />
+        <div ref={host} className="absolute inset-0" />
+        <canvas ref={ref} className="relative h-full w-full" />
         {phase === "wait" && (
           <div className="absolute inset-x-0 bottom-0 bg-ink-950/90 p-6 text-center">
             <div className="headline text-5xl">Drive the lap</div>
