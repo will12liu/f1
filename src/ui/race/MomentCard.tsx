@@ -4,6 +4,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { PendingMoment } from "../../engine/race/moments";
 import { BrakeBar, zoneFor, type BrakeZone } from "./BrakeBar";
+import { readMomentsView } from "./MomentsView";
 
 // the 3D cockpit (three.js) loads only when a duel opens in it
 const Cockpit3D = lazy(() => import("./cockpit/Cockpit3D"));
@@ -14,13 +15,6 @@ export interface CockpitTrack {
   myColor: string;
   oppColor: string;
 }
-const cockpitOn = () => {
-  try {
-    return localStorage.getItem("paddock.momentsView") !== "simple";
-  } catch {
-    return true;
-  }
-};
 
 export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string; cockpit?: CockpitTrack }) {
   const [exec, setExec] = useState<{ id: string; label: string; zone: BrakeZone } | null>(null);
@@ -29,7 +23,7 @@ export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPi
     setExec(null);
     setSimple(false);
   }, [m.id]);
-  const in3d = !!exec && !!cockpit && !simple && m.kind !== "call" && cockpitOn();
+  const in3d = !!exec && !!cockpit && !simple && m.kind !== "call" && readMomentsView() === "cockpit";
   const pick = (id: string) => {
     const o = m.opts.find((x) => x.id === id);
     if (!o || o.disabled) return;

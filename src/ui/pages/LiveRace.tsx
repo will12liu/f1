@@ -19,6 +19,7 @@ import type { Replay } from "../../engine/types";
 import { useGame } from "../../state/game";
 import { PitWall } from "../race/PitWall";
 import { MomentCard } from "../race/MomentCard";
+import { MomentsViewPicker, readMomentsView, type MomentsView } from "../race/MomentsView";
 import { verdict, verdictColor } from "../race/BrakeBar";
 import { Reaction } from "../career/SimGames";
 import type { PendingMoment } from "../../engine/race/moments";
@@ -106,6 +107,7 @@ export function LiveRace() {
   const mine = myTeamId ? entries.map((e, i) => (e.teamId === myTeamId ? i : -1)).filter((i) => i >= 0) : [];
   const [tab, setTab] = useState(0);
   const [mode, setMode] = useState<MomentMode>(readMode);
+  const [view, setView] = useState<MomentsView>(readMomentsView);
   const [pend, setPend] = useState<PendingMoment | null>(null);
   const [zoomAt, setZoomAt] = useState<{ t: number; cars: number[]; until?: number } | null>(null); // the last moment: 1x + zoom
   const [banner, setBanner] = useState<{ t: number; node: ReactNode } | null>(null); // how it went
@@ -269,6 +271,12 @@ export function LiveRace() {
               </button>
             ))}
           </div>
+          {mode !== "off" && (
+            <>
+              <div className="mt-2 text-base text-slate-400">How you fight a duel:</div>
+              <MomentsViewPicker value={view} onChange={setView} />
+            </>
+          )}
         </div>
         <div>
           {startGame && (

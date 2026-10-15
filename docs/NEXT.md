@@ -63,7 +63,7 @@ Make it driving:
 - Track data: `public/data/tracks/<id>.json` (`pts` evenly resampled, `w`/`h`, `corners[{n,f}]`), loaded via
   `loadTrack` in `components/bits.tsx`. Units are px of a 1000-wide frame (~2 m per unit on a 5 km lap).
 
-### 2. Cockpit view in key moments ("from INSIDE the car")
+### 2. Cockpit view in key moments ("from INSIDE the car") (FIRST VERSION DONE 2026-10-16 with three.js, see CLAUDE.md "Cockpit duels"; still to do: tune the scoring with real play, opponent habits from `tendencies`, better car model, a sound)
 
 Duel moments open `MomentCard` -> pick a move -> `BrakeBar` (a flat timing bar). Replace the bar with a
 **pseudo-3D onboard** (OutRun-style road projection, canvas 2D, no WebGL needed):
