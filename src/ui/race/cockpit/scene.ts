@@ -37,6 +37,11 @@ export function sky(scene: THREE.Scene, trackId: string): void {
   scene.add(sun);
 }
 
+/** Turn a car's front wheels: steer -1 (right) .. 1 (left). */
+export function steerWheels(c: THREE.Group, steer: number): void {
+  for (const w of c.children) if (w.name === "front") w.rotation.y = steer * 0.35;
+}
+
 /** A low-poly F1 car facing -z. The halo's meshes are named "halo" so an onboard camera can hide its own. */
 export function car(color: string, halo = true): THREE.Group {
   const grp = new THREE.Group();
@@ -78,6 +83,7 @@ export function car(color: string, halo = true): THREE.Group {
     const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.4, 16), tyre);
     w.rotation.z = Math.PI / 2;
     w.position.set(x, r, z);
+    if (z < 0) w.name = "front"; // steered (rotation.y)
     grp.add(w);
   }
   return grp;
@@ -238,8 +244,9 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
   let w = 0;
   let h = 0;
   return {
-    draw(s: CarState, gp: { d: number; x: number } | null, showGuide = true) {
+    draw(s: CarState, gp: { d: number; x: number } | null, showGuide = true, steer = 0) {
       guide.visible = showGuide;
+      steerWheels(mine, steer);
       if (el.clientWidth !== w || el.clientHeight !== h) {
         w = el.clientWidth;
         h = el.clientHeight;

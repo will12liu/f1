@@ -8,7 +8,7 @@ import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
-import { car, frame, groundOf, road, sky } from "./scene";
+import { car, frame, groundOf, road, sky, steerWheels } from "./scene";
 
 export interface CockpitProps {
   trackId: string;
@@ -184,6 +184,7 @@ export default function Cockpit3D(p: CockpitProps) {
       const me = at_ ? frame(g, at_[0], at_[1], at_[2]) : frame(g, s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0);
       mine.position.set(me.px, 0, me.pz);
       mine.rotation.y = me.yaw;
+      steerWheels(mine, at_ ? 0 : steer);
       const o = at_ ? frame(g, at_[3], at_[4]) : frame(g, s.opp.d, s.opp.x);
       opp.position.set(o.px, 0, o.pz);
       opp.rotation.y = o.yaw;
