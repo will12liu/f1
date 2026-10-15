@@ -112,7 +112,17 @@ export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {
   if (s.side === "defend" && gap > 0 && gap < LEN + 2.5 && lat < WIDE) vt = Math.min(vt, s.me.v);
   o.v += Math.max(-35 * dt, Math.min(12 * dt, vt - o.v));
   o.d += (o.v * dt) / g.m;
-  o.x += (tx - o.x) * Math.min(1, dt * 1.6);
+  // it leaves a car's width when you're alongside: contact is you steering into it or running into the back
+  const nx = o.x + (tx - o.x) * Math.min(1, dt * 1.6);
+  const alongside = Math.abs(gapM(s)) < LEN + 1;
+  const closer = Math.abs(nx - s.me.x) < Math.abs(o.x - s.me.x);
+  if (!(alongside && closer && Math.abs(nx - s.me.x) * HALF_M < WIDE + 0.4)) o.x = nx;
+  // and squeezed, it gives way (onto the kerb and past it) rather than crash: run him wide, he goes wide
+  if (alongside) {
+    const room = (WIDE + 0.4) / HALF_M;
+    const away = o.x >= s.me.x ? 1 : -1;
+    if (Math.abs(o.x - s.me.x) < room) o.x = Math.max(-EDGE.limit, Math.min(EDGE.limit, s.me.x + away * room));
+  }
 
   const now = gapM(s);
   if (Math.abs(now) < Math.abs(s.minGap)) s.minGap = now;

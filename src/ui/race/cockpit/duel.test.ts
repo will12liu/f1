@@ -45,3 +45,20 @@ describe("cockpit duel", () => {
     expect(r.q).toBeGreaterThan(0.5);
   });
 });
+
+describe("cockpit duel on every circuit", async () => {
+  const { CIRCUITS } = await import("../../../../data/manual/circuits");
+  it("sets up and finishes a tidy run at each track, attacking and defending", () => {
+    const bad: string[] = [];
+    for (const c of CIRCUITS) {
+      const g = build(track(c.id), c.km, c.base - 0.4);
+      for (const side of ["attack", "defend"] as const)
+        for (const pick of [0, 1, 2]) {
+          const s = startDuel(g, side, side === "attack" ? "inside" : "coverIn", pick);
+          const r = run(s, 0, -0.9 * s.zone.turn);
+          if (!r || r.why === "Contact" || r.why === "Ran wide") bad.push(`${c.id} ${side} ${pick}: ${r?.why}`);
+        }
+    }
+    expect(bad).toEqual([]);
+  });
+});
