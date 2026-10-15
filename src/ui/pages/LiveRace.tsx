@@ -22,11 +22,14 @@ import { MomentCard } from "../race/MomentCard";
 import { MomentsViewPicker, readMomentsView, type MomentsView } from "../race/MomentsView";
 import { verdict, verdictColor } from "../race/BrakeBar";
 import { Reaction } from "../career/SimGames";
-import type { PendingMoment } from "../../engine/race/moments";
+import { tendencies, type PendingMoment } from "../../engine/race/moments";
+import { gripOf } from "../race/drive";
+
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
 import { TeamBar, TrackOutline, useMaps } from "../components/bits";
 
 const PICK_KEY = "paddock.liveDriver";
+const topHabit = (w: Record<string, number>) => Object.entries(w).sort((a, b) => b[1] - a[1])[0]?.[0];
 const MOMENTS_KEY = "paddock.moments";
 type MomentMode = "off" | "key" | "all";
 const readMode = (): MomentMode => {
@@ -370,6 +373,9 @@ export function LiveRace() {
                 target: prep.input.circuit.base - 0.4,
                 myColor: team(entries[pend.car].teamId)?.color ?? "#e10600",
                 oppColor: pend.vs !== undefined ? (team(entries[pend.vs].teamId)?.color ?? "#94a3b8") : "#94a3b8",
+                // the other car drives his favourite move; your grip comes from your one-lap and race pace
+                habit: pend.vs !== undefined ? topHabit(tendencies(entries[pend.vs].driverId, entries[pend.vs].r.aggression)[pend.kind === "attack" ? "def" : "att"]) : undefined,
+                grip: gripOf(entries[pend.car].r),
               }}
               onPick={(opt, q) => {
                 const m = pend;

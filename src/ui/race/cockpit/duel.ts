@@ -32,6 +32,7 @@ export interface Duel {
   minGap: number; // metres, signed (me ahead +), closest call
   contact: boolean;
   result: { q: number; why: string } | null;
+  habit: string; // the other driver's favourite move (moments.ts tendencies): coverIn/coverOut/hold/lateDef or inside/outside/late/dummy
 }
 
 export const RUN = 340; // metres from the start to the braking point
@@ -56,7 +57,7 @@ export function zones(g: Geo): Zone[] {
 
 /** The duel's opening frame: RUN metres before the zone; attacking you start in the tow 16 m back, defending
  *  you lead by 14 m. `pick` chooses among the three heaviest zones (the lap number, so it's not always T1). */
-export function startDuel(g: Geo, side: Side, move: string, pick = 0): Duel {
+export function startDuel(g: Geo, side: Side, move: string, pick = 0, habit = side === "attack" ? "hold" : "inside"): Duel {
   const zs = zones(g);
   const zone = zs[Math.abs(pick) % Math.min(3, zs.length)];
   // distances run on past the line (d grows past g.len; at() wraps), so nothing crosses zero
@@ -67,7 +68,7 @@ export function startDuel(g: Geo, side: Side, move: string, pick = 0): Duel {
   const me: CarState = { d: d0, x: side === "attack" ? -0.15 * z.turn : 0.1 * z.turn, v: v0, vlat: 0, t: 0, started: false, sector: 0, sectors: [], deleted: false, use: 0, surface: "track", done: false };
   const off = (side === "attack" ? 16 : -14) / g.m;
   const opp: Rival = { d: d0 + off, x: at(g, g.line, d0 + off), v: v0 };
-  return { g, side, move, zone: z, endD: z.apexD + 60 / g.m, me, opp, t: 0, braked: false, minGap: (me.d - opp.d) * g.m, contact: false, result: null };
+  return { g, side, move, zone: z, endD: z.apexD + 60 / g.m, me, opp, t: 0, braked: false, minGap: (me.d - opp.d) * g.m, contact: false, result: null, habit };
 }
 
 const gapM = (s: Duel) => (s.me.d - s.opp.d) * s.g.m;
@@ -86,9 +87,24 @@ export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {
   // inside), quicker on the straight when it's behind (the tow); its line drifts to the inside to attack
   const o = s.opp;
   const inZone = o.d > zone.brakeD - 20 / g.m && o.d < zone.apexD + 60 / g.m;
-  // defending: if you've covered the inside he has to go round the outside, the long way
-  const covered = s.side === "defend" && s.me.x * -zone.turn > 0.3;
-  const f = s.side === "attack" ? (inZone ? 0.95 : 0.985) : inZone ? (covered ? 0.95 : 0.985) : 1.02;
+  const near = o.d > zone.brakeD - 260 / g.m && o.d < zone.apexD;
+  const h = s.habit;
+  let f: number;
+  let tx: number;
+  if (s.side === "attack") {
+    // he defends the way he usually does: covers a side, holds the line, or brakes late
+    f = inZone ? (h === "lateDef" ? 0.975 : 0.95) : 0.985;
+    tx = !near ? at(g, g.line, o.d) * 0.8 : h === "coverIn" ? -0.6 * zone.turn : h === "coverOut" ? 0.45 * zone.turn : -0.3 * zone.turn;
+  } else {
+    // he attacks his way; if you've covered the side he wants he has to go round, the long way
+    const want = h === "outside" ? 1 : -1; // + = outside
+    const late = o.d > zone.brakeD - 90 / g.m;
+    const side = h === "dummy" && late ? -want : want; // the dummy: shows one side, takes the other
+    const covered = s.me.x * zone.turn * side > 0.3; // you're sitting on the side he's going for
+    const goes = covered ? -side : side;
+    f = inZone ? (goes > 0 ? 0.95 : h === "late" ? 1.0 : 0.985) : 1.02;
+    tx = near ? goes * 0.6 * zone.turn : at(g, g.line, o.d) * 0.8;
+  }
   let vt = at(g, g.ref.v, o.d) * f;
   const gap = gapM(s);
   const lat = Math.abs(s.me.x - o.x) * HALF_M;
@@ -96,8 +112,6 @@ export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {
   if (s.side === "defend" && gap > 0 && gap < LEN + 2.5 && lat < WIDE) vt = Math.min(vt, s.me.v);
   o.v += Math.max(-35 * dt, Math.min(12 * dt, vt - o.v));
   o.d += (o.v * dt) / g.m;
-  const near = o.d > zone.brakeD - 260 / g.m && o.d < zone.apexD;
-  const tx = s.side === "defend" && near ? (covered ? 0.6 : -0.55) * zone.turn : s.side === "attack" && near ? -0.35 * zone.turn : at(g, g.line, o.d) * 0.8;
   o.x += (tx - o.x) * Math.min(1, dt * 1.6);
 
   const now = gapM(s);

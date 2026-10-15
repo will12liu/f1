@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
-import { at, build, gearOf, HALF_M, type Geo } from "../drive";
+import { at, build, GEARS, gearOf, HALF_M, type Geo } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
 
 export interface CockpitProps {
@@ -21,9 +21,19 @@ export interface CockpitProps {
   oppColor: string;
   onResult: (q: number) => void;
   onSimple: () => void; // fall back to the braking bar
+  habit?: string; // the other driver's favourite duel move
+  grip?: number; // from your driver's ratings (drive.ts gripOf)
 }
 
 const STEP = 1 / 120;
+const SOUND = "paddock.cockpitSound";
+const soundOn = () => {
+  try {
+    return localStorage.getItem(SOUND) !== "off";
+  } catch {
+    return true;
+  }
+};
 
 function frame(g: Geo, d: number, x: number, slip = 0) {
   const nx = at(g, g.nx, d);
@@ -127,6 +137,18 @@ function road(g: Geo, d0: number, d1: number, turn: number, brakeD: number): THR
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
   grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+  // grandstands behind the barriers, every so often, for a sense of speed
+  const seats = ["#1d4ed8", "#b91c1c", "#f8fafc", "#0f766e"];
+  let k = 0;
+  for (let d = d0; d < d1; d += 140 / g.m, k++) {
+    if (k % 3 === 2) continue;
+    const sd = k % 2 ? 1 : -1;
+    const f = frame(g, d, sd * (1 + 22 / HALF_M));
+    const st = new THREE.Mesh(new THREE.BoxGeometry(40, 7, 9), new THREE.MeshLambertMaterial({ color: seats[k % seats.length], side: THREE.DoubleSide }));
+    st.position.set(f.px, 3.5, f.pz);
+    st.rotation.y = f.yaw;
+    grp.add(st);
+  }
   // braking boards on the outside of the corner
   for (const m of [300, 200, 100, 50]) {
     const f = frame(g, brakeD - (m - 40) / g.m, turn * (1 + 6 / HALF_M));
@@ -146,11 +168,12 @@ export default function Cockpit3D(p: CockpitProps) {
   const [hud, setHud] = useState({ kmh: 0, gear: 1, gap: 0, steer: 0, braked: false, go: false });
   const [res, setRes] = useState<{ q: number; why: string } | null>(null);
   const done = useRef(false);
+  const [sound, setSound] = useState(soundOn); // takes effect next duel
 
   useEffect(() => {
     if (!track || !host.current) return;
     const g = build(track, p.km, p.target);
-    const s: Duel = startDuel(g, p.side, p.move, p.pick);
+    const s: Duel = startDuel(g, p.side, p.move, p.pick, p.habit);
     const el = host.current;
     let renderer: THREE.WebGLRenderer;
     try {
@@ -191,6 +214,26 @@ export default function Cockpit3D(p: CockpitProps) {
     resize();
     window.addEventListener("resize", resize);
 
+    // engine note: a sawtooth through a low-pass, pitch from the revs in the current gear
+    let audio: AudioContext | null = null;
+    let osc: OscillatorNode | null = null;
+    let vol: GainNode | null = null;
+    if (soundOn()) {
+      try {
+        audio = new AudioContext();
+        osc = audio.createOscillator();
+        osc.type = "sawtooth";
+        const lp = audio.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 900;
+        vol = audio.createGain();
+        vol.gain.value = 0.04;
+        osc.connect(lp).connect(vol).connect(audio.destination);
+        osc.start();
+      } catch {
+        audio = null;
+      }
+    }
     let steer = 0;
     let acc = 0;
     let last = performance.now();
@@ -212,7 +255,7 @@ export default function Cockpit3D(p: CockpitProps) {
           steer += Math.max(-STEP * 4, Math.min(STEP * 4, want - steer));
           const brake = k.has("ArrowDown") || k.has("KeyS") || k.has("Space") || pd.brk ? 1 : 0;
           const throttle = !brake && (k.has("ArrowUp") || k.has("KeyW") || pd.gas) ? 1 : 0;
-          stepDuel(s, { throttle, brake, steer }, STEP);
+          stepDuel(s, { throttle, brake, steer }, STEP, p.grip ?? 1);
           if (s.result) break;
         }
         const r = s.result as Duel["result"]; // set inside stepDuel
@@ -252,6 +295,14 @@ export default function Cockpit3D(p: CockpitProps) {
         renderer.setScissor(x0, y0, mw, mh);
         renderer.render(scene, mirror);
       }
+      if (osc && audio) {
+        const kmh = s.me.v * 3.6;
+        const gr = gearOf(kmh);
+        const lo = GEARS[gr - 1] ?? 0;
+        const hi = GEARS[gr] ?? 345;
+        const rev = Math.max(0, Math.min(1, (kmh - lo) / (hi - lo)));
+        osc.frequency.setTargetAtTime(s.result ? 90 : 140 + 260 * rev + gr * 12, audio.currentTime, 0.03);
+      }
       if (now - hudAt > 80) {
         hudAt = now;
         setHud({ kmh: s.me.v * 3.6, gear: gearOf(s.me.v * 3.6), gap: (s.me.d - s.opp.d) * g.m, steer, braked: s.braked, go });
@@ -261,6 +312,7 @@ export default function Cockpit3D(p: CockpitProps) {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
+      audio?.close();
       renderer.dispose();
       el.removeChild(renderer.domElement);
     };
@@ -326,9 +378,24 @@ export default function Cockpit3D(p: CockpitProps) {
         </div>
         <div className="mt-1 text-sm text-slate-400">Steer with A D or the arrows. Off the road or into him and it's over.</div>
       </div>
-      <button onClick={p.onSimple} className="absolute right-4 top-4 rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800">
-        Simple controls
-      </button>
+      <div className="absolute right-4 top-4 flex gap-2">
+        <button
+          onClick={() => {
+            try {
+              localStorage.setItem(SOUND, soundOn() ? "off" : "on");
+            } catch {
+              /* private mode */
+            }
+            setSound(soundOn());
+          }}
+          className="rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800"
+        >
+          {sound ? "Sound on" : "Sound off"}
+        </button>
+        <button onClick={p.onSimple} className="rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800">
+          Simple controls
+        </button>
+      </div>
       {!hud.go && track && <div className="pointer-events-none absolute inset-x-0 top-[38%] text-center font-display text-7xl font-black uppercase text-white">Ready</div>}
       <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-between gap-3 md:hidden">
         <div className="flex gap-2">
