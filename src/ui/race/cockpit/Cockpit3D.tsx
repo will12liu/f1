@@ -42,6 +42,7 @@ export default function Cockpit3D(p: CockpitProps) {
   const host = useRef<HTMLDivElement>(null);
   const keys = useRef(new Set<string>());
   const pads = useRef({ l: false, r: false, gas: false, brk: false });
+  const tilt = useRef(0); // phone tilt steering, -1..1 (+ = left)
   const [hud, setHud] = useState({ kmh: 0, gear: 1, gap: 0, steer: 0, braked: false, go: false });
   const [res, setRes] = useState<{ q: number; why: string } | null>(null);
   const done = useRef(false);
@@ -150,7 +151,7 @@ export default function Cockpit3D(p: CockpitProps) {
         acc += dt;
         const k = keys.current;
         const pd = pads.current;
-        const want = (k.has("ArrowLeft") || k.has("KeyA") || pd.l ? 1 : 0) - (k.has("ArrowRight") || k.has("KeyD") || pd.r ? 1 : 0);
+        const want = Math.max(-1, Math.min(1, (k.has("ArrowLeft") || k.has("KeyA") || pd.l ? 1 : 0) - (k.has("ArrowRight") || k.has("KeyD") || pd.r ? 1 : 0) + tilt.current));
         while (acc >= STEP) {
           acc -= STEP;
           steer += Math.max(-STEP * 4, Math.min(STEP * 4, want - steer));
@@ -260,18 +261,30 @@ export default function Cockpit3D(p: CockpitProps) {
       keys.current.add(e.code);
     };
     const up = (e: KeyboardEvent) => keys.current.delete(e.code);
+    // tilt steering on phones, as in the qualifying lap (iOS asks once, on the first touch of a pad)
+    const onTilt = (e: DeviceOrientationEvent) => {
+      const landscape = window.innerWidth > window.innerHeight;
+      const a = landscape ? e.beta : e.gamma;
+      tilt.current = a === null ? 0 : Math.max(-1, Math.min(1, -(a ?? 0) / 22));
+    };
+    window.addEventListener("deviceorientation", onTilt);
     window.addEventListener("keydown", dn);
     window.addEventListener("keyup", up);
     return () => {
       window.removeEventListener("keydown", dn);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("deviceorientation", onTilt);
     };
   }, []);
 
   const pad = (k: keyof typeof pads.current, text: string, cls: string) => (
     <button
       className={`pointer-events-auto select-none rounded-lg bg-ink-950/80 font-display text-2xl font-black uppercase text-white active:bg-white active:text-ink-950 ${cls}`}
-      onPointerDown={() => (pads.current[k] = true)}
+      onPointerDown={() => {
+        pads.current[k] = true;
+        const DOE = (window as unknown as { DeviceOrientationEvent?: { requestPermission?: () => Promise<string> } }).DeviceOrientationEvent;
+        DOE?.requestPermission?.().catch(() => undefined);
+      }}
       onPointerUp={() => (pads.current[k] = false)}
       onPointerLeave={() => (pads.current[k] = false)}
     >
@@ -314,7 +327,7 @@ export default function Cockpit3D(p: CockpitProps) {
           {p.side === "attack" ? "Get past him. " : "Keep him behind (mirrors). "}
           {hud.braked ? "Throttle is yours now: W / Up." : "Brake near the 50 board (later is braver): S / Down / Space."}
         </div>
-        <div className="mt-1 text-sm text-slate-400">Steer with A D or the arrows. Off the road or into him and it's over.</div>
+        <div className="mt-1 text-sm text-slate-400">Steer with A D or the arrows (on a phone: tilt or the pads). Off the road or into him and it's over.</div>
       </div>
         </>
       )}
