@@ -24,13 +24,32 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
   );
 }
 
-export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { seed: number; circuit: CircuitDef; driverId: string; engineer: number; onRun: (p: CarPlan) => void; busy?: boolean }) {
+export function Weekend({
+  seed,
+  circuit,
+  driverId,
+  engineer,
+  onRun,
+  busy,
+  ratings,
+  color,
+}: {
+  seed: number;
+  circuit: CircuitDef;
+  driverId: string;
+  engineer: number;
+  onRun: (p: CarPlan) => void;
+  busy?: boolean;
+  ratings?: { quali: number; pace: number }; // the driver's one-lap and race pace: a little more grip in the lap game
+  color?: string; // the car's colour in the lap game
+}) {
   const [program, setProgram] = useState<Program>("setup");
   const [setup, setSetup] = useState(() => Math.round(setupEstimate(seed, circuit, driverId, "setup", engineer).mid * 20) / 20);
   const [tune, setTune] = useState(false); // practice and setup opened
   const [risk, setRisk] = useState<[number, number, number]>([2, 2, 2]);
   const [late, setLate] = useState<[boolean, boolean, boolean]>([false, false, false]);
   const [laps, setLaps] = useState<(number | null)[]>([null, null, null]);
+  const [lapLabels, setLapLabels] = useState<string[]>(["", "", ""]); // the driven lap's time, for the button
   const [driving, setDriving] = useState<number | null>(null); // the lap mini-game for this session
   const est = setupEstimate(seed, circuit, driverId, program, engineer);
   const pct = (x: number) => Math.round(x * 100);
@@ -41,9 +60,14 @@ export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { se
         <QualiLap
           session={SESSIONS[driving]}
           trackId={circuit.id}
+          km={circuit.km}
+          target={circuit.base - 0.4}
+          ratings={ratings}
+          color={color}
           onQuit={() => setDriving(null)}
-          onDone={(q) => {
+          onDone={(q, label) => {
             setLaps((x) => x.map((v, k) => (k === driving ? q : v)));
+            setLapLabels((x) => x.map((v, k) => (k === driving ? label : v)));
             setDriving(null);
           }}
         />
@@ -74,7 +98,7 @@ export function Weekend({ seed, circuit, driverId, engineer, onRun, busy }: { se
                   <div className={`text-sm ${late[i] ? "text-ink-700" : "text-slate-500"}`}>{late[i] ? "Fast track, traffic" : "Clear track"}</div>
                 </button>
                 <button onClick={() => laps[i] === null && setDriving(i)} disabled={laps[i] !== null} className={`rounded-lg px-4 py-3 text-left max-sm:col-start-2 ${laps[i] !== null ? "bg-emerald-400 text-ink-950" : "border-2 border-race bg-ink-900 text-white hover:bg-ink-800"}`}>
-                  <div className="font-display text-xl font-bold uppercase leading-tight">{laps[i] !== null ? `Lap ${Math.round(laps[i]! * 100)}%` : "Drive the lap"}</div>
+                  <div className="font-display text-xl font-bold uppercase leading-tight">{laps[i] !== null ? lapLabels[i] || `Lap ${Math.round(laps[i]! * 100)}%` : "Drive the lap"}</div>
                   <div className={`text-sm ${laps[i] !== null ? "text-ink-800" : "text-slate-400"}`}>{laps[i] !== null ? "Driven: one try per session" : "Or leave it to instinct"}</div>
                 </button>
               </div>

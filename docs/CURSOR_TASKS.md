@@ -4,9 +4,13 @@ These are sized for a fast model (Grok / Composer). Do ONE task per chat. Read `
 
 ## Ground rules for every task
 
-- **Do not edit these files** (engine and work in progress, handled by Claude/Opus):
-  `src/engine/race/*`, `src/engine/season/*`, `src/engine/rng.ts`, `src/ui/race/QualiLap.tsx`,
-  `src/ui/race/drive.ts`, `src/ui/race/drive.test.ts`, `src/ui/race/RaceViewer.tsx`, `src/ui/pages/LiveRace.tsx`.
+- **Another agent (Claude) works in this same folder at the same time**, building the 3D cockpit moments.
+  **Do not edit these files**: `src/engine/race/*`, `src/engine/season/*`, `src/engine/rng.ts`,
+  `src/ui/race/QualiLap.tsx`, `src/ui/race/drive.ts`, `src/ui/race/drive.test.ts`, `src/ui/race/RaceViewer.tsx`,
+  `src/ui/pages/LiveRace.tsx`, `src/ui/race/MomentCard.tsx`, `src/ui/race/BrakeBar.tsx`, anything under
+  `src/ui/race/cockpit/`, `package.json`, `package-lock.json`, `CLAUDE.md`, `docs/NEXT.md`.
+- If `npx tsc` or `npm test` fails ONLY in files you did not touch, that's the other agent mid-work: note it in
+  the Results section, make sure your own files are clean, and still commit your own files.
 - Never add `Math.random()` to anything under `src/engine/`.
 - When done: `npx tsc --noEmit -p . && npm test` must pass. Then commit ONLY the files you changed
   (`git add <files>`, not `git add -A`: there is uncommitted work in progress in the tree) and push.
@@ -45,10 +49,15 @@ of this file:
 3. Phone: Stocks, type `25k` in the amount box, Buy works; Sell all works.
 4. Career hub: nothing overlaps at 1280px and at phone width (DevTools device mode).
 
-## C5. (after Opus lands the 3D moments) a "Simple controls" setting
+## C5. The moments view setting (a small standalone component)
 
-Wait until `docs/NEXT.md` says the 3D moment prototype is in. Then add a toggle on the live race pre-race
-screen next to "Key moments": `3D cockpit` / `Simple`, saved in localStorage like the moments mode.
+Create a NEW file `src/ui/race/MomentsView.tsx` (do not edit LiveRace.tsx; Claude will mount it there). Export:
+- `type MomentsView = "cockpit" | "simple"`
+- `readMomentsView(): MomentsView` (localStorage key `paddock.momentsView`, default `"cockpit"`, wrapped in
+  try/catch like `readMode` in LiveRace.tsx)
+- `function MomentsViewPicker({ value, onChange })`: two big buttons styled like the "Key moments" picker on the
+  live race pre-race screen (look at LiveRace.tsx for the classes, but don't edit it): `3D cockpit` ("Drive the
+  moment yourself, from the car") and `Simple` ("Pick a move, then the braking bar"). Saves to localStorage on change.
 
 ## Results / notes from Cursor
 

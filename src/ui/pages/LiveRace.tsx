@@ -192,7 +192,16 @@ export function LiveRace() {
           </div>
           <TrackOutline id={circuit.id} className="h-36 w-56" stroke="#e2e8f0" />
         </div>
-        <Weekend seed={seed} circuit={circuit} driverId={planIds[0] ?? ""} engineer={engineer} onRun={runQuali} busy={!!busy} />
+        <Weekend
+          seed={seed}
+          circuit={circuit}
+          driverId={planIds[0] ?? ""}
+          engineer={engineer}
+          onRun={runQuali}
+          busy={!!busy}
+          ratings={drivers.get(planIds[0] ?? "")?.ratings}
+          color={world.teams.find((t) => t.drivers.includes(planIds[0] ?? ""))?.color}
+        />
       </div>
     );
   }

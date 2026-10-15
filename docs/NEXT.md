@@ -38,7 +38,7 @@ contacts/partner/family, stocks, crypto, homes, cars, businesses, social). Life 
 ## What the user asked for next (in their words: "improve the qualifying, improve the actual GAME itself,
 ## in the moments you can view it from INSIDE the car like F1, make it more skill based")
 
-### 1. Qualifying lap: real driving, real lap time (most important)
+### 1. Qualifying lap: real driving, real lap time (DONE 2026-10-16: drive.ts + QualiLap.tsx; the notes below are how it was specced)
 
 Now (`src/ui/race/QualiLap.tsx`): the car follows the track at a fixed speed profile and you only steer left/right
 to stay on a green racing line; score = share of time on the line. It looks like the track but it's a
