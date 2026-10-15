@@ -367,6 +367,7 @@ export function LiveRace() {
             <MomentCard
               m={pend}
               who={codeOf(pend.car)}
+              ease={career ? DIFFICULTY[career.difficulty].window : 1}
               cockpit={{
                 trackId: prep.input.circuit.id,
                 km: prep.input.circuit.km,

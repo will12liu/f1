@@ -99,10 +99,12 @@ export const TIERS = {
 export type Tier = keyof typeof TIERS;
 
 export const DIFFICULTY = {
-  rookie: { label: "Rookie", xp: 1.4, duel: 0.15 }, // duel: added to the player's duel odds (log-odds)
-  pro: { label: "Pro", xp: 1, duel: 0 },
-  champion: { label: "Champion", xp: 0.85, duel: -0.15 },
-  legend: { label: "Legend", xp: 0.7, duel: -0.3 },
+  // duel: added to the player's duel odds (log-odds); window: how wide the mini-games' green zones are (and a
+  // little grip in the 3D cockpit)
+  rookie: { label: "Rookie", xp: 1.4, duel: 0.15, window: 1.35 },
+  pro: { label: "Pro", xp: 1, duel: 0, window: 1 },
+  champion: { label: "Champion", xp: 0.85, duel: -0.15, window: 0.85 },
+  legend: { label: "Legend", xp: 0.7, duel: -0.3, window: 0.7 },
 } as const;
 export type Difficulty = keyof typeof DIFFICULTY;
 

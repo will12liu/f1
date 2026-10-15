@@ -19,7 +19,7 @@ export interface CockpitTrack {
   grip?: number;
 }
 
-export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string; cockpit?: CockpitTrack }) {
+export function MomentCard({ m, onPick, who, cockpit, ease = 1 }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string; cockpit?: CockpitTrack; ease?: number }) {
   const [exec, setExec] = useState<{ id: string; label: string; zone: BrakeZone | null } | null>(null);
   const [simple, setSimple] = useState(false);
   useEffect(() => {
@@ -30,7 +30,8 @@ export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPi
   const pick = (id: string) => {
     const o = m.opts.find((x) => x.id === id);
     if (!o || o.disabled) return;
-    const zone = m.kind === "call" ? (m.sit === "restart" ? zoneFor("restart") : null) : zoneFor(id);
+    const z0 = m.kind === "call" ? (m.sit === "restart" ? zoneFor("restart") : null) : zoneFor(id);
+    const zone = z0 && { ...z0, half: z0.half * ease }; // difficulty: wider or tighter green
     if (zone) setExec({ id, label: o.label, zone });
     else if (m.sit === "tyres-gone" && id === "nurse") setExec({ id, label: o.label, zone: null }); // the needle game
     else onPick(id);
@@ -63,12 +64,12 @@ export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPi
           <div className="mb-3 font-display text-2xl font-black uppercase text-race">{exec.label}</div>
           {in3d ? (
             <Suspense fallback={<div className="text-lg text-slate-400">Loading the cockpit...</div>}>
-              <Cockpit3D {...cockpit!} side={m.kind === "defend" ? "defend" : "attack"} move={exec.id} label={exec.label} pick={m.lap} onResult={(q) => onPick(exec.id, q)} onSimple={() => setSimple(true)} />
+              <Cockpit3D {...cockpit!} grip={(cockpit!.grip ?? 1) * (1 + (ease - 1) * 0.06)} side={m.kind === "defend" ? "defend" : "attack"} move={exec.id} label={exec.label} pick={m.lap} onResult={(q) => onPick(exec.id, q)} onSimple={() => setSimple(true)} />
             </Suspense>
           ) : exec.zone ? (
             <BrakeBar zone={exec.zone} onResult={(q) => onPick(exec.id, q)} />
           ) : (
-            <TyreSave onResult={(q) => onPick(exec.id, q)} />
+            <TyreSave ease={ease} onResult={(q) => onPick(exec.id, q)} />
           )}
         </div>
       ) : (

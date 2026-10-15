@@ -7,7 +7,8 @@ import { verdict, verdictColor } from "./BrakeBar";
 const TIME = 4;
 const BAND = 0.24; // half-width of the green
 
-export function TyreSave({ onResult }: { onResult: (q: number) => void }) {
+export function TyreSave({ onResult, ease = 1 }: { onResult: (q: number) => void; ease?: number }) {
+  const band = BAND * ease;
   const [view, setView] = useState({ p: 0, left: TIME });
   const [res, setRes] = useState<number | null>(null);
   const keys = useRef({ l: false, r: false });
@@ -37,7 +38,7 @@ export function TyreSave({ onResult }: { onResult: (q: number) => void }) {
       const input = (keys.current.r ? 1 : 0) - (keys.current.l ? 1 : 0);
       v += (push * 1.6 + input * 3.2 - v * 1.8) * dt;
       p = Math.max(-1, Math.min(1, p + v * dt));
-      if (Math.abs(p) <= BAND) inBand += dt;
+      if (Math.abs(p) <= band) inBand += dt;
       setView({ p, left: Math.max(0, TIME - t) });
       if (t >= TIME) {
         const q = Math.max(0, Math.min(1, (inBand / TIME - 0.3) / 0.6));
@@ -61,7 +62,7 @@ export function TyreSave({ onResult }: { onResult: (q: number) => void }) {
     <div className="grid gap-3">
       <div className="text-lg text-slate-300">Keep the needle in the green: Left and Right (A, D), or hold a side.</div>
       <div className="relative h-14 overflow-hidden rounded-md bg-ink-950">
-        <div className="absolute inset-y-0 bg-emerald-600" style={{ left: `${((1 - BAND) / 2) * 100}%`, width: `${BAND * 100}%` }} />
+        <div className="absolute inset-y-0 bg-emerald-600" style={{ left: `${((1 - band) / 2) * 100}%`, width: `${band * 100}%` }} />
         <div className="absolute inset-y-0 left-0 w-[12%] bg-rose-700" />
         <div className="absolute inset-y-0 right-0 w-[12%] bg-rose-700" />
         <div className="absolute inset-y-0 w-1.5 -translate-x-1/2 bg-white" style={{ left: `${x * 100}%` }} />

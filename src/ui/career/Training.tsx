@@ -93,7 +93,7 @@ export function Training() {
                   myColor={color}
                   oppColor="#94a3b8"
                   habit={duel.side === "attack" ? (["coverIn", "coverOut", "hold", "lateDef"] as const)[duel.n % 4] : (["inside", "outside", "late", "dummy"] as const)[duel.n % 4]}
-                  grip={gripOf(d.ratings)}
+                  grip={gripOf(d.ratings) * (1 + (DIFFICULTY[c.difficulty].window - 1) * 0.06)}
                   onResult={(q) => (setDuelBest(q), setDuel(null))}
                   onSimple={() => setDuel(null)}
                   simpleLabel="Quit"
