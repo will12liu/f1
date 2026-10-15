@@ -8,7 +8,7 @@ import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
-import { car, frame, road, sky } from "./scene";
+import { car, frame, groundOf, road, sky } from "./scene";
 
 export interface CockpitProps {
   trackId: string;
@@ -68,11 +68,11 @@ export default function Cockpit3D(p: CockpitProps) {
     const scene = new THREE.Scene();
     sky(scene, p.trackId);
     const f0 = frame(g, s.zone.brakeD, 0);
-    const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: "#3f7a36", side: THREE.DoubleSide }));
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: groundOf(p.trackId), side: THREE.DoubleSide }));
     grass.rotation.x = -Math.PI / 2;
     grass.position.set(f0.px, -0.03, f0.pz);
     scene.add(grass);
-    scene.add(road(g, s.me.d - 60 / g.m, s.endD + 500 / g.m, [s.zone]));
+    scene.add(road(g, s.me.d - 60 / g.m, s.endD + 500 / g.m, [s.zone], p.trackId));
     const mine = car(p.myColor);
     const ownHalo = mine.children.filter((c) => c.name === "halo");
     for (const c of ownHalo) c.visible = false; // the overlay draws it from inside

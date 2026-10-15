@@ -8,7 +8,7 @@ import { reactionScore } from "../../career/SimGames";
 import { useTrack } from "../../components/bits";
 import { verdictColor } from "../BrakeBar";
 import { build, HALF_M } from "../drive";
-import { car, frame, road, sky } from "./scene";
+import { car, frame, groundOf, road, sky } from "./scene";
 import { zones } from "./duel";
 
 export interface Start3DProps {
@@ -59,11 +59,11 @@ export default function Start3D(p: Start3DProps) {
     const slotAt = (slot: number) => ({ d: g.len - ((slot - 1) * SLOT + 6) / g.m, x: slot % 2 ? 0.35 : -0.35 }); // pole on the left of the road
     const back = slotAt(Math.max(22, p.mySlot) + 2).d;
     const f0 = frame(g, 0, 0);
-    const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: "#3f7a36", side: THREE.DoubleSide }));
+    const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: groundOf(p.trackId), side: THREE.DoubleSide }));
     grass.rotation.x = -Math.PI / 2;
     grass.position.set(f0.px, -0.03, f0.pz);
     scene.add(grass);
-    scene.add(road(g, back - 40 / g.m, g.len + 600 / g.m, zones(g).filter((z) => z.brakeD < 600 / g.m).map((z) => ({ ...z, brakeD: z.brakeD + g.len }))));
+    scene.add(road(g, back - 40 / g.m, g.len + 600 / g.m, zones(g).filter((z) => z.brakeD < 600 / g.m).map((z) => ({ ...z, brakeD: z.brakeD + g.len })), p.trackId));
     // the grid boxes and the field
     const cars = p.grid.map((e) => {
       const c = car(e.slot === p.mySlot ? p.myColor : e.color);

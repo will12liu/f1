@@ -18,6 +18,10 @@ export function frame(g: Geo, d: number, x: number, slip = 0) {
   return { px, pz, nx, ny, dx, dz, yaw: Math.atan2(-dx, -dz) };
 }
 
+// street circuits: walls at the edge, concrete, buildings
+export const STREET = new Set(["monaco", "baku", "marina_bay", "vegas", "jeddah", "madring"]);
+export const groundOf = (trackId: string) => (STREET.has(trackId) ? "#55595f" : "#3f7a36");
+
 // races run under lights
 const NIGHT = new Set(["bahrain", "jeddah", "marina_bay", "vegas", "losail", "yas_marina"]);
 
@@ -96,7 +100,8 @@ function board(text: string): THREE.Mesh {
 }
 
 /** Road, kerbs, lines and barriers for d0..d1 (track units) as one vertex-coloured mesh. */
-export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn: number }[]): THREE.Group {
+export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn: number }[], trackId = ""): THREE.Group {
+  const street = STREET.has(trackId);
   const grp = new THREE.Group();
   const pos: number[] = [];
   const col: number[] = [];
@@ -106,7 +111,8 @@ export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn:
     red = C("#d42a2a"),
     wht = C("#f1f5f9"),
     wall = C("#c9ced6"),
-    top = C("#1d4ed8");
+    top = C("#1d4ed8"),
+    fence = C("#6b7280");
   const step = 2 / g.m;
   const strip = (a: number, b: number, y0: number, y1: number, pick: (d: number, k: number) => THREE.Color | null) => {
     let k = 0;
@@ -132,23 +138,27 @@ export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn:
   for (const s of [1, -1]) {
     strip(s * (W - 0.35), s * (W - 0.1), 0.01, 0.01, () => line);
     strip(s * W, s * (W + 1.3), 0.03, 0.03, (d, k) => (kerbAt(d) ? (k % 4 < 2 ? red : wht) : null));
-    strip(s * (W + 14), s * (W + 14), 0, 1.1, () => wall);
-    strip(s * (W + 14), s * (W + 14), 1.1, 1.3, () => top);
+    // barriers: far back behind run-off on a circuit, right at the edge (with a debris fence) on the streets
+    const B = street ? W + 4 : W + 14; // street: just past the track limit (the lap or duel ends there)
+    strip(s * B, s * B, 0, 1.1, () => wall);
+    strip(s * B, s * B, 1.1, street ? 3.6 : 1.3, () => (street ? fence : top));
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
   grp.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-  // grandstands behind the barriers, every so often, for a sense of speed
-  const seats = ["#1d4ed8", "#b91c1c", "#f8fafc", "#0f766e"];
+  // grandstands behind the barriers every so often for a sense of speed; buildings on the streets
+  const seats = street ? ["#d6d3d1", "#a8a29e", "#e7e5e4", "#78716c"] : ["#1d4ed8", "#b91c1c", "#f8fafc", "#0f766e"];
   let k = 0;
-  for (let d = d0; d < d1; d += 140 / g.m, k++) {
-    if (k % 3 === 2) continue;
+  for (let d = d0; d < d1; d += (street ? 60 : 140) / g.m, k++) {
+    if (!street && k % 3 === 2) continue;
     const sd = k % 2 ? 1 : -1;
-    const f = frame(g, d, sd * (1 + 30 / HALF_M));
-    const st = new THREE.Mesh(new THREE.BoxGeometry(40, 6, 9), new THREE.MeshLambertMaterial({ color: seats[k % seats.length], side: THREE.DoubleSide }));
-    st.position.set(f.px, 3, f.pz);
+    const hgt = street ? 14 + (k % 3) * 9 : 6;
+    const deep = street ? 16 : 9;
+    const f = frame(g, d, sd * (1 + ((street ? 4 : 16) + deep / 2) / HALF_M));
+    const st = new THREE.Mesh(new THREE.BoxGeometry(deep, hgt, street ? 50 : 40), new THREE.MeshLambertMaterial({ color: seats[k % seats.length], side: THREE.DoubleSide }));
+    st.position.set(f.px, hgt / 2, f.pz);
     st.rotation.y = f.yaw;
     grp.add(st);
   }
@@ -175,11 +185,11 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
   const scene = new THREE.Scene();
   sky(scene, trackId);
   const size = Math.max(g.w, g.h) * g.m;
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(size * 3, size * 3), new THREE.MeshLambertMaterial({ color: "#3f7a36" }));
+  const grass = new THREE.Mesh(new THREE.PlaneGeometry(size * 3, size * 3), new THREE.MeshLambertMaterial({ color: groundOf(trackId) }));
   grass.rotation.x = -Math.PI / 2;
   grass.position.set((g.w / 2) * g.m, -0.03, (g.h / 2) * g.m);
   scene.add(grass);
-  scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g)));
+  scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g), trackId));
   const mine = car(color, false);
   const ghost = car("#e2e8f0");
   ghost.traverse((o) => {
