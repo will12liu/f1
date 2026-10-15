@@ -79,13 +79,18 @@ Duel moments open `MomentCard` -> pick a move -> `BrakeBar` (a flat timing bar).
 - A cheap first step: render the cockpit view for the existing braking zone only (boards approach, press
   brake), then add steering.
 
-### 3. More skill in the race itself (ideas, pick with the user)
+Built 2026-10-16 (Claude, see CLAUDE.md "Cockpit duels"): `src/ui/race/cockpit/` (`duel.ts` pure + tested at
+every circuit, `scene.ts` road/cars/sky/onboard, `Cockpit3D.tsx`), the TV replay after each duel, sound, mirrors,
+night races, phone pads + tilt, the moments-view picker on the pre-race screen, duel practice on the Training
+page, and an "Onboard" view for the qualifying lap. Still open: tune `duelScore` from real play (the user hasn't
+driven it yet), the 3D start (grid + lights gantry instead of the flat Reaction game), a better car model,
+scenery per circuit (walls at street tracks, trees), the duel at the corner where the fight actually is.
 
-- Restart / safety-car restart as a reaction + throttle game (same shape as the lights-out start).
-- Defending: pick the side early, then hold it under braking (a second timing).
-- Tyre saving: a short "hold the needle" mini-game on a call (`tyres going` moment) whose score moves wear for
-  that lap (store it on the command like `crew`).
-- Difficulty setting scales the windows (rookie wide, legend tight) instead of only XP.
+### 3. More skill in the race itself
+
+DONE 2026-10-16: safety-car restart Go bar (`RACE.restartSkill`), tyre saving needle game on "Nurse them"
+(`TyreSave.tsx`, wear for five laps), difficulty sets the windows (`DIFFICULTY[..].window`). Still an idea:
+defending as two timings (pick the side early, hold it under braking).
 
 ## Not checked in a browser yet
 
