@@ -1,13 +1,35 @@
 // The freeze-frame card for a key moment: what's happening, what you know of the other driver, the options,
 // and "instinct" (let the driver decide, the plain AI path). A duel move is then executed through the braking
 // mini-game (BrakeBar); its score goes to the engine with the answer. Keys 1-n pick an option.
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { PendingMoment } from "../../engine/race/moments";
 import { BrakeBar, zoneFor, type BrakeZone } from "./BrakeBar";
 
-export function MomentCard({ m, onPick, who }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string }) {
+// the 3D cockpit (three.js) loads only when a duel opens in it
+const Cockpit3D = lazy(() => import("./cockpit/Cockpit3D"));
+export interface CockpitTrack {
+  trackId: string;
+  km: number;
+  target: number;
+  myColor: string;
+  oppColor: string;
+}
+const cockpitOn = () => {
+  try {
+    return localStorage.getItem("paddock.momentsView") !== "simple";
+  } catch {
+    return true;
+  }
+};
+
+export function MomentCard({ m, onPick, who, cockpit }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string; cockpit?: CockpitTrack }) {
   const [exec, setExec] = useState<{ id: string; label: string; zone: BrakeZone } | null>(null);
-  useEffect(() => setExec(null), [m.id]);
+  const [simple, setSimple] = useState(false);
+  useEffect(() => {
+    setExec(null);
+    setSimple(false);
+  }, [m.id]);
+  const in3d = !!exec && !!cockpit && !simple && m.kind !== "call" && cockpitOn();
   const pick = (id: string) => {
     const o = m.opts.find((x) => x.id === id);
     if (!o || o.disabled) return;
@@ -41,7 +63,13 @@ export function MomentCard({ m, onPick, who }: { m: PendingMoment; onPick: (opt:
       {exec ? (
         <div className="mt-4">
           <div className="mb-3 font-display text-2xl font-black uppercase text-race">{exec.label}</div>
-          <BrakeBar zone={exec.zone} onResult={(q) => onPick(exec.id, q)} />
+          {in3d ? (
+            <Suspense fallback={<div className="text-lg text-slate-400">Loading the cockpit...</div>}>
+              <Cockpit3D {...cockpit!} side={m.kind === "defend" ? "defend" : "attack"} move={exec.id} label={exec.label} pick={m.lap} onResult={(q) => onPick(exec.id, q)} onSimple={() => setSimple(true)} />
+            </Suspense>
+          ) : (
+            <BrakeBar zone={exec.zone} onResult={(q) => onPick(exec.id, q)} />
+          )}
         </div>
       ) : (
       <div className="mt-4 grid gap-2 sm:grid-cols-3">

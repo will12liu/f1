@@ -356,6 +356,13 @@ export function LiveRace() {
             <MomentCard
               m={pend}
               who={codeOf(pend.car)}
+              cockpit={{
+                trackId: prep.input.circuit.id,
+                km: prep.input.circuit.km,
+                target: prep.input.circuit.base - 0.4,
+                myColor: team(entries[pend.car].teamId)?.color ?? "#e10600",
+                oppColor: pend.vs !== undefined ? (team(entries[pend.vs].teamId)?.color ?? "#94a3b8") : "#94a3b8",
+              }}
               onPick={(opt, q) => {
                 const m = pend;
                 const before = runner.state.order.indexOf(m.car) + 1;
