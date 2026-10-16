@@ -179,7 +179,7 @@ export default function Start3D(p: Start3DProps) {
   useEffect(() => clear, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.code === "Space" || e.code === "Enter") && !e.repeat) {
+      if ((e.code === "Space" || e.code === "Enter" || e.code === "KeyW" || e.code === "ArrowUp") && !e.repeat) {
         e.preventDefault();
         go();
       }
@@ -197,7 +197,7 @@ export default function Start3D(p: Start3DProps) {
       </svg>
       <div className="absolute left-4 top-4 rounded-md bg-ink-950/85 px-4 py-3">
         <div className="kicker">The start · P{p.mySlot} on the grid</div>
-        <div className="mt-1 text-lg text-white">Five red lights. When they all go out, launch: Space or tap. Go early and it's five seconds.</div>
+        <div className="mt-1 text-lg text-white">Five red lights. When they all go out, launch: W (throttle), Space or tap. Go early and it's five seconds.</div>
       </div>
       {/* the lights, repeated on screen like the TV onboard graphic */}
       <div className="pointer-events-none absolute left-1/2 top-[16%] flex -translate-x-1/2 gap-2 rounded-md bg-ink-950/85 p-2">

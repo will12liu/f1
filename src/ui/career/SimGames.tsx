@@ -108,7 +108,7 @@ export function Reaction({ onDone, onQuit, kicker, cta = "Save the session ›",
   useEffect(() => clear, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.code === "Space" || e.code === "Enter") && !e.repeat) {
+      if ((e.code === "Space" || e.code === "Enter" || e.code === "KeyW" || e.code === "ArrowUp") && !e.repeat) {
         e.preventDefault();
         go();
       }

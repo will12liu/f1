@@ -302,7 +302,7 @@ export function LiveRace() {
             <Reaction
               kicker={`${circuit.gp} · the start`}
               cta="Race ›"
-              intro="Five red lights. When they go out, launch: Space or tap. A great start gains places; jump it and it's five seconds."
+              intro="Five red lights. When they go out, launch: W (throttle), Space or tap. A great start gains places; jump it and it's five seconds."
               onQuit={() => (setStartGame(false), start())}
               onDone={(q, jumped) => (setStartGame(false), start({ [chosen]: jumped ? -1 : q }))}
             />
