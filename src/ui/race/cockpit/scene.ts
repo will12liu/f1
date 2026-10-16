@@ -173,8 +173,8 @@ export function sky(scene: THREE.Scene, trackId: string): void {
   const air = night ? "#0b1220" : "#9cc3e6";
   scene.background = new THREE.Color(air);
   scene.fog = new THREE.Fog(air, night ? 140 : 220, night ? 700 : 1100);
-  scene.add(new THREE.HemisphereLight(night ? "#c7d2fe" : "#ffffff", night ? "#1f2937" : DESERT.has(trackId) ? "#c2a36b" : "#4a6b3a", night ? 1.1 : 1.6));
-  const sun = new THREE.DirectionalLight(night ? "#fef3c7" : "#fff7ed", night ? 1.0 : 1.35);
+  scene.add(new THREE.HemisphereLight(night ? "#c7d2fe" : "#ffffff", night ? "#1f2937" : DESERT.has(trackId) ? "#c2a36b" : "#4a6b3a", night ? 1.7 : 1.6));
+  const sun = new THREE.DirectionalLight(night ? "#fef3c7" : "#fff7ed", night ? 1.5 : 1.35);
   sun.position.set(80, 200, 40);
   scene.add(sun);
   const dome = new THREE.SphereGeometry(4000, 18, 12);
