@@ -88,4 +88,13 @@ Write what you did and anything left at the bottom of this file.
 
 ## Results / notes from Grok
 
-(write here)
+Built in `road()` and `sky()` (signatures unchanged, car code untouched):
+
+- Surface: slabbed tarmac, a dark rubber line on `g.line` that widens in `g.ref.brake`, white edge lines, a white start line plus a chequered strip, grid boxes (same 8 m stagger as the lights-out start), green-and-white paint outside the line.
+- Kerbs: raised red/white blocks where `g.kerb`, yellow sausage bumps on the outside.
+- Run-off: striped grey tarmac on the outside of the braking zones, beige gravel on the other corner outsides, mown grass (sand at Bahrain and Lusail) up to the fence. Streets stay a sidewalk and a wall. Monaco has water and a few boats on the left.
+- Barriers: two armco rails on posts, a low-opacity catch fence, tyre stacks with a red belt by the fence, colour hoardings (no brands), an orange marshal hut every ~320 m. Streets keep the concrete wall and the debris fence.
+- Scenery: instanced trees (denser at Spa, Monza, Suzuka, none in the desert, darker at night), tiered grandstands with a roof, a pit building before the line, one footbridge (a hotel deck at Yas Marina), a wheel at Suzuka, taller blocks at Singapore, Las Vegas and Baku.
+- Sky: a vertex-coloured dome (horizon to overhead), fog, floodlight poles on the night list.
+
+Still open: soft shadows on the cars only (that needs the renderer in `Cockpit3D` / `Start3D`, which this task leaves alone), a real pit-lane exit blend, and more landmarks than the wheel, the hotel and the harbour.
