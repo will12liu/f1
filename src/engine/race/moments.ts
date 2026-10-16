@@ -256,7 +256,7 @@ sit({
     "Restart, P{pos}. {left} laps after this. Tell me attack, defend, or no change.",
   ],
   calls: [
-    { id: "neutral", label: "No change", hint: "No change: standard pace, ERS balanced. The getaway bar still moves this lap." },
+    { id: "neutral", label: "No change", hint: "No change: you keep your dials as they are. The getaway bar still decides your start." },
     { id: "attack", label: "Full attack", hint: "Pace 5, ERS attack: quicker off the restart and stronger in a pass. Tyres and battery go quicker.", dials: { ers: "attack", pace: 5 } },
     { id: "defend", label: "Cover the inside", hint: "ERS defend: you spend battery to hold the inside. No extra pace.", dials: { ers: "defend" } },
   ],
