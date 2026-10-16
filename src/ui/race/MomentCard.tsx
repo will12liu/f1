@@ -31,17 +31,10 @@ export function MomentCard({ m, onPick, who, cockpit, ease = 1 }: { m: PendingMo
     setSimple(false);
   }, [m.id]);
   const in3d = !!exec && !!cockpit && !simple && m.kind !== "call" && readMomentsView() === "cockpit";
-  // cockpit mode: no list of moves, a countdown and straight into the car; your driving decides the move
-  const direct = !!cockpit && !simple && m.kind !== "call" && readMomentsView() === "cockpit";
-  const [count, setCount] = useState(3);
-  useEffect(() => {
-    setCount(3);
-  }, [m.id]);
-  useEffect(() => {
-    if (!direct || count <= 0) return;
-    const id = window.setTimeout(() => setCount((c) => c - 1), 700);
-    return () => clearTimeout(id);
-  }, [direct, count]);
+  // "Race it yourself": straight into the 3D car, your driving decides the move
+  const canDrive = !!cockpit && m.kind !== "call";
+  const [drive, setDrive] = useState(false);
+  useEffect(() => setDrive(false), [m.id]);
   const legal = (move: string) => {
     const ok = (id: string) => m.opts.some((o) => o.id === id && !o.disabled);
     return ok(move) ? move : (m.opts.find((o) => !o.disabled && o.id !== "wait" && o.id !== "yield")?.id ?? "auto");
@@ -56,8 +49,13 @@ export function MomentCard({ m, onPick, who, cockpit, ease = 1 }: { m: PendingMo
     else onPick(id);
   };
   useEffect(() => {
-    if (exec || direct) return;
+    if (exec || drive) return;
     const onKey = (e: KeyboardEvent) => {
+      if (canDrive && (e.code === "Enter" || e.code === "Space")) {
+        e.preventDefault();
+        setDrive(true);
+        return;
+      }
       const i = Number(e.key) - 1;
       if (i >= 0 && i < m.opts.length) pick(m.opts[i].id);
       else if (i === m.opts.length) onPick("auto");
@@ -65,46 +63,27 @@ export function MomentCard({ m, onPick, who, cockpit, ease = 1 }: { m: PendingMo
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  if (direct)
+  if (drive && canDrive)
     return (
-      <div className="rounded-lg border border-ink-600 bg-ink-900 p-5 shadow-xl">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-md bg-race px-2.5 py-1 font-display text-base font-bold uppercase tracking-wide text-white">Key moment</span>
-          <span className="kicker">
-            Lap {m.lap}
-            {who ? ` · ${who}` : ""}
-          </span>
-        </div>
-        <h3 className="headline mt-3 text-4xl">{m.title}</h3>
-        <p className="mt-2 text-lg text-slate-300">{m.text}</p>
-        {m.read && <p className="mt-1 text-base text-sky-300">{m.read}</p>}
-        {count > 0 ? (
-          <div className="mt-4 flex items-center gap-6">
-            <span className="font-display text-8xl font-black leading-none text-white">{count}</span>
-            <button className="text-base text-slate-400 underline hover:text-white" onClick={() => setSimple(true)}>
-              Pick a move instead
-            </button>
-          </div>
-        ) : (
-          <Suspense fallback={<div className="mt-4 text-lg text-slate-400">Loading the cockpit...</div>}>
-            <Cockpit3D
-              {...cockpit!}
-              grip={(cockpit!.grip ?? 1) * (1 + (ease - 1) * 0.06)}
-              side={m.kind === "defend" ? "defend" : "attack"}
-              move="free"
-              label={m.kind === "defend" ? "Defend" : "Attack"}
-              pick={m.lap}
-              onResult={(q, move) => onPick(legal(move), q)}
-              onSimple={() => setSimple(true)}
-            />
-          </Suspense>
-        )}
-      </div>
+      <Suspense fallback={<div className="rounded-lg bg-ink-900 p-5 text-lg text-slate-400">Loading the cockpit...</div>}>
+        <Cockpit3D
+          {...cockpit!}
+          grip={(cockpit!.grip ?? 1) * (1 + (ease - 1) * 0.06)}
+          side={m.kind === "defend" ? "defend" : "attack"}
+          move="free"
+          label={m.title}
+          pick={m.lap}
+          onResult={(q, move) => onPick(legal(move), q)}
+          onSimple={() => setDrive(false)}
+          simpleLabel="Back to the choices"
+        />
+      </Suspense>
     );
   const tag = m.kind === "attack" ? "bg-sky-400 text-ink-950" : m.kind === "defend" ? "bg-amber-400 text-ink-950" : "bg-slate-300 text-ink-950";
   return (
     <div className="rounded-lg border border-ink-600 bg-ink-900 p-5 shadow-xl">
       <div className="flex flex-wrap items-center gap-3">
+        {canDrive && <span className="rounded-md bg-race px-2.5 py-1 font-display text-base font-bold uppercase tracking-wide text-white">Key moment</span>}
         <span className={`rounded-md px-2.5 py-1 font-display text-base font-bold uppercase tracking-wide ${tag}`}>{m.kind === "attack" ? "Attack" : m.kind === "defend" ? "Defend" : "Pit wall"}</span>
         <span className="kicker">
           Lap {m.lap}
@@ -114,6 +93,14 @@ export function MomentCard({ m, onPick, who, cockpit, ease = 1 }: { m: PendingMo
       <h3 className="headline mt-3 text-4xl">{m.title}</h3>
       <p className="mt-2 text-lg text-slate-300">{m.text}</p>
       {m.read && <p className="mt-1 text-base text-sky-300">{m.read}</p>}
+      {canDrive && !exec && (
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <button autoFocus onClick={() => setDrive(true)} className="btn-xl bg-race text-white hover:bg-red-500">
+            Race it yourself ›
+          </button>
+          <span className="text-base text-slate-400">What do you do? Drive it in the cockpit (Enter), or pick a move below.</span>
+        </div>
+      )}
       {exec ? (
         <div className="mt-4">
           <div className="mb-3 font-display text-2xl font-black uppercase text-race">{exec.label}</div>

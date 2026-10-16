@@ -30,6 +30,8 @@ import { TeamBar, TrackOutline, useMaps } from "../components/bits";
 
 const Start3D = lazy(() => import("../race/cockpit/Start3D")); // three.js only when the start opens in 3D
 const PICK_KEY = "paddock.liveDriver";
+// radio calls that are only chatter: answered "no change" so the race only stops for fights and real strategy calls
+const CHATTER = new Set(["pressure", "battery-low", "gap-behind", "closing", "points-home", "manage-lead", "engine-hot", "mate-race", "fuel-short"]);
 const topHabit = (w: Record<string, number>) => Object.entries(w).sort((a, b) => b[1] - a[1])[0]?.[0];
 const MOMENTS_KEY = "paddock.moments";
 type MomentMode = "off" | "key" | "all";
@@ -145,12 +147,26 @@ export function LiveRace() {
       const s = runner.state;
       return s.order.length ? s.cars[s.order[0]].cum : Infinity;
     };
+    // radio chatter (no fight, no real strategy call) is answered "no change" without stopping the race;
+    // the answer is stored like any other, so the replay matches
+    const chatter = () => {
+      const m = runner.pending();
+      if (!m || m.kind !== "call" || !CHATTER.has(m.sit)) return false;
+      runner.choose("auto");
+      runner.step(); // the answer only lands when the lap goes on
+      return true;
+    };
     return {
       advance(t) {
         let stepped = false;
         // stay one lap ahead of what's on screen, so a dial change counts from the next lap
         // stop at a key moment: the picture freezes until the player answers
-        while (!runner.done() && !runner.pending() && leadEnd() - 1 < t) {
+        while (!runner.done() && leadEnd() - 1 < t) {
+          if (chatter()) {
+            stepped = true;
+            continue;
+          }
+          if (runner.pending()) break;
           runner.step();
           stepped = true;
         }
@@ -159,6 +175,15 @@ export function LiveRace() {
         if (m) setZoomAt((f) => (f?.t === m.t ? f : { t: m.t, cars: m.vs !== undefined ? [m.car, m.vs] : [m.car] }));
         if (stepped) refresh();
         return runner.done() ? Infinity : leadEnd() - 0.5;
+      },
+      nextMoment() {
+        // run on (current dials) to the next moment; the screen jumps to just before it
+        while (!runner.done() && (chatter() || !runner.pending())) if (!runner.pending()) runner.step();
+        const m = runner.pending();
+        setPend((p) => (p?.id === m?.id ? p : m));
+        if (m) setZoomAt({ t: m.t, cars: m.vs !== undefined ? [m.car, m.vs] : [m.car] });
+        refresh();
+        return m ? m.t : null;
       },
       finish() {
         while (!runner.done()) {
@@ -262,7 +287,7 @@ export function LiveRace() {
         </div>
         <div className="grid gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
           <div className="font-display text-2xl font-extrabold uppercase text-white">Key moments</div>
-          <div className="text-base text-slate-400">The race stops for duels within a second and for strategy calls.</div>
+          <div className="text-base text-slate-400">The race stops for fights you can race yourself (Race it yourself) and for big strategy calls: safety car, tyres, undercut, restart.</div>
           <div className="grid grid-cols-3 gap-2">
             {(
               [

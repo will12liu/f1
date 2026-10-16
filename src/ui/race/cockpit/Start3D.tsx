@@ -177,6 +177,13 @@ export default function Start3D(p: Start3DProps) {
     } else if (ph === "ready") start();
   };
   useEffect(() => clear, []);
+  // once you've launched (or jumped it), watch the getaway for a moment, then back to the race on its own
+  useEffect(() => {
+    if (phase !== "done" && phase !== "jump") return;
+    const q = phase === "done" ? reactionScore(ms) : 0;
+    const id = window.setTimeout(() => p.onDone(q, phase === "jump"), 2400);
+    return () => clearTimeout(id);
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.code === "Space" || e.code === "Enter" || e.code === "KeyW" || e.code === "ArrowUp") && !e.repeat) {

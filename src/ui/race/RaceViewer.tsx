@@ -18,6 +18,7 @@ const BASE_RATE = 6; // race seconds per real second at 1x
 export interface LiveSource {
   advance(t: number): number; // runs laps as needed, returns the latest time that can be shown
   finish(): void; // run to the flag at the current dials
+  nextMoment?(): number | null; // run on to the next key moment and return its time (null: none left)
 }
 
 export function RaceViewer({
@@ -154,6 +155,19 @@ export function RaceViewer({
             {follow !== null && circ && (
               <button onClick={toggleOnboard} className={`btn !px-3 !py-2 !text-base ${onboard ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`} title="Ride along with the car you follow, in 3D">
                 Onboard
+              </button>
+            )}
+            {live?.nextMoment && (
+              <button
+                className="btn !px-3 !py-2 !text-base bg-race text-white hover:bg-red-500"
+                title="Skip ahead to the next key moment"
+                onClick={() => {
+                  const tm = live.nextMoment!();
+                  if (tm !== null) setT((cur) => Math.max(cur, tm - 4));
+                  setPlaying(true);
+                }}
+              >
+                Next key moment ›
               </button>
             )}
             <button className="btn-ghost !px-3 !py-2 !text-base" onClick={() => jumpLap(1)} title="Next lap">
