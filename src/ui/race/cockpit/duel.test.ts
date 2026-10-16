@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { TrackFile } from "../../components/bits";
 import { at, build, type Input } from "../drive";
-import { aheadOf, startDuel, stepDuel, zones, type Duel } from "./duel";
+import { aheadOf, inferMove, startDuel, stepDuel, zones, type Duel } from "./duel";
 
 const track = (id: string) => JSON.parse(readFileSync(`public/data/tracks/${id}.json`, "utf8")) as TrackFile;
 const monza = () => build(track("monza"), 5.793, 83.1);
@@ -33,8 +33,10 @@ describe("cockpit duel", () => {
   it("a tidy attack on the inside gains, a flat-out one ends off the road or in the car", () => {
     const g = monza();
     const z = zones(g)[0];
-    const good = run(startDuel(g, "attack", "inside", 0), 0, -0.9 * z.turn);
+    const duel = startDuel(g, "attack", "free", 0);
+    const good = run(duel, 0, -0.9 * z.turn);
     expect(good.q).toBeGreaterThan(0.55);
+    expect(inferMove(duel)).toBe("inside"); // driving up the inside counts as the inside move
     const silly = run(startDuel(g, "attack", "inside", 0), 400, -0.9 * z.turn);
     expect(silly.q).toBeLessThan(0.2);
   });

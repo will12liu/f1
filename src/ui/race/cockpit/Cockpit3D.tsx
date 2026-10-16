@@ -8,7 +8,7 @@ import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "../assist";
-import { aheadOf, startDuel, stepDuel, type Duel, type Side } from "./duel";
+import { aheadOf, inferMove, startDuel, stepDuel, type Duel, type Side } from "./duel";
 import { car, EYE, frame, groundOf, inside, road, sky, steerWheels } from "./scene";
 
 export interface CockpitProps {
@@ -25,7 +25,7 @@ export interface CockpitProps {
   oppColor2?: string;
   myNum?: number;
   oppNum?: number;
-  onResult: (q: number) => void;
+  onResult: (q: number, move: string) => void; // move: what your driving amounted to (inferMove)
   onSimple: () => void; // fall back to the braking bar
   simpleLabel?: string; // that button's text ("Quit" in practice)
   habit?: string; // the other driver's favourite duel move
@@ -55,6 +55,7 @@ export default function Cockpit3D(p: CockpitProps) {
   const [res, setRes] = useState<{ q: number; why: string } | null>(null);
   const done = useRef(false);
   const finished = useRef(false); // onResult sent
+  const moveRef = useRef("inside");
   const replaying = useRef(false);
   const [replay, setReplay] = useState(false);
   const [sound, setSound] = useState(soundOn); // takes effect next duel
@@ -177,6 +178,7 @@ export default function Cockpit3D(p: CockpitProps) {
         if (r) s.result = r;
         if (r && !done.current) {
           done.current = true;
+          moveRef.current = inferMove(s);
           setRes(r);
           replayAt = now + 900; // a beat on the result, then the replay
         }
@@ -186,7 +188,7 @@ export default function Cockpit3D(p: CockpitProps) {
       const from = Math.max(0, rec.length - 300);
       if (rp >= 0 && from + rp >= rec.length + 60 && !finished.current) {
         finished.current = true;
-        p.onResult(s.result!.q);
+        p.onResult(s.result!.q, inferMove(s));
       }
       const at_ = rp >= 0 ? rec[Math.min(rec.length - 1, from + rp)] : null;
       if (rp >= 0 && !replaying.current) {
@@ -406,7 +408,7 @@ export default function Cockpit3D(p: CockpitProps) {
               onClick={() => {
                 if (finished.current) return;
                 finished.current = true;
-                p.onResult(res.q);
+                p.onResult(res.q, moveRef.current);
               }}
             >
               Back to the race ›

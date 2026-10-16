@@ -32,6 +32,7 @@ export interface Duel {
   minGap: number; // metres, signed (me ahead +), closest call
   contact: boolean;
   result: { q: number; why: string } | null;
+  apexSide?: number; // +1 you were inside him at the apex, -1 outside (sets the move when you just drive)
   habit: string; // the other driver's favourite move (moments.ts tendencies): coverIn/coverOut/hold/lateDef or inside/outside/late/dummy
 }
 
@@ -129,10 +130,17 @@ export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {
     if (Math.abs(o.x - s.me.x) < room) o.x = Math.max(-EDGE.limit, Math.min(EDGE.limit, s.me.x + away * room));
   }
 
+  if (s.apexSide === undefined && s.me.d >= zone.apexD) s.apexSide = (s.me.x - o.x) * -zone.turn > 0 ? 1 : -1;
   const now = gapM(s);
   if (Math.abs(now) < Math.abs(s.minGap)) s.minGap = now;
   if (Math.abs(now) < LEN && Math.abs(s.me.x - o.x) * HALF_M < WIDE) s.contact = true;
   if (s.contact || s.me.deleted || s.me.d >= s.endD || s.t > 22 || (s.braked && s.me.v < 4)) s.result = duelScore(s);
+}
+
+/** The duel move your driving amounts to (when you drive it without picking one): the side you took at the apex. */
+export function inferMove(s: Duel): string {
+  const inside = (s.apexSide ?? ((s.me.x - s.opp.x) * -s.zone.turn > 0 ? 1 : -1)) > 0;
+  return s.side === "attack" ? (inside ? "inside" : "outside") : inside ? "coverIn" : "coverOut";
 }
 
 /** On the road to the engine's 0-1. */
