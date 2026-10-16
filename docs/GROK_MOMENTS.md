@@ -61,4 +61,18 @@ calls })`:
 
 ## Results / notes from Grok
 
-(write here)
+Only the `// ── calls ──` block in `src/engine/race/moments.ts`. Duels, ids, and the rest of `src/engine/` are unchanged. `fuel-short` is still weight 0.
+
+Existing calls, same ids, options now match the label:
+- `sc-box`: box this lap pits; stay out holds the stop.
+- `tyres-gone`: box pits; nurse is tyre care 5 and pace 2 (the needle game still keys off `nurse`); push on is pace 4 and tyre care 1.
+- `undercut`: stay on the plan does nothing; box pits early; stay out and push is pace 4, tyre care 2, and hold the stop.
+- `restart`: no change leaves the dials; full attack is pace 5 and ERS attack; cover the inside is ERS defend. The getaway bar is unchanged.
+- `fuel-short`: lean is pace 2, engine low, lean mix; lift and coast is pace 1 as well; no change does nothing. The car still sets the mix itself when a race is running.
+- `limits`: back off is pace 2 and tyre care 4; keep pushing is pace 4 and engine high.
+- `mate-swap`: no change; let him through is `letBy`.
+- `pressure`: no change; defend mode is ERS defend; push to break the tow is pace 4 and ERS attack.
+
+Each of those, and the eight new ones, has six title lines and six text lines. Placeholders only from `fill()`.
+
+New calls: `battery-low` (harvest vs keep deploying), `gap-behind` (save vs fastest lap), `closing` (patient vs pace 4), `points-home` (bring it home vs attack), `manage-lead` (engine low vs keep pushing), `engine-hot` (weight 2, any green lap after 10, not on a restart), `mate-race` (race him vs hold station, when the car ahead is your team-mate or `teammateFight`), `vsc-box` (box vs stay under a virtual safety car). They stay quiet on a restart lap so the restart call still wins. `npx tsc --noEmit -p . && npm test` passed after the option rewrite, after the extra lines, and after the new calls. In the browser, a career live race with Every fight selected reached the lights-out start.

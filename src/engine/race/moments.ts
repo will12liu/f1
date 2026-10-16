@@ -331,6 +331,142 @@ sit({
     { id: "push", label: "Push to break the tow", hint: "Pace 4, ERS attack: you try to pull out of the tow. Tyres and battery go quicker.", dials: { pace: 4, ers: "attack" } },
   ],
 });
+sit({
+  id: "battery-low", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.battery < 0.25 && c.left > 3 && c.lap > 3 ? 6 : 0),
+  title: ["Battery is low", "Charge it", "ERS is empty", "Harvest now?", "Don't spend it", "Battery, {me}"],
+  text: [
+    "Battery is nearly empty with {left} laps to go. Harvest now, or keep deploying?",
+    "{me}, we have almost nothing in the battery. A long straight is coming. Charge, or stay on it?",
+    "ERS is flat. If we harvest you are slower this lap and full for the next fight.",
+    "Charge is under a quarter. I want harvest. You can keep attack mode if you need the lap.",
+    "We cannot defend and we cannot pass like this. Harvest, or leave the mode as it is?",
+    "Battery warning, lap {lap}. Lift the deployment and fill it, or keep using what's left.",
+  ],
+  calls: [
+    { id: "harvest", label: "Harvest now", hint: "ERS harvest, pace 2: slower now, the battery fills.", dials: { ers: "harvest", pace: 2 } },
+    { id: "deploy", label: "Keep deploying", hint: "ERS attack: you keep spending it. Quicker until the battery is empty.", dials: { ers: "attack" } },
+  ],
+});
+sit({
+  id: "gap-behind", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.pos > 1 && c.behindGap > 4 && c.left > 8 && c.gap > 2 ? 5 : 0),
+  title: ["Gap behind", "Free air", "Nothing behind", "We can save", "Comfortable", "Manage this stint"],
+  text: [
+    "More than four seconds behind, and {left} laps still to run. Save the tyres, or push for the fastest lap?",
+    "{me}, the car behind is gone. We can look after the engine, or you send it.",
+    "Clear air, P{pos}. No one in the mirrors. Cruise and save, or chase the lap?",
+    "Gap is safe. {left} to go. I recommend tyre care and engine low. Or pace up for the fastest.",
+    "Nobody threatening. We can bank the tyres for later, or push while the air is clean.",
+    "Comfortable. {opp} is {gap}s up the road, nothing close behind. Save or attack the stint?",
+  ],
+  calls: [
+    { id: "save", label: "Save the tyres", hint: "Tyre care 5, pace 2, engine low: slower, the tyres and the power unit last longer.", dials: { tyres: 5, pace: 2, engine: "low" } },
+    { id: "flyer", label: "Push for the fastest lap", hint: "Pace 5, engine high, ERS attack: a fast lap now. Tyres, battery and the engine all pay for it.", dials: { pace: 5, engine: "high", ers: "attack" } },
+  ],
+});
+sit({
+  id: "closing", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.pos > 1 && c.gap >= 1 && c.gap <= 2 && c.left > 3 ? 6 : 0),
+  title: ["Closing on {opp}", "Not in the DRS yet", "We are catching him", "Two seconds", "Bring him in", "Patient or push"],
+  text: [
+    "{opp} is {gap}s ahead. Not close enough for DRS. Push to close it, or stay patient?",
+    "We are closing, slowly. {gap}s to {opp}. I can give you pace 4, or we wait for the tyres.",
+    "{me}, he's {gap}s up the road. A push now gets you to the DRS. It costs the rears.",
+    "Gap is coming down, still over a second. Attack the gap, or hold this pace?",
+    "P{pos}, {opp} ahead by {gap}s. Not a fight yet. Your call on the pace.",
+    "We can be on him if you push. Or we leave the plan and wait. {left} laps left.",
+  ],
+  calls: [
+    { id: "patient", label: "Stay patient", hint: "No change: you keep this pace and wait for the gap to come.", },
+    { id: "push-gap", label: "Push to catch him", hint: "Pace 4, ERS attack: faster for the chase. Tyres and battery go quicker.", dials: { pace: 4, ers: "attack" } },
+  ],
+});
+sit({
+  id: "points-home", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.forPoints && c.pos <= 10 && c.left <= 5 && c.left > 1 ? 8 : 0),
+  title: ["Bring it home", "Points place", "Five laps left", "Don't throw it away", "P{pos} to the flag", "Hold the points"],
+  text: [
+    "{left} laps left and you are P{pos}, in the points. Bring it home, or attack?",
+    "The flag is close. P{pos} is points. I want engine low and a safe pace. You can still push.",
+    "{me}, {left} to go. Nothing silly. Cruise it home, or go after {opp}?",
+    "We are in the points. {gap}s to the car ahead. Manage, or spend the battery?",
+    "Last part of the race. P{pos}. Bring the car home, or attack for one more place.",
+    "Don't give this away. {left} laps. Safe mode, or pace 4 and overtake mode.",
+  ],
+  calls: [
+    { id: "home", label: "Bring it home", hint: "Pace 2, engine low, tyre care 4: slower, you protect the car and the tyres.", dials: { pace: 2, engine: "low", tyres: 4 } },
+    { id: "attack-pts", label: "Attack", hint: "Pace 4, ERS attack: you go for the place ahead. More tyre wear, more battery used.", dials: { pace: 4, ers: "attack" } },
+  ],
+});
+sit({
+  id: "manage-lead", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.pos === 1 && c.behindGap > 1.5 && c.left > 3 ? 7 : 0),
+  title: ["You lead", "Manage the lead", "P1, gap behind", "Control the race", "Don't overdrive", "Leader's choice"],
+  text: [
+    "You lead, and there is a gap behind. Engine low and manage it, or keep pushing?",
+    "P1, {me}. The car behind is not in your mirrors. We can save the power unit.",
+    "{left} laps left in the lead. I recommend we manage. You can stay flat out.",
+    "Gap is there. No need to stress the engine unless you want the fastest lap.",
+    "Control pace from the front. Engine low, or pace 4 and keep the hammer down.",
+    "Leading. {behind} is the first car behind. Manage the gap, or push away.",
+  ],
+  calls: [
+    { id: "manage", label: "Manage it", hint: "Engine low, pace 2, tyre care 4: slower, less engine risk, the tyres last.", dials: { engine: "low", pace: 2, tyres: 4 } },
+    { id: "push-lead", label: "Keep pushing", hint: "Pace 4, engine high: you keep pulling away. More wear and more engine risk.", dials: { pace: 4, engine: "high" } },
+  ],
+});
+sit({
+  id: "engine-hot", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.lap > 10 && c.left > 4 ? 2 : 0),
+  title: ["Engine temperatures", "Power unit is warm", "Turn it down", "Temps", "Cool the engine", "Engine, {me}"],
+  text: [
+    "Engine temperatures are up, lap {lap}. Engine low for the stint, or leave it?",
+    "{me}, the power unit is warm. I want mode low. You can ignore it.",
+    "Temps are climbing with {left} laps still to run. Turn it down, or stay as we are?",
+    "We are asking a lot of the engine. Low mode costs a bit of lap time and saves it.",
+    "Engine warning, not critical. Drop the mode, or keep this one.",
+    "Power unit would like a breather. {left} to go. Your call.",
+  ],
+  calls: [
+    { id: "cool", label: "Engine low", hint: "Engine low, pace 3: a little slower, much less chance of a mechanical.", dials: { engine: "low", pace: 3 } },
+    { id: "ignore-temp", label: "No change", hint: "No change: you leave the engine where it is." },
+  ],
+});
+sit({
+  id: "mate-race", kind: "call",
+  w: (c) => (c.flag === "green" && !c.restart && c.mate !== "" && (c.teammateFight || c.opp === c.mate) && c.gap < 2 && c.gap > 0.2 && !c.mateBehindFaster ? 6 : 0),
+  title: ["Team-mate ahead", "Race {mate}?", "Same team", "Hold station?", "Your team-mate", "{mate} is ahead"],
+  text: [
+    "{mate} is {gap}s ahead, same team. Race him, or hold station?",
+    "You are on your team-mate. {gap}s to {mate}. The wall will accept either call.",
+    "{me}, that's {mate} in front. Push and race, or pace 2 and hold station.",
+    "No order yet. {mate} is {gap}s up the road. Do you want to race him?",
+    "Team-mate, P{pos} behind him. We can attack, or we tuck in and save the tyres.",
+    "{mate}, {gap}s. Race or hold. Tell me.",
+  ],
+  calls: [
+    { id: "race-him", label: "Race him", hint: "Pace 4, ERS attack: you attack your team-mate. More tyre wear, battery down.", dials: { pace: 4, ers: "attack" } },
+    { id: "station", label: "Hold station", hint: "Pace 2, tyre care 4, ERS balanced: you stop attacking and look after the tyres.", dials: { pace: 2, tyres: 4, ers: "balanced" } },
+  ],
+});
+sit({
+  id: "vsc-box", kind: "call",
+  w: (c) => (c.flag === "vsc" && c.left > 4 && c.wear > 0.35 && (c.stopDue === null || c.stopDue > 1) ? 11 : 0),
+  title: ["Virtual safety car", "VSC: box?", "Cheap stop, VSC", "Virtual, your call", "VSC window", "Pit or stay"],
+  text: [
+    "Virtual safety car. The stop is cheaper. Tyres are {wear}% worn. Box, or stay out?",
+    "VSC. We are P{pos}. A stop now loses less than a normal stop. Want it?",
+    "{left} laps left, VSC on the board. New tyres, or keep the track position?",
+    "{me}, virtual safety car. Pit loss is down. These tyres are {wear}% gone.",
+    "Window under the VSC. Box this lap, or we hold P{pos} and stay out.",
+    "They're all slowing. We can pit for a cheap set, or keep this one.",
+  ],
+  calls: [
+    { id: "box", label: "Box this lap", hint: "Pit this lap: a cheaper stop under the virtual safety car, new tyres, you lose places.", pit: "box" },
+    { id: "stay", label: "Stay out", hint: "Stay out: you keep the place. The stop is refused even if it was due.", pit: "stay" },
+  ],
+});
 
 export function chooseSit(c: MCtx, kind: SitKind | "duel", rng: Rng, pen: (id: string) => number): Sit | null {
   const fits = sits.filter((s) => (kind === "duel" ? s.kind !== "call" : s.kind === kind)).map((s) => ({ s, w: s.w(c) * pen(s.id) })).filter((x) => x.w > 0);
