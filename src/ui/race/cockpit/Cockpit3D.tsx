@@ -9,6 +9,7 @@ import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
 import { car, frame, groundOf, road, sky, steerWheels } from "./scene";
+import { Helmet, WheelHud } from "./WheelHud";
 
 export interface CockpitProps {
   trackId: string;
@@ -304,24 +305,8 @@ export default function Cockpit3D(p: CockpitProps) {
         <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
         <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
       </svg>
-      {/* steering wheel */}
-      <div className="pointer-events-none absolute bottom-[-4%] left-1/2 w-[min(46vw,520px)] -translate-x-1/2" style={{ transform: `translateX(-50%) rotate(${-hud.steer * 80}deg)` }}>
-        <svg viewBox="0 0 200 110" className="w-full">
-          <path d="M20 40 Q20 8 52 8 H148 Q180 8 180 40 V96 Q180 108 166 108 H140 L128 80 H72 L60 108 H34 Q20 108 20 96 Z" fill="#141619" stroke="#2a2e34" strokeWidth="3" />
-          <rect x="68" y="18" width="64" height="40" rx="4" fill="#05070a" />
-          <text x="100" y="40" textAnchor="middle" fill="#f8fafc" fontSize="18" fontWeight="900" fontFamily="sans-serif">
-            {Math.round(hud.kmh)}
-          </text>
-          <text x="100" y="54" textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="sans-serif">
-            KM/H · GEAR {hud.gear}
-          </text>
-          <text x="46" y="44" textAnchor="middle" fill={gap > 0 ? "#34d399" : "#fbbf24"} fontSize="13" fontWeight="900" fontFamily="sans-serif">
-            {gap > 0 ? "+" : ""}
-            {gap.toFixed(0)}m
-          </text>
-          <circle cx="154" cy="40" r="7" fill={hud.braked ? "#ef4444" : "#334155"} />
-        </svg>
-      </div>
+      <WheelHud kmh={hud.kmh} gear={hud.gear} steer={hud.steer} note={`${gap > 0 ? "+" : ""}${gap.toFixed(0)} m · GEAR ${hud.gear}`} />
+      <Helmet />
       <div className="pointer-events-none absolute left-4 top-4 max-w-md rounded-md bg-ink-950/85 px-4 py-3">
         <div className="font-display text-3xl font-black uppercase text-race">{p.label}</div>
         <div className="mt-1 text-base text-white">

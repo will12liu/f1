@@ -42,50 +42,73 @@ export function steerWheels(c: THREE.Group, steer: number): void {
   for (const w of c.children) if (w.name === "front") w.rotation.y = steer * 0.35;
 }
 
-/** A low-poly F1 car facing -z. The halo's meshes are named "halo" so an onboard camera can hide its own. */
+/** A low-poly F1 car facing -z, shaped like an onboard: open cockpit, nose, wings, rims.
+ *  The halo's meshes are named "halo" so an onboard camera can hide its own.
+ *  Front-wheel groups are named "front" so `steerWheels` can turn them. */
 export function car(color: string, halo = true): THREE.Group {
   const grp = new THREE.Group();
   // double-sided: the mirrors render through a flipped camera
   const body = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
   const dark = new THREE.MeshLambertMaterial({ color: "#16181c", side: THREE.DoubleSide });
-  const tyre = new THREE.MeshLambertMaterial({ color: "#0a0a0a", side: THREE.DoubleSide });
-  const box = (w: number, h: number, l: number, x: number, y: number, z: number, m: THREE.Material) => {
+  const tyreM = new THREE.MeshLambertMaterial({ color: "#0a0a0a", side: THREE.DoubleSide });
+  const rimM = new THREE.MeshLambertMaterial({ color: "#e7e5e4", side: THREE.DoubleSide });
+  const bandM = new THREE.MeshLambertMaterial({ color: "#e11d48", side: THREE.DoubleSide });
+  const box = (w: number, h: number, l: number, x: number, y: number, z: number, m: THREE.Material, name?: string) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), m);
     b.position.set(x, y, z);
+    if (name) b.name = name;
     grp.add(b);
+    return b;
   };
-  box(0.8, 0.45, 4.4, 0, 0.42, 0, body); // tub
-  box(0.34, 0.22, 1.3, 0, 0.32, -2.6, body); // nose
-  box(1.5, 0.38, 1.8, 0, 0.36, 0.5, body); // sidepods
-  box(0.42, 0.5, 1.1, 0, 0.85, 0.6, body); // airbox
-  box(1.9, 0.06, 0.55, 0, 0.12, -3.1, dark); // front wing
-  box(1.0, 0.07, 0.45, 0, 0.95, 2.25, dark); // rear wing
-  box(0.05, 0.6, 0.55, 0.5, 0.7, 2.25, dark);
-  box(0.05, 0.6, 0.55, -0.5, 0.7, 2.25, dark);
-  box(1.4, 0.05, 3.6, 0, 0.07, 0.2, dark); // floor
-  box(0.04, 0.32, 1.3, 0, 1.0, 1.35, body); // engine cover fin
-  box(0.05, 0.22, 0.6, 0.95, 0.2, -3.1, dark); // front wing endplates
-  box(0.05, 0.22, 0.6, -0.95, 0.2, -3.1, dark);
-  const light = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.04), new THREE.MeshBasicMaterial({ color: "#ff2a2a" }));
-  light.position.set(0, 0.55, 2.5);
+  // flanks, left open through the middle so the driver's camera is not inside a box
+  box(0.42, 0.26, 1.45, 0.58, 0.3, 0.3, body);
+  box(0.42, 0.26, 1.45, -0.58, 0.3, 0.3, body);
+  box(0.55, 0.05, 0.8, 0, 0.2, 0.05, body); // cockpit floor
+  const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.07, 1.55, 10), body);
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0.28, -1.85);
+  grp.add(nose);
+  box(0.36, 0.12, 0.4, 0, 0.26, -1.05, body); // nose shoulders
+  box(1.95, 0.04, 0.42, 0, 0.1, -2.65, dark); // front wing
+  box(1.4, 0.02, 0.16, 0, 0.16, -2.5, dark);
+  box(0.05, 0.24, 0.42, 0.96, 0.16, -2.65, dark);
+  box(0.05, 0.24, 0.42, -0.96, 0.16, -2.65, dark);
+  box(0.32, 0.32, 0.75, 0, 0.66, 0.75, dark); // airbox, behind the driver
+  box(0.03, 0.22, 0.7, 0, 0.88, 1.15, dark); // shark fin
+  box(1.15, 0.05, 0.36, 0, 0.98, 2.15, dark); // rear wing
+  box(0.95, 0.03, 0.2, 0, 0.78, 2.05, dark);
+  box(0.04, 0.55, 0.36, 0.52, 0.72, 2.15, dark);
+  box(0.04, 0.55, 0.36, -0.52, 0.72, 2.15, dark);
+  box(0.7, 0.08, 0.4, 0, 0.14, 1.9, dark); // diffuser
+  box(1.45, 0.04, 3.5, 0, 0.07, 0.15, dark); // floor
+  const light = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.04), new THREE.MeshBasicMaterial({ color: "#ff2a2a" }));
+  light.position.set(0, 0.48, 2.32);
   grp.add(light);
   if (halo) {
-    // the halo: a hoop over the cockpit and the centre pillar
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.045, 6, 18, Math.PI), dark);
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 8, 20, Math.PI), dark);
     hoop.rotation.x = -Math.PI / 2;
-    hoop.position.set(0, 0.92, -0.25);
+    hoop.position.set(0, 0.9, -0.2);
     hoop.name = "halo";
     grp.add(hoop);
-    box(0.07, 0.3, 0.07, 0, 0.78, -0.68, dark);
-    grp.children[grp.children.length - 1].name = "halo";
+    box(0.06, 0.28, 0.06, 0, 0.74, -0.62, dark, "halo");
   }
-  for (const [x, z, r] of [[0.85, -1.75, 0.33], [-0.85, -1.75, 0.33], [0.85, 1.6, 0.36], [-0.85, 1.6, 0.36]]) {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.4, 16), tyre);
-    w.rotation.z = Math.PI / 2;
-    w.position.set(x, r, z);
-    if (z < 0) w.name = "front"; // steered (rotation.y)
-    grp.add(w);
-  }
+  const wheel = (x: number, z: number, r: number, wide: number, front: boolean) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, r, z);
+    if (front) pivot.name = "front";
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, wide, 18), tyreM);
+    tyre.rotation.z = Math.PI / 2;
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, wide + 0.02, 12), rimM);
+    rim.rotation.z = Math.PI / 2;
+    const band = new THREE.Mesh(new THREE.TorusGeometry(r * 0.96, 0.012, 6, 16), bandM);
+    band.rotation.y = Math.PI / 2;
+    pivot.add(tyre, rim, band);
+    grp.add(pivot);
+  };
+  wheel(0.88, -1.7, 0.33, 0.36, true);
+  wheel(-0.88, -1.7, 0.33, 0.36, true);
+  wheel(0.86, 1.55, 0.36, 0.42, false);
+  wheel(-0.86, 1.55, 0.36, 0.42, false);
   return grp;
 }
 

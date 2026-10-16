@@ -9,6 +9,7 @@ import { useTrack } from "../../components/bits";
 import { verdictColor } from "../BrakeBar";
 import { build, HALF_M } from "../drive";
 import { car, frame, groundOf, road, sky } from "./scene";
+import { Helmet, WheelHud } from "./WheelHud";
 import { zones } from "./duel";
 
 export interface Start3DProps {
@@ -137,7 +138,7 @@ export default function Start3D(p: Start3DProps) {
       const me = cars.find((e) => e.slot === p.mySlot)!;
       const f = frame(g, me.d, me.x);
       cam.position.set(f.px + f.dx * 0.35, 1.0, f.pz + f.dz * 0.35);
-      cam.lookAt(f.px + f.dx * 40, 2.2, f.pz + f.dz * 40);
+      cam.lookAt(f.px + f.dx * 30, 0.5, f.pz + f.dz * 30);
       renderer.render(scene, cam);
     };
     raf = requestAnimationFrame(tick);
@@ -195,6 +196,8 @@ export default function Start3D(p: Start3DProps) {
         <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
         <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
       </svg>
+      <WheelHud kmh={0} gear={1} note={phase === "out" ? "GO" : phase === "lights" ? "WAIT" : "GEAR 1"} />
+      <Helmet />
       <div className="absolute left-4 top-4 rounded-md bg-ink-950/85 px-4 py-3">
         <div className="kicker">The start · P{p.mySlot} on the grid</div>
         <div className="mt-1 text-lg text-white">Five red lights. When they all go out, launch: Space or tap. Go early and it's five seconds.</div>
