@@ -188,63 +188,92 @@ sit({
 });
 
 // ── calls ──
-const box: CallOption = { id: "box", label: "Box this lap", hint: "Take the stop now.", pit: "box" };
-const stay: CallOption = { id: "stay", label: "Stay out", hint: "Keep track position.", pit: "stay" };
+// Option ids are stable: saved races replay the answer by id. A no-effect option is labelled "No change"
+// or "Stay on the plan". Fuel mix is set by the car (race.ts), so fuel-short stays at weight 0.
 sit({
   id: "sc-box", kind: "call",
   w: (c) => (c.flag === "sc" && c.left > 4 && (c.stopDue === null || c.stopDue > 1) && c.wear > 0.3 ? 14 : 0),
   title: ["Safety car: box?", "Cheap stop", "Safety car deployed"],
   text: ["Safety car. A stop costs half of the usual now. Tyres are {wear}% worn and {left} laps remain.", "The field is bunching up behind the safety car. Box for new tyres, or keep P{pos}?"],
-  calls: [box, stay],
+  calls: [
+    { id: "box", label: "Box this lap", hint: "Pit this lap: a cheap stop under the safety car, new tyres, you lose track position.", pit: "box" },
+    { id: "stay", label: "Stay out", hint: "Stay out: you keep the place and these tyres. The stop is refused even if it was due.", pit: "stay" },
+  ],
 });
 sit({
   id: "tyres-gone", kind: "call",
   w: (c) => (c.flag === "green" && c.tyreLapsLeft < 4 && c.left > 5 && (c.stopDue === null || c.stopDue > 2) ? 10 : 0),
   title: ["Tyres are going", "The rears are finished", "Grip is falling away"],
   text: ["The tyres have about {tyrelaps} laps left and {left} to go. Box now, or nurse them?", "You're losing time every lap on these tyres. The engineer asks what you want."],
-  calls: [box, { id: "nurse", label: "Nurse them", hint: "Tyre care 5, pace 2.", dials: { tyres: 5, pace: 2 } }, { id: "push", label: "Push on", hint: "Ignore it and keep pushing.", dials: { pace: 4 } }],
+  calls: [
+    { id: "box", label: "Box this lap", hint: "Pit this lap for a new set. You give up the place and get the grip back.", pit: "box" },
+    { id: "nurse", label: "Nurse them", hint: "Tyre care 5, pace 2: slower, the tyres last longer. A needle game sets how well you save them.", dials: { tyres: 5, pace: 2 } },
+    { id: "push", label: "Push on", hint: "Pace 4, tyre care 1: faster now, the tyres fall off quicker.", dials: { pace: 4, tyres: 1 } },
+  ],
 });
 sit({
   id: "undercut", kind: "call",
   w: (c) => (c.flag === "green" && c.gap < 1.8 && c.stopDue !== null && c.stopDue <= 3 && c.stopDue > 0 && c.pos > 1 ? 8 : 0),
   title: ["Undercut?", "Box early to jump him", "The undercut is on"],
   text: ["{opp} is {gap}s ahead and the stop is due in {stopdue} laps. Box now to jump him on fresh tyres?", "The window is open. Go early for the undercut on {opp}, or follow the plan?"],
-  calls: [{ id: "plan", label: "Follow the plan", hint: "Stop when planned." }, box, { id: "overcut", label: "Stay longer", hint: "Push on old tyres, try the overcut.", pit: "stay", dials: { pace: 4 } }],
+  calls: [
+    { id: "plan", label: "Stay on the plan", hint: "No change: you stop when the plan says, not this lap." },
+    { id: "box", label: "Box for the undercut", hint: "Pit this lap: you stop early and try to jump the car ahead on fresh tyres.", pit: "box" },
+    { id: "overcut", label: "Stay out and push", hint: "Stay out, pace 4, tyre care 2: you go longer on these tyres and try the overcut. The tyres wear faster.", pit: "stay", dials: { pace: 4, tyres: 2 } },
+  ],
 });
 sit({
   id: "restart", kind: "call",
   w: (c) => (c.restart && c.flag === "green" ? 9 : 0),
   title: ["Restart", "Green flag coming", "Lights out again"],
   text: ["The restart is this lap. You're P{pos} with {opp} ahead and {behind} behind.", "Restart. How do you go into turn one?"],
-  calls: [{ id: "neutral", label: "Clean restart", hint: "No risk." }, { id: "attack", label: "Full attack", hint: "Overtake mode and pace 5.", dials: { ers: "attack", pace: 5 } }, { id: "defend", label: "Cover the inside", hint: "Defend mode.", dials: { ers: "defend" } }],
+  calls: [
+    { id: "neutral", label: "No change", hint: "No change: standard pace, ERS balanced. The getaway bar still moves this lap." },
+    { id: "attack", label: "Full attack", hint: "Pace 5, ERS attack: quicker off the restart and stronger in a pass. Tyres and battery go quicker.", dials: { ers: "attack", pace: 5 } },
+    { id: "defend", label: "Cover the inside", hint: "ERS defend: you spend battery to hold the inside. No extra pace.", dials: { ers: "defend" } },
+  ],
 });
 sit({
   id: "fuel-short", kind: "call",
   w: () => 0, // fuel runs on auto now (race.ts): kept so old saved answers still read
   title: ["Fuel", "We're short on fuel", "Save fuel"],
   text: ["The engineer: we're short on fuel to the flag. Lean mix or lift and coast?", "Fuel is critical. {left} laps to go."],
-  calls: [{ id: "lean", label: "Lean mix", hint: "Slower, saves fuel.", dials: { fuel: "lean" } }, { id: "lift", label: "Lift and coast", hint: "Pace 1 until the numbers work.", dials: { pace: 1, fuel: "lean" } }, { id: "ignore", label: "Ignore it", hint: "Hope for a safety car." }],
+  calls: [
+    { id: "lean", label: "Lean mix", hint: "Pace 2, engine low, lean mix: slower, you burn less. The car may put the mix back to standard.", dials: { pace: 2, engine: "low", fuel: "lean" } },
+    { id: "lift", label: "Lift and coast", hint: "Pace 1, engine low, lean mix: a big lift. You save the most fuel and lose the most time.", dials: { pace: 1, engine: "low", fuel: "lean" } },
+    { id: "ignore", label: "No change", hint: "No change: you stay on this pace and hope for a safety car." },
+  ],
 });
 sit({
   id: "limits", kind: "call",
   w: (c) => (c.strikes === 3 ? 12 : 0),
   title: ["Black-and-white flag", "Last warning", "Track limits"],
   text: ["That's three strikes for track limits: the next one is a penalty.", "Race control has shown you the black-and-white flag."],
-  calls: [{ id: "careful", label: "Back off", hint: "Pace 2 for a while.", dials: { pace: 2 } }, { id: "same", label: "Keep pushing", hint: "Risk the penalty." }],
+  calls: [
+    { id: "careful", label: "Back off", hint: "Pace 2, tyre care 4: slower, you leave a margin at the white line.", dials: { pace: 2, tyres: 4 } },
+    { id: "same", label: "Keep pushing", hint: "Pace 4, engine high: you stay on the limit. Faster, and the next strike is still a penalty.", dials: { pace: 4, engine: "high" } },
+  ],
 });
 sit({
   id: "mate-swap", kind: "call",
   w: (c) => (c.mateBehindFaster ? 7 : 0),
   title: ["Team orders?", "Your team-mate is faster", "Swap the cars?"],
   text: ["{mate} is right behind you and quicker. The pit wall asks: let him through?", "{mate} has better tyres and is stuck behind you."],
-  calls: [{ id: "race", label: "Let them race", hint: "No orders." }, { id: "swap", label: "Swap the cars", hint: "You move over this lap.", letBy: true }],
+  calls: [
+    { id: "race", label: "No change", hint: "No change: no team order. You keep the place and race." },
+    { id: "swap", label: "Let him through", hint: "Team order: you move over this lap and let your team-mate through.", letBy: true },
+  ],
 });
 sit({
   id: "pressure", kind: "call",
   w: (c) => (c.flag === "green" && c.lap > 4 && c.behindGap < 0.7 && c.left > 3 && c.battery > 0.2 ? 3 : 0),
   title: ["Pressure from behind", "He's all over you"],
   text: ["{behind} has been in your mirrors for laps. Use the battery to defend?", "The car behind is close. The engineer asks about the ERS."],
-  calls: [{ id: "ignore", label: "Run your race", hint: "No change." }, { id: "defend", label: "Defend mode", hint: "ERS defend.", dials: { ers: "defend" } }, { id: "push", label: "Push to break the tow", hint: "Pace 4.", dials: { pace: 4 } }],
+  calls: [
+    { id: "ignore", label: "No change", hint: "No change: you do not defend and you do not push." },
+    { id: "defend", label: "Defend mode", hint: "ERS defend: harder to pass, the battery drops.", dials: { ers: "defend" } },
+    { id: "push", label: "Push to break the tow", hint: "Pace 4, ERS attack: you try to pull out of the tow. Tyres and battery go quicker.", dials: { pace: 4, ers: "attack" } },
+  ],
 });
 
 export function chooseSit(c: MCtx, kind: SitKind | "duel", rng: Rng, pen: (id: string) => number): Sit | null {
