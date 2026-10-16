@@ -8,8 +8,7 @@ import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { startDuel, stepDuel, type Duel, type Side } from "./duel";
-import { car, frame, groundOf, road, sky, steerWheels } from "./scene";
-import { Helmet, WheelHud } from "./WheelHud";
+import { car, EYE, frame, groundOf, inside, road, sky, steerWheels } from "./scene";
 
 export interface CockpitProps {
   trackId: string;
@@ -21,6 +20,10 @@ export interface CockpitProps {
   pick: number; // which of the heaviest braking zones (the lap number)
   myColor: string;
   oppColor: string;
+  myColor2?: string;
+  oppColor2?: string;
+  myNum?: number;
+  oppNum?: number;
   onResult: (q: number) => void;
   onSimple: () => void; // fall back to the braking bar
   simpleLabel?: string; // that button's text ("Quit" in practice)
@@ -74,10 +77,9 @@ export default function Cockpit3D(p: CockpitProps) {
     grass.position.set(f0.px, -0.03, f0.pz);
     scene.add(grass);
     scene.add(road(g, s.me.d - 60 / g.m, s.endD + 500 / g.m, [s.zone], p.trackId));
-    const mine = car(p.myColor);
-    const ownHalo = mine.children.filter((c) => c.name === "halo");
-    for (const c of ownHalo) c.visible = false; // the overlay draws it from inside
-    const opp = car(p.oppColor);
+    const mine = car(p.myColor, true, p.myColor2, p.myNum);
+    inside(mine, true); // the overlay draws the halo and wheel from inside
+    const opp = car(p.oppColor, true, p.oppColor2, p.oppNum);
     scene.add(mine, opp);
     const cam = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
     const mirror = new THREE.PerspectiveCamera(40, 2, 0.5, 400);
@@ -179,7 +181,7 @@ export default function Cockpit3D(p: CockpitProps) {
       const at_ = rp >= 0 ? rec[Math.min(rec.length - 1, from + rp)] : null;
       if (rp >= 0 && !replaying.current) {
         replaying.current = true;
-        for (const c of ownHalo) c.visible = true;
+        inside(mine, false);
         setReplay(true);
       }
       const me = at_ ? frame(g, at_[0], at_[1], at_[2]) : frame(g, s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0);
@@ -209,8 +211,8 @@ export default function Cockpit3D(p: CockpitProps) {
         return;
       }
       // the driver's eyes: low, in front of the airbox, the nose and front wheels below
-      cam.position.set(me.px + me.dx * 0.35, 1.0, me.pz + me.dz * 0.35);
-      cam.lookAt(me.px + me.dx * 30, 0.55, me.pz + me.dz * 30);
+      cam.position.set(me.px - me.dx * EYE.z, EYE.y, me.pz - me.dz * EYE.z);
+      cam.lookAt(me.px + me.dx * 30, EYE.y - 0.35, me.pz + me.dz * 30);
       const w = el.clientWidth;
       const h = el.clientHeight;
       renderer.setScissorTest(false);
@@ -305,8 +307,24 @@ export default function Cockpit3D(p: CockpitProps) {
         <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
         <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
       </svg>
-      <WheelHud kmh={hud.kmh} gear={hud.gear} steer={hud.steer} note={`${gap > 0 ? "+" : ""}${gap.toFixed(0)} m · GEAR ${hud.gear}`} />
-      <Helmet />
+      {/* steering wheel */}
+      <div className="pointer-events-none absolute bottom-[-4%] left-1/2 w-[min(46vw,520px)] -translate-x-1/2" style={{ transform: `translateX(-50%) rotate(${-hud.steer * 80}deg)` }}>
+        <svg viewBox="0 0 200 110" className="w-full">
+          <path d="M20 40 Q20 8 52 8 H148 Q180 8 180 40 V96 Q180 108 166 108 H140 L128 80 H72 L60 108 H34 Q20 108 20 96 Z" fill="#141619" stroke="#2a2e34" strokeWidth="3" />
+          <rect x="68" y="18" width="64" height="40" rx="4" fill="#05070a" />
+          <text x="100" y="40" textAnchor="middle" fill="#f8fafc" fontSize="18" fontWeight="900" fontFamily="sans-serif">
+            {Math.round(hud.kmh)}
+          </text>
+          <text x="100" y="54" textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="sans-serif">
+            KM/H · GEAR {hud.gear}
+          </text>
+          <text x="46" y="44" textAnchor="middle" fill={gap > 0 ? "#34d399" : "#fbbf24"} fontSize="13" fontWeight="900" fontFamily="sans-serif">
+            {gap > 0 ? "+" : ""}
+            {gap.toFixed(0)}m
+          </text>
+          <circle cx="154" cy="40" r="7" fill={hud.braked ? "#ef4444" : "#334155"} />
+        </svg>
+      </div>
       <div className="pointer-events-none absolute left-4 top-4 max-w-md rounded-md bg-ink-950/85 px-4 py-3">
         <div className="font-display text-3xl font-black uppercase text-race">{p.label}</div>
         <div className="mt-1 text-base text-white">

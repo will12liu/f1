@@ -290,7 +290,7 @@ export function LiveRace() {
                 trackId={circuit.id}
                 km={circuit.km}
                 target={circuit.base - 0.4}
-                grid={entries.filter((e) => e.grid > 0).map((e) => ({ slot: e.grid, color: team(e.teamId)?.color ?? "#94a3b8" }))}
+                grid={entries.filter((e) => e.grid > 0).map((e) => ({ slot: e.grid, color: team(e.teamId)?.color ?? "#94a3b8", color2: team(e.teamId)?.color2, num: drivers.get(e.driverId)?.num }))}
                 mySlot={entries[chosen]?.grid || entries.length}
                 myColor={team(entries[chosen]?.teamId ?? "")?.color ?? "#e10600"}
                 onSimple={() => setFlatStart(true)}
@@ -393,6 +393,10 @@ export function LiveRace() {
                 // the other car drives his favourite move; your grip comes from your one-lap and race pace
                 habit: pend.vs !== undefined ? topHabit(tendencies(entries[pend.vs].driverId, entries[pend.vs].r.aggression)[pend.kind === "attack" ? "def" : "att"]) : undefined,
                 grip: gripOf(entries[pend.car].r),
+                myColor2: team(entries[pend.car].teamId)?.color2,
+                myNum: drivers.get(entries[pend.car].driverId)?.num,
+                oppColor2: pend.vs !== undefined ? team(entries[pend.vs].teamId)?.color2 : undefined,
+                oppNum: pend.vs !== undefined ? drivers.get(entries[pend.vs].driverId)?.num : undefined,
               }}
               onPick={(opt, q) => {
                 const m = pend;

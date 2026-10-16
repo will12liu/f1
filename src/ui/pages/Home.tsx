@@ -204,6 +204,21 @@ export function Home() {
           onChange={refresh}
         />
       </div>
+      <p className="px-6 py-4 text-xs text-slate-500">
+        3D models (CC-BY-4.0, recoloured): car based on{" "}
+        <a className="underline" href="https://sketchfab.com/3d-models/mclaren-mp46-47ead8639cc84630bd2f98b34c646c25" target="_blank" rel="noreferrer">
+          "Mclaren MP4/6"
+        </a>{" "}
+        by hwong9000, driver based on{" "}
+        <a className="underline" href="https://sketchfab.com/3d-models/race-car-driver-a8503189a20a441893b66e4c57d3231b" target="_blank" rel="noreferrer">
+          "Race Car Driver"
+        </a>{" "}
+        by tomkart (
+        <a className="underline" href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
+          licence
+        </a>
+        ).
+      </p>
     </div>
   );
 }

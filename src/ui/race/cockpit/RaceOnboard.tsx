@@ -6,7 +6,7 @@ import { useTrack } from "../../components/bits";
 import { build } from "../drive";
 import { raceOnboard } from "./scene";
 
-export default function RaceOnboard({ trackId, km, target, colors, view, follow, code }: { trackId: string; km: number; target: number; colors: string[]; view: RaceView; follow: number; code: string }) {
+export default function RaceOnboard({ trackId, km, target, colors, view, follow, code }: { trackId: string; km: number; target: number; colors: { color: string; color2?: string; num?: number }[]; view: RaceView; follow: number; code: string }) {
   const track = useTrack(trackId);
   const host = useRef<HTMLDivElement>(null);
   const world = useRef<ReturnType<typeof raceOnboard> | null>(null);

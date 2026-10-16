@@ -3,7 +3,148 @@
 // ready-made onboard view that follows a drive.ts car.
 import * as THREE from "three";
 import { at, HALF_M, type CarState, type Geo } from "../drive";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { zones } from "./duel";
+
+// ── the car model (public/models, CC-BY, see CREDITS.txt): loaded once, cloned per car, painted per team ──
+const SCALE = 0.1; // the model is in tenths of a metre: 2.1 m wide
+type Tmpl = { car: THREE.Group; driver: THREE.Group };
+let tmpl: Tmpl | null = null;
+let loading: Promise<Tmpl | null> | null = null;
+/** Start loading the models (cars made before it lands are swapped in when it does). */
+export function loadModels(): Promise<Tmpl | null> {
+  if (!loading) {
+    const L = new GLTFLoader();
+    loading = Promise.all([L.loadAsync("/models/car.gltf"), L.loadAsync("/models/driver.gltf")])
+      .then(([c, d]) => {
+        // car: nose to -z, centred, wheels on the ground
+        const body = c.scene;
+        body.rotation.y = Math.PI;
+        body.scale.setScalar(SCALE);
+        const car = new THREE.Group();
+        car.add(body);
+        car.updateMatrixWorld(true);
+        const b = new THREE.Box3().setFromObject(car);
+        body.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
+        body.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          const name = (m.material as THREE.Material).name;
+          if (/steeringWheel|leather|green_button|Tach/.test(name) || /pCylinder51/.test(m.name)) m.userData.tag = "cockpitWheel";
+          (m.material as THREE.Material).side = THREE.DoubleSide; // the mirrors render through a flipped camera
+        });
+        const driver = new THREE.Group();
+        driver.add(d.scene);
+        return (tmpl = { car, driver });
+      })
+      .catch(() => null);
+  }
+  return loading;
+}
+
+const paints = new Map<string, THREE.Material>();
+const paint = (base: THREE.Material, color: string) => {
+  const k = `${base.uuid}:${color}`;
+  let m = paints.get(k);
+  if (!m) {
+    m = (base as THREE.MeshStandardMaterial).clone();
+    (m as THREE.MeshStandardMaterial).color.set(color);
+    paints.set(k, m);
+  }
+  return m;
+};
+const numbers = new Map<string, THREE.Material>();
+function numberDecal(num: number, color: string): THREE.Mesh {
+  const k = `${num}:${color}`;
+  let m = numbers.get(k);
+  if (!m) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "#f8fafc";
+    x.beginPath();
+    x.arc(64, 64, 60, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = color;
+    x.font = "900 78px sans-serif";
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    x.fillText(String(num), 64, 70);
+    m = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, side: THREE.DoubleSide });
+    numbers.set(k, m);
+  }
+  return new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), m);
+}
+
+function fillModel(grp: THREE.Group, t: Tmpl, color: string, color2: string, num?: number, halo = true) {
+  const c = t.car.clone(true);
+  c.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const name = (m.material as THREE.Material).name;
+    // the team's colours where McLaren had red and white
+    if (name === "BodyTexture" || name === "BodyworkWhite") m.material = paint(m.material as THREE.Material, color);
+    else if (name === "BodyworkRed") m.material = paint(m.material as THREE.Material, color2);
+  });
+  grp.add(c);
+  const drv = t.driver.clone(true);
+  drv.userData.tag = "driver";
+  drv.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (m.isMesh) m.material = paint(m.material as THREE.Material, color2);
+  });
+  drv.position.set(DRIVER.x, DRIVER.y, DRIVER.z);
+  drv.rotation.y = DRIVER.rot;
+  drv.scale.setScalar(DRIVER.s);
+  grp.add(drv);
+  if (num !== undefined) {
+    // the number on the nose and on both sides of the engine cover
+    const top = numberDecal(num, color === "#f8fafc" ? "#111" : color);
+    top.rotation.x = -Math.PI / 2 + 0.12;
+    top.position.set(0, NUMBER.noseY, NUMBER.noseZ);
+    grp.add(top);
+    for (const sd of [1, -1]) {
+      const side = numberDecal(num, color === "#f8fafc" ? "#111" : color);
+      side.rotation.y = sd * Math.PI / 2;
+      side.position.set(sd * NUMBER.sideX, NUMBER.sideY, NUMBER.sideZ);
+      grp.add(side);
+    }
+  }
+  if (halo) {
+    const dark = new THREE.MeshLambertMaterial({ color: "#16181c", side: THREE.DoubleSide });
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.04, 6, 18, Math.PI), dark);
+    hoop.rotation.x = -Math.PI / 2;
+    hoop.position.set(0, EYE.y + 0.12, EYE.z - 0.05);
+    hoop.userData.tag = "halo";
+    grp.add(hoop);
+  }
+}
+// where things sit on the scaled model (local metres, nose toward -z); tuned by eye
+export const EYE = { y: 0.86, z: 0.05 };
+const DRIVER = { x: -0.34, y: -0.12, z: 0.2, rot: 0, s: 0.55 };
+const NUMBER = { noseY: 0.42, noseZ: -1.55, sideX: 0.42, sideY: 0.62, sideZ: 0.75 };
+
+/** Hide (or show) what the onboard camera would sit inside: the driver, the halo, the model's wheel. */
+export function inside(c: THREE.Group, on: boolean): void {
+  c.traverse((o) => {
+    if (o.userData.tag === "driver" || o.userData.tag === "halo" || o.userData.tag === "cockpitWheel" || o.name === "halo") o.visible = !on;
+  });
+  c.userData.inside = on;
+}
+
+/** A car in team colours (the model once loaded, the block car until then), facing -z. */
+export function car(color: string, halo = true, color2 = "#111827", num?: number): THREE.Group {
+  const grp = new THREE.Group();
+  const build = (t: Tmpl | null) => {
+    grp.clear();
+    if (t) fillModel(grp, t, color, color2, num, halo);
+    else for (const ch of [...blockCar(color, halo).children]) grp.add(ch);
+    if (grp.userData.inside) inside(grp, true);
+  };
+  build(tmpl);
+  if (!tmpl) loadModels().then((t) => t && build(t));
+  return grp;
+}
 
 export function frame(g: Geo, d: number, x: number, slip = 0) {
   const nx = at(g, g.nx, d);
@@ -42,73 +183,50 @@ export function steerWheels(c: THREE.Group, steer: number): void {
   for (const w of c.children) if (w.name === "front") w.rotation.y = steer * 0.35;
 }
 
-/** A low-poly F1 car facing -z, shaped like an onboard: open cockpit, nose, wings, rims.
- *  The halo's meshes are named "halo" so an onboard camera can hide its own.
- *  Front-wheel groups are named "front" so `steerWheels` can turn them. */
-export function car(color: string, halo = true): THREE.Group {
+/** A low-poly F1 car facing -z. The halo's meshes are named "halo" so an onboard camera can hide its own. */
+function blockCar(color: string, halo = true): THREE.Group {
   const grp = new THREE.Group();
   // double-sided: the mirrors render through a flipped camera
   const body = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide });
   const dark = new THREE.MeshLambertMaterial({ color: "#16181c", side: THREE.DoubleSide });
-  const tyreM = new THREE.MeshLambertMaterial({ color: "#0a0a0a", side: THREE.DoubleSide });
-  const rimM = new THREE.MeshLambertMaterial({ color: "#e7e5e4", side: THREE.DoubleSide });
-  const bandM = new THREE.MeshLambertMaterial({ color: "#e11d48", side: THREE.DoubleSide });
-  const box = (w: number, h: number, l: number, x: number, y: number, z: number, m: THREE.Material, name?: string) => {
+  const tyre = new THREE.MeshLambertMaterial({ color: "#0a0a0a", side: THREE.DoubleSide });
+  const box = (w: number, h: number, l: number, x: number, y: number, z: number, m: THREE.Material) => {
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), m);
     b.position.set(x, y, z);
-    if (name) b.name = name;
     grp.add(b);
-    return b;
   };
-  // flanks, left open through the middle so the driver's camera is not inside a box
-  box(0.42, 0.26, 1.45, 0.58, 0.3, 0.3, body);
-  box(0.42, 0.26, 1.45, -0.58, 0.3, 0.3, body);
-  box(0.55, 0.05, 0.8, 0, 0.2, 0.05, body); // cockpit floor
-  const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.07, 1.55, 10), body);
-  nose.rotation.x = Math.PI / 2;
-  nose.position.set(0, 0.28, -1.85);
-  grp.add(nose);
-  box(0.36, 0.12, 0.4, 0, 0.26, -1.05, body); // nose shoulders
-  box(1.95, 0.04, 0.42, 0, 0.1, -2.65, dark); // front wing
-  box(1.4, 0.02, 0.16, 0, 0.16, -2.5, dark);
-  box(0.05, 0.24, 0.42, 0.96, 0.16, -2.65, dark);
-  box(0.05, 0.24, 0.42, -0.96, 0.16, -2.65, dark);
-  box(0.32, 0.32, 0.75, 0, 0.66, 0.75, dark); // airbox, behind the driver
-  box(0.03, 0.22, 0.7, 0, 0.88, 1.15, dark); // shark fin
-  box(1.15, 0.05, 0.36, 0, 0.98, 2.15, dark); // rear wing
-  box(0.95, 0.03, 0.2, 0, 0.78, 2.05, dark);
-  box(0.04, 0.55, 0.36, 0.52, 0.72, 2.15, dark);
-  box(0.04, 0.55, 0.36, -0.52, 0.72, 2.15, dark);
-  box(0.7, 0.08, 0.4, 0, 0.14, 1.9, dark); // diffuser
-  box(1.45, 0.04, 3.5, 0, 0.07, 0.15, dark); // floor
-  const light = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 0.04), new THREE.MeshBasicMaterial({ color: "#ff2a2a" }));
-  light.position.set(0, 0.48, 2.32);
+  box(0.8, 0.45, 4.4, 0, 0.42, 0, body); // tub
+  box(0.34, 0.22, 1.3, 0, 0.32, -2.6, body); // nose
+  box(1.5, 0.38, 1.8, 0, 0.36, 0.5, body); // sidepods
+  box(0.42, 0.5, 1.1, 0, 0.85, 0.6, body); // airbox
+  box(1.9, 0.06, 0.55, 0, 0.12, -3.1, dark); // front wing
+  box(1.0, 0.07, 0.45, 0, 0.95, 2.25, dark); // rear wing
+  box(0.05, 0.6, 0.55, 0.5, 0.7, 2.25, dark);
+  box(0.05, 0.6, 0.55, -0.5, 0.7, 2.25, dark);
+  box(1.4, 0.05, 3.6, 0, 0.07, 0.2, dark); // floor
+  box(0.04, 0.32, 1.3, 0, 1.0, 1.35, body); // engine cover fin
+  box(0.05, 0.22, 0.6, 0.95, 0.2, -3.1, dark); // front wing endplates
+  box(0.05, 0.22, 0.6, -0.95, 0.2, -3.1, dark);
+  const light = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.04), new THREE.MeshBasicMaterial({ color: "#ff2a2a" }));
+  light.position.set(0, 0.55, 2.5);
   grp.add(light);
   if (halo) {
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.04, 8, 20, Math.PI), dark);
+    // the halo: a hoop over the cockpit and the centre pillar
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.045, 6, 18, Math.PI), dark);
     hoop.rotation.x = -Math.PI / 2;
-    hoop.position.set(0, 0.9, -0.2);
+    hoop.position.set(0, 0.92, -0.25);
     hoop.name = "halo";
     grp.add(hoop);
-    box(0.06, 0.28, 0.06, 0, 0.74, -0.62, dark, "halo");
+    box(0.07, 0.3, 0.07, 0, 0.78, -0.68, dark);
+    grp.children[grp.children.length - 1].name = "halo";
   }
-  const wheel = (x: number, z: number, r: number, wide: number, front: boolean) => {
-    const pivot = new THREE.Group();
-    pivot.position.set(x, r, z);
-    if (front) pivot.name = "front";
-    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, wide, 18), tyreM);
-    tyre.rotation.z = Math.PI / 2;
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, wide + 0.02, 12), rimM);
-    rim.rotation.z = Math.PI / 2;
-    const band = new THREE.Mesh(new THREE.TorusGeometry(r * 0.96, 0.012, 6, 16), bandM);
-    band.rotation.y = Math.PI / 2;
-    pivot.add(tyre, rim, band);
-    grp.add(pivot);
-  };
-  wheel(0.88, -1.7, 0.33, 0.36, true);
-  wheel(-0.88, -1.7, 0.33, 0.36, true);
-  wheel(0.86, 1.55, 0.36, 0.42, false);
-  wheel(-0.86, 1.55, 0.36, 0.42, false);
+  for (const [x, z, r] of [[0.85, -1.75, 0.33], [-0.85, -1.75, 0.33], [0.85, 1.6, 0.36], [-0.85, 1.6, 0.36]]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.4, 16), tyre);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(x, r, z);
+    if (z < 0) w.name = "front"; // steered (rotation.y)
+    grp.add(w);
+  }
   return grp;
 }
 
@@ -249,7 +367,8 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
   grass.position.set((g.w / 2) * g.m, -0.03, (g.h / 2) * g.m);
   scene.add(grass);
   scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g), trackId));
-  const mine = car(color, false);
+  const mine = car(color);
+  inside(mine, true);
   const ghost = car("#e2e8f0");
   ghost.traverse((o) => {
     const m = (o as THREE.Mesh).material as THREE.MeshLambertMaterial | undefined;
@@ -286,8 +405,8 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
         ghost.position.set(o.px, 0, o.pz);
         ghost.rotation.y = o.yaw;
       }
-      cam.position.set(me.px + me.dx * 0.35, 1.0, me.pz + me.dz * 0.35);
-      cam.lookAt(me.px + me.dx * 30, 0.55, me.pz + me.dz * 30);
+      cam.position.set(me.px - me.dx * EYE.z, EYE.y, me.pz - me.dz * EYE.z);
+      cam.lookAt(me.px + me.dx * 30, EYE.y - 0.35, me.pz + me.dz * 30);
       renderer.render(scene, cam);
     },
     dispose() {
@@ -299,7 +418,7 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
 
 /** The whole race from one car (the race view's "Onboard"): every car placed from the replay (lap fraction,
  *  racing line, pairs that are close side by side), the camera in the followed car. */
-export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: string[]) {
+export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: { color: string; color2?: string; num?: number }[]) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
   renderer.domElement.style.position = "absolute";
@@ -314,14 +433,14 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: st
   scene.add(grass);
   scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g), trackId));
   const cars = colors.map((c) => {
-    const m = car(c);
+    const m = car(c.color, true, c.color2, c.num);
     scene.add(m);
     return m;
   });
   const cam = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
   let w = 0;
   let h = 0;
-  let inside = -1;
+  let rider = -1;
   return {
     draw(list: { idx: number; frac: number; pit: boolean; out: boolean }[], follow: number) {
       if (el.clientWidth !== w || el.clientHeight !== h) {
@@ -331,9 +450,9 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: st
         cam.aspect = w / h;
         cam.updateProjectionMatrix();
       }
-      if (inside !== follow) {
-        for (const [i, m] of cars.entries()) for (const c of m.children) if (c.name === "halo") c.visible = i !== follow;
-        inside = follow;
+      if (rider !== follow) {
+        for (const [i, m] of cars.entries()) inside(m, i === follow);
+        rider = follow;
       }
       // along the lap, then cars within a car length or two of the one ahead move across
       const on = list.filter((c) => !c.pit).map((c) => ({ ...c, d: c.frac * g.len })).sort((a, b) => b.d - a.d);
@@ -349,8 +468,8 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: st
         m.position.set(f.px, 0, f.pz);
         m.rotation.y = f.yaw;
         if (c.idx === follow) {
-          cam.position.set(f.px + f.dx * 0.35, 1.0, f.pz + f.dz * 0.35);
-          cam.lookAt(f.px + f.dx * 30, 0.55, f.pz + f.dz * 30);
+          cam.position.set(f.px - f.dx * EYE.z, EYE.y, f.pz - f.dz * EYE.z);
+          cam.lookAt(f.px + f.dx * 30, EYE.y - 0.35, f.pz + f.dz * 30);
         }
       }
       for (const c of list) if (c.pit && cars[c.idx]) cars[c.idx].visible = false;

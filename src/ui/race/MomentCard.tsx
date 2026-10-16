@@ -17,6 +17,10 @@ export interface CockpitTrack {
   oppColor: string;
   habit?: string;
   grip?: number;
+  myColor2?: string;
+  oppColor2?: string;
+  myNum?: number;
+  oppNum?: number;
 }
 
 export function MomentCard({ m, onPick, who, cockpit, ease = 1 }: { m: PendingMoment; onPick: (opt: string, q?: number) => void; who?: string; cockpit?: CockpitTrack; ease?: number }) {

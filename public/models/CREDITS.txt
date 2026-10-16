@@ -1,0 +1,3 @@
+3D models (CC-BY-4.0), textures removed and recoloured for this game:
+- Car: based on "Mclaren MP4/6" (https://sketchfab.com/3d-models/mclaren-mp46-47ead8639cc84630bd2f98b34c646c25) by hwong9000 (https://sketchfab.com/hwong9000), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+- Driver: based on "Race Car Driver" (https://sketchfab.com/3d-models/race-car-driver-a8503189a20a441893b66e4c57d3231b) by tomkart (https://sketchfab.com/tomkart), licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

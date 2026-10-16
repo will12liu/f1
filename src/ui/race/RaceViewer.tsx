@@ -203,7 +203,7 @@ export function RaceViewer({
           <TrackCanvas track={track} view={view} cars={cars} follow={follow} marks={marks ?? null} zoomOn={near(t) ? focus!.cars : null} />
           {onboard && follow !== null && circ && (
             <Suspense fallback={null}>
-              <RaceOnboard trackId={circ.id} km={circ.km} target={circ.base - 0.4} colors={cars.map((c) => c.color)} view={view} follow={follow} code={cars[follow]?.code ?? ""} />
+              <RaceOnboard trackId={circ.id} km={circ.km} target={circ.base - 0.4} colors={replay.cars.map((c, i) => ({ color: cars[i].color, color2: cars[i].color2, num: drivers.get(c.driverId)?.num }))} view={view} follow={follow} code={cars[follow]?.code ?? ""} />
             </Suspense>
           )}
           {radio && radio.car >= 0 && <Radio replay={replay} view={view} t={t} car={radio.car} code={cars[radio.car]?.code ?? ""} engineer={radio.engineer} forecast={radio.forecast} />}

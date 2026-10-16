@@ -8,15 +8,14 @@ import { reactionScore } from "../../career/SimGames";
 import { useTrack } from "../../components/bits";
 import { verdictColor } from "../BrakeBar";
 import { build, HALF_M } from "../drive";
-import { car, frame, groundOf, road, sky } from "./scene";
-import { Helmet, WheelHud } from "./WheelHud";
+import { car, EYE, frame, groundOf, inside, road, sky } from "./scene";
 import { zones } from "./duel";
 
 export interface Start3DProps {
   trackId: string;
   km: number;
   target: number;
-  grid: { slot: number; color: string }[]; // the field, 1-based slots
+  grid: { slot: number; color: string; color2?: string; num?: number }[]; // the field, 1-based slots
   mySlot: number;
   myColor: string;
   onDone: (score: number, jumped: boolean) => void;
@@ -67,8 +66,8 @@ export default function Start3D(p: Start3DProps) {
     scene.add(road(g, back - 40 / g.m, g.len + 600 / g.m, zones(g).filter((z) => z.brakeD < 600 / g.m).map((z) => ({ ...z, brakeD: z.brakeD + g.len })), p.trackId));
     // the grid boxes and the field
     const cars = p.grid.map((e) => {
-      const c = car(e.slot === p.mySlot ? p.myColor : e.color);
-      if (e.slot === p.mySlot) for (const m of c.children) if (m.name === "halo") m.visible = false;
+      const c = car(e.slot === p.mySlot ? p.myColor : e.color, true, e.color2, e.num);
+      if (e.slot === p.mySlot) inside(c, true);
       scene.add(c);
       return { c, slot: e.slot, react: 0.18 + ((e.slot * 37) % 17) / 100, d: slotAt(e.slot).d, x: slotAt(e.slot).x, v: 0 };
     });
@@ -137,8 +136,8 @@ export default function Start3D(p: Start3DProps) {
       }
       const me = cars.find((e) => e.slot === p.mySlot)!;
       const f = frame(g, me.d, me.x);
-      cam.position.set(f.px + f.dx * 0.35, 1.0, f.pz + f.dz * 0.35);
-      cam.lookAt(f.px + f.dx * 30, 0.5, f.pz + f.dz * 30);
+      cam.position.set(f.px - f.dx * EYE.z, EYE.y, f.pz - f.dz * EYE.z);
+      cam.lookAt(f.px + f.dx * 40, 2.2, f.pz + f.dz * 40);
       renderer.render(scene, cam);
     };
     raf = requestAnimationFrame(tick);
@@ -196,8 +195,6 @@ export default function Start3D(p: Start3DProps) {
         <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
         <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
       </svg>
-      <WheelHud kmh={0} gear={1} note={phase === "out" ? "GO" : phase === "lights" ? "WAIT" : "GEAR 1"} />
-      <Helmet />
       <div className="absolute left-4 top-4 rounded-md bg-ink-950/85 px-4 py-3">
         <div className="kicker">The start · P{p.mySlot} on the grid</div>
         <div className="mt-1 text-lg text-white">Five red lights. When they all go out, launch: Space or tap. Go early and it's five seconds.</div>
