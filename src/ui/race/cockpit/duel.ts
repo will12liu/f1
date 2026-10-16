@@ -72,6 +72,11 @@ export function startDuel(g: Geo, side: Side, move: string, pick = 0, habit = si
 }
 
 const gapM = (s: Duel) => (s.me.d - s.opp.d) * s.g.m;
+/** Metres to the other car if it's ahead in your lane (for the assists), else null. */
+export const aheadOf = (s: Duel): number | null => {
+  const gap = (s.opp.d - s.me.d) * s.g.m;
+  return gap > 0 && Math.abs(s.opp.x - s.me.x) * HALF_M < WIDE + 0.3 ? gap - LEN : null;
+};
 
 /** One step. `inp` is the player's; until the first brake press the throttle is held for them. */
 export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {

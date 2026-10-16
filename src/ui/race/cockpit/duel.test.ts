@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { TrackFile } from "../../components/bits";
 import { at, build, type Input } from "../drive";
-import { startDuel, stepDuel, zones, type Duel } from "./duel";
+import { aheadOf, startDuel, stepDuel, zones, type Duel } from "./duel";
 
 const track = (id: string) => JSON.parse(readFileSync(`public/data/tracks/${id}.json`, "utf8")) as TrackFile;
 const monza = () => build(track("monza"), 5.793, 83.1);
@@ -58,6 +58,28 @@ describe("cockpit duel on every circuit", async () => {
           const r = run(s, 0, -0.9 * s.zone.turn);
           if (!r || r.why === "Contact" || r.why === "Ran wide") bad.push(`${c.id} ${side} ${pick}: ${r?.why}`);
         }
+    }
+    expect(bad).toEqual([]);
+  });
+});
+
+describe("driving assists", async () => {
+  const { CIRCUITS } = await import("../../../../data/manual/circuits");
+  const { assisted } = await import("../assist");
+  const drive = (s: Duel, level: "full" | "medium", inp: Input) => {
+    for (let i = 0; i < 120 * 30 && !s.result; i++) stepDuel(s, assisted(s.g, s.me, inp, level, 1, aheadOf(s)).inp, 1 / 120);
+    return s.result!;
+  };
+  it("full: hands off the wheel, the car makes every braking zone cleanly; medium: never braking, it still brakes for you", () => {
+    const bad: string[] = [];
+    for (const c of CIRCUITS) {
+      const g = build(track(c.id), c.km, c.base - 0.4);
+      for (const side of ["attack", "defend"] as const) {
+        const a = drive(startDuel(g, side, "hold", 0), "full", { throttle: 0, brake: 0, steer: 0 });
+        if (a.why === "Contact" || a.why === "Ran wide") bad.push(`${c.id} full ${side}: ${a.why}`);
+        const b = drive(startDuel(g, side, "hold", 1), "medium", { throttle: 1, brake: 0, steer: 0 });
+        if (b.why === "Contact" || b.why === "Ran wide") bad.push(`${c.id} medium ${side}: ${b.why}`);
+      }
     }
     expect(bad).toEqual([]);
   });

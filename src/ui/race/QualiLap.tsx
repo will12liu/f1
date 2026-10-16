@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { QUALI } from "../../engine/race/qualifying";
 import { lapTime } from "../../lib/format";
 import { loadTrack } from "../components/bits";
+import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "./assist";
 import { at, build, EDGE, fmtDelta, gearOf, GHOST_DT, ghostAt, gripOf, HALF, lapScore, loadGhost, refAt, refLap, refSectors, saveGhost, sectorTone, startState, stepCar, TONE, type CarState, type Geo, type Ghost } from "./drive";
 
 const STEP = 1 / 120; // physics step, seconds
@@ -91,6 +92,10 @@ export function QualiLap({
   const [sectors, setSectors] = useState<number[]>([]);
   const [result, setResult] = useState<Result | null>(null);
   const [guide, setGuide] = useState(true);
+  const [assist, setAssist] = useState<Assist>(readAssist);
+  const assistRef = useRef(assist);
+  assistRef.current = assist;
+  const cueRef = useRef(false);
   const [onboard, setOnboard] = useState(readOnboard); // the 3D onboard view instead of the chase cam
   const onboardRef = useRef(onboard);
   onboardRef.current = onboard;
@@ -193,7 +198,7 @@ export function QualiLap({
     const finish = (s: CarState) => {
       const deleted = s.deleted;
       const time = s.t;
-      const q = lapScore(g, time, deleted);
+      const q = Math.min(lapScore(g, time, deleted), ASSIST_CAP[assistRef.current]); // assists cap the score
       const prev = ghostRef.current;
       const best = !deleted && (!prev || time < prev.time);
       if (best) {
@@ -257,7 +262,10 @@ export function QualiLap({
         c.read(dt);
         acc += dt;
         while (acc >= STEP && !s.done && !s.deleted) {
-          stepCar(g, s, { throttle: c.throttle, brake: c.brake, steer: c.steer }, STEP, grip);
+          const lvl = assistRef.current;
+          const a = assisted(g, s, { throttle: c.throttle, brake: c.brake, steer: c.steer }, lvl, grip);
+          cueRef.current = a.cue;
+          stepCar(g, s, a.inp, STEP, grip * ASSIST_GRIP[lvl]);
           acc -= STEP;
           if (s.started && s.t >= trace.d.length * GHOST_DT) {
             trace.d.push(s.d);
@@ -452,6 +460,13 @@ export function QualiLap({
       ctx.fillRect(px0 - 4, py0 - 26, (small ? 60 : 78) + 8, 8);
       ctx.fillStyle = "#f8fafc";
       ctx.fillRect(px0 - 4 + ((small ? 60 : 78) + 8) / 2 - 4 - c.steer * (((small ? 60 : 78) + 8) / 2 - 4), py0 - 26, 8, 8);
+      // the brake cue (assists)
+      if (cueRef.current && assistRef.current !== "off" && phase === "run" && !finished) {
+        ctx.font = `900 ${Math.round(Math.min(W, H) * 0.08)}px ${DISPLAY}`;
+        ctx.textAlign = "center";
+        ctx.fillStyle = assistRef.current === "full" ? "rgba(226,232,240,0.85)" : "#ef4444";
+        ctx.fillText(assistRef.current === "full" ? "BRAKING" : "BRAKE", W / 2, H * 0.3);
+      }
       // mini map: the circuit, your dot, the ghost
       const mw = Math.min(small ? 150 : 220, W * 0.26);
       const ms = mw / g.w;
@@ -528,6 +543,9 @@ export function QualiLap({
           </div>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <button className="rounded-md bg-ink-800 px-3 py-2 font-display text-base font-bold uppercase text-white" title={ASSISTS.find((x) => x.id === assist)?.hint} onClick={() => setAssist((a) => saveAssist(nextAssist(a)))}>
+            Assists: {ASSISTS.find((x) => x.id === assist)?.label}
+          </button>
           <button className={`rounded-md px-3 py-2 font-display text-base font-bold uppercase ${onboard ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300"}`} onClick={() => setOnboard((v) => saveOnboard(!v))}>
             {onboard ? "Onboard" : "Chase cam"}
           </button>

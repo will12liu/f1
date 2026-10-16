@@ -7,7 +7,8 @@ import * as THREE from "three";
 import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
-import { startDuel, stepDuel, type Duel, type Side } from "./duel";
+import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "../assist";
+import { aheadOf, startDuel, stepDuel, type Duel, type Side } from "./duel";
 import { car, EYE, frame, groundOf, inside, road, sky, steerWheels } from "./scene";
 
 export interface CockpitProps {
@@ -47,7 +48,10 @@ export default function Cockpit3D(p: CockpitProps) {
   const keys = useRef(new Set<string>());
   const pads = useRef({ l: false, r: false, gas: false, brk: false });
   const tilt = useRef(0); // phone tilt steering, -1..1 (+ = left)
-  const [hud, setHud] = useState({ kmh: 0, gear: 1, gap: 0, steer: 0, braked: false, go: false });
+  const [hud, setHud] = useState({ kmh: 0, gear: 1, gap: 0, steer: 0, braked: false, go: false, cue: false });
+  const [assist, setAssist] = useState<Assist>(readAssist);
+  const assistRef = useRef(assist);
+  assistRef.current = assist;
   const [res, setRes] = useState<{ q: number; why: string } | null>(null);
   const done = useRef(false);
   const finished = useRef(false); // onResult sent
@@ -135,6 +139,7 @@ export default function Cockpit3D(p: CockpitProps) {
       }
     }
     let steer = 0;
+    let cue = false; // the brake cue (assists)
     let acc = 0;
     let last = performance.now();
     const t0 = last;
@@ -160,11 +165,16 @@ export default function Cockpit3D(p: CockpitProps) {
           steer += Math.max(-STEP * 4, Math.min(STEP * 4, want - steer));
           const brake = k.has("ArrowDown") || k.has("KeyS") || k.has("Space") || pd.brk ? 1 : 0;
           const throttle = !brake && (k.has("ArrowUp") || k.has("KeyW") || pd.gas) ? 1 : 0;
-          stepDuel(s, { throttle, brake, steer }, STEP, p.grip ?? 1);
+          const lvl = assistRef.current;
+          const a = assisted(g, s.me, { throttle, brake, steer }, lvl, p.grip ?? 1, aheadOf(s));
+          cue = a.cue;
+          stepDuel(s, a.inp, STEP, (p.grip ?? 1) * ASSIST_GRIP[lvl]);
           if (n++ % 2 === 0) rec.push([s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0, s.opp.d, s.opp.x]);
           if (s.result) break;
         }
-        const r = s.result as Duel["result"]; // set inside stepDuel
+        const r0 = s.result as Duel["result"]; // set inside stepDuel
+        const r = r0 && { ...r0, q: Math.min(r0.q, ASSIST_CAP[assistRef.current]) }; // assists cap the score
+        if (r) s.result = r;
         if (r && !done.current) {
           done.current = true;
           setRes(r);
@@ -246,7 +256,7 @@ export default function Cockpit3D(p: CockpitProps) {
       }
       if (now - hudAt > 80) {
         hudAt = now;
-        setHud({ kmh: s.me.v * 3.6, gear: gearOf(s.me.v), gap: (s.me.d - s.opp.d) * g.m, steer, braked: s.braked, go });
+        setHud({ kmh: s.me.v * 3.6, gear: gearOf(s.me.v), gap: (s.me.d - s.opp.d) * g.m, steer, braked: s.braked, go, cue: cue && !s.result });
       }
     };
     raf = requestAnimationFrame(tick);
@@ -329,13 +339,31 @@ export default function Cockpit3D(p: CockpitProps) {
         <div className="font-display text-3xl font-black uppercase text-race">{p.label}</div>
         <div className="mt-1 text-base text-white">
           {p.side === "attack" ? "Get past him. " : "Keep him behind (mirrors). "}
-          {hud.braked ? "Throttle is yours now: W / Up." : "Brake near the 50 board (later is braver): S / Down / Space."}
+          {assist === "full"
+            ? "The car brakes and accelerates: steer left or right to pick your side."
+            : assist === "medium"
+              ? "Brake when it says BRAKE (it brakes for you if you're late). Steer to pick your side."
+              : hud.braked
+                ? "Throttle is yours now: W / Up."
+                : "Brake near the 50 board (later is braver): S / Down / Space."}
         </div>
         <div className="mt-1 text-sm text-slate-400">Steer with A D or the arrows (on a phone: tilt or the pads). Off the road or into him and it's over.</div>
       </div>
         </>
       )}
+      {hud.cue && !replay && assist !== "off" && (
+        <div className="pointer-events-none absolute inset-x-0 top-[24%] text-center">
+          <span className={`rounded-md px-5 py-1.5 font-display text-5xl font-black uppercase ${assist === "full" ? "bg-ink-950/80 text-slate-300" : "bg-race text-white"}`}>{assist === "full" ? "Braking" : "Brake"}</span>
+        </div>
+      )}
       <div className="absolute right-4 top-4 flex gap-2">
+        <button
+          onClick={() => setAssist((a) => saveAssist(nextAssist(a)))}
+          title={ASSISTS.find((x) => x.id === assist)?.hint}
+          className="rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800"
+        >
+          Assists: {ASSISTS.find((x) => x.id === assist)?.label}
+        </button>
         <button
           onClick={() => {
             try {

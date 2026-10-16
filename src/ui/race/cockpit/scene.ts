@@ -1,5 +1,5 @@
 // The 3D pieces shared by the cockpit duel and the onboard qualifying lap: the road built from the track
-// polyline (flat, real width, kerbs, lines, barriers, grandstands, braking boards), a low-poly F1 car, and a
+// polyline (asphalt, rubber line, kerbs, runoff, gravel, grass, armco, hoardings, trees), a low-poly F1 car, and a
 // ready-made onboard view that follows a drive.ts car.
 import * as THREE from "three";
 import { at, HALF_M, type CarState, type Geo } from "../drive";
