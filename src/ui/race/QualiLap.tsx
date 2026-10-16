@@ -53,9 +53,9 @@ class Controls {
 const VIEW_KEY = "paddock.qualiView";
 const readOnboard = () => {
   try {
-    return localStorage.getItem(VIEW_KEY) === "onboard";
+    return localStorage.getItem(VIEW_KEY) !== "chase"; // the 3D onboard unless you picked the chase cam
   } catch {
-    return false;
+    return true;
   }
 };
 const saveOnboard = (v: boolean) => {
@@ -547,7 +547,7 @@ export function QualiLap({
             Assists: {ASSISTS.find((x) => x.id === assist)?.label}
           </button>
           <button className={`rounded-md px-3 py-2 font-display text-base font-bold uppercase ${onboard ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300"}`} onClick={() => setOnboard((v) => saveOnboard(!v))}>
-            {onboard ? "Onboard" : "Chase cam"}
+            {onboard ? "View: onboard 3D" : "View: chase cam"}
           </button>
           <button className={`rounded-md px-3 py-2 font-display text-base font-bold uppercase ${guide ? "bg-white text-ink-950" : "bg-ink-800 text-slate-300"}`} onClick={() => setGuide((v) => !v)}>
             Guide {guide ? "on" : "off"}
