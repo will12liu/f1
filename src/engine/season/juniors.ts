@@ -4,7 +4,8 @@
 import { genDriver } from "../generate";
 import { hashString, makeRng } from "../rng";
 import { carPace } from "../ratings";
-import { qualify } from "../race/qualifying";
+import type { DrivenRace } from "../race/driven";
+import { applyDrivenQuali, qualify } from "../race/qualifying";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, Series, World } from "../types";
 import type { Command } from "../race/dials";
@@ -36,14 +37,14 @@ export function juniorRounds(calendarLength: number, series: Junior): number[] {
 export const isJuniorRound = (w: World, series: Junior, round: number) => juniorRounds(w.calendar.length, series).includes(round);
 
 /** The junior grid at a circuit as a race input (spec cars: a third of the F1-style spread). */
-export function juniorInput(w: World, series: Junior, round: number, circuit: Circuit, plan?: WeekendPlan): RaceInput {
+export function juniorInput(w: World, series: Junior, round: number, circuit: Circuit, plan?: WeekendPlan, qualiTimes?: Record<string, number>): RaceInput {
   const seed = hashString(`${w.seed}:${w.season}:${round}:${series}`);
   const fx = (id: string) => (plan?.[id] ? planEffects(seed, circuit, plan[id]) : null);
   const teams = w.teams.filter((t) => t.series === series);
   const dm = new Map(w.drivers.map((d) => [d.id, d]));
   const field = teams.flatMap((t) => t.drivers.map((id) => ({ team: t, driver: dm.get(id) })).filter((x): x is { team: (typeof teams)[number]; driver: Driver } => !!x.driver && !x.driver.retired));
   const car = (t: (typeof teams)[number]) => 80 + (carPace(t.car, circuit) - 80) * 0.6;
-  const q = qualify(
+  let q = qualify(
     seed,
     circuit,
     field.map(({ team, driver }) => ({
@@ -55,6 +56,7 @@ export function juniorInput(w: World, series: Junior, round: number, circuit: Ci
       plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late, laps: plan[driver.id].laps } : undefined,
     })),
   );
+  if (qualiTimes) q = applyDrivenQuali(q, qualiTimes);
   const grid = new Map(q.map((x) => [x.driverId, x.pos]));
   const entries: Entry[] = field
     .map(({ team, driver }) => ({
@@ -85,12 +87,34 @@ export interface JuniorLive {
   launch?: Record<number, number>;
 }
 
-/** Run this round's junior races (if any). `live` replays the one the player drove. */
-export function simJuniorRound(w: World, round: number, circuit: Circuit, live?: JuniorLive) {
+/** A junior race the player drove, in the shape the championship stores. */
+export function juniorResultFrom(series: Junior, round: number, circuitId: string, race: DrivenRace): JuniorResult {
+  return {
+    series,
+    round,
+    circuitId,
+    rows: race.rows.map((r) => ({
+      driverId: r.driverId,
+      teamId: r.teamId,
+      grid: r.grid,
+      pos: r.pos,
+      points: r.pos <= JUNIOR.points.length ? JUNIOR.points[r.pos - 1] : 0,
+      status: r.status,
+    })),
+  };
+}
+
+/** Run this round's junior races (if any). `live` replays the one the player drove.
+ *  `replace` is a race they drove themselves, used instead of simulating that series. */
+export function simJuniorRound(w: World, round: number, circuit: Circuit, live?: JuniorLive, replace?: JuniorResult, qualiTimes?: Record<string, number>) {
   ensureProspects(w);
   for (const series of ["F3", "F2"] as Junior[]) {
     if (!isJuniorRound(w, series, round)) continue;
-    const input = juniorInput(w, series, round, circuit, live?.series === series ? live.plan : undefined);
+    if (replace && replace.series === series && replace.round === round) {
+      (w.juniorResults ??= []).push(replace);
+      continue;
+    }
+    const input = juniorInput(w, series, round, circuit, live?.series === series ? live.plan : undefined, qualiTimes);
     if (input.entries.length < 6) continue;
     const l = live?.series === series ? live : undefined;
     const { result, state } = simRace(l ? { ...input, commands: l.commands, choices: l.choices, focus: l.focus, moments: l.moments, reads: w.reads, duelEdge: l.duelEdge, launch: l.launch } : input);

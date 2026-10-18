@@ -68,3 +68,30 @@ export function qualify(seed: number, circuit: CircuitDef, entries: QualiEntry[]
   grid.forEach((i, k) => (rows[i].pos = k + 1));
   return rows.sort((a, b) => a.pos - b.pos);
 }
+
+/** A qualifying session the player drove: one time per driver replaces the knockout laps.
+ *  The same draws already happened inside qualify(); this only re-ranks. Top 10 keep a time in
+ *  every session, the next slice in Q2, the rest in Q1, so the race page still reads normally. */
+export function applyDrivenQuali(rows: QualiRow[], times: Record<string, number>): QualiRow[] {
+  // another series' times (a junior session handed to the F1 field, or the other way) leave this grid alone
+  if (!rows.some((r) => times[r.driverId] > 0)) return rows.slice().sort((a, b) => a.pos - b.pos);
+  const n = rows.length;
+  const q3 = Math.min(10, n);
+  const q2n = Math.min(n, q3 + Math.ceil((n - q3) / 2));
+  const ranked = rows.slice().sort((a, b) => (times[a.driverId] ?? 1e9) - (times[b.driverId] ?? 1e9));
+  ranked.forEach((row, i) => {
+    const time = times[row.driverId] ?? null;
+    row.pos = i + 1;
+    if (i < q3) {
+      row.out = 3;
+      row.q = [time, time, time];
+    } else if (i < q2n) {
+      row.out = 2;
+      row.q = [time, time, null];
+    } else {
+      row.out = 1;
+      row.q = [time, null, null];
+    }
+  });
+  return ranked;
+}

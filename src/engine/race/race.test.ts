@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { carPace } from "../ratings";
 import { lineup } from "../season/season";
 import { loadWorld } from "../testWorld";
-import { qualify } from "./qualifying";
+import { applyDrivenQuali, qualify } from "./qualifying";
 import { indexReplay, viewAt } from "./replay";
 import { createRace, simRace, type RaceInput } from "./race";
 import type { Replay } from "../types";
@@ -84,6 +84,19 @@ describe("race engine", () => {
     expect(new Set(q.map((x) => x.driverId)).size).toBe(22);
     expect(q.slice(0, 10).every((x) => x.out === 3)).toBe(true);
     expect(q.slice(16).every((x) => x.out === 1)).toBe(true);
+  });
+
+  it("a driven qualifying time puts that driver on pole and leaves another series alone", () => {
+    const q = qualify(9, circuit, field.map(({ team, driver }) => ({ driverId: driver.id, teamId: team.id, car: carPace(team.car, circuit), r: driver.ratings })));
+    const back = q[q.length - 1].driverId;
+    const times = Object.fromEntries(q.map((r) => [r.driverId, (r.q[2] ?? r.q[1] ?? r.q[0] ?? 90) as number]));
+    times[back] = 60;
+    const next = applyDrivenQuali(q, times);
+    expect(next[0].driverId).toBe(back);
+    expect(next[0].q).toEqual([60, 60, 60]);
+    expect(next[0].out).toBe(3);
+    expect(next.map((x) => x.pos)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1));
+    expect(applyDrivenQuali(next, { "some-junior": 70 }).map((x) => x.driverId)).toEqual(next.map((x) => x.driverId));
   });
 
   it("the qualifying-lap mini-game moves only that driver's laps", () => {

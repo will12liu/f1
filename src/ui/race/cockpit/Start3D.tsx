@@ -3,13 +3,11 @@
 // as the flat Reaction game (reactionScore), so the engine's launch is unchanged. Display only: Math.random
 // here never touches the race.
 import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
 import { reactionScore } from "../../career/SimGames";
 import { useTrack } from "../../components/bits";
 import { verdictColor } from "../BrakeBar";
-import { build, HALF_M } from "../drive";
-import { car, EYE, frame, groundOf, inside, road, sky } from "./scene";
-import { zones } from "./duel";
+import { build } from "../drive";
+import { auroraView } from "../look";
 
 export interface Start3DProps {
   trackId: string;
@@ -45,84 +43,28 @@ export default function Start3D(p: Start3DProps) {
     if (!track || !host.current) return;
     const g = build(track, p.km, p.target);
     const el = host.current;
-    let renderer: THREE.WebGLRenderer;
+    const slotAt = (slot: number) => ({ d: -(6 + (slot - 1) * SLOT) / g.m, x: (slot % 2 === 0 ? 1 : -1) * (2.6 / 7.5) });
+    let view: ReturnType<typeof auroraView>;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      view = auroraView(
+        el,
+        g,
+        "",
+        p.grid.map((e) => ({ color: e.slot === p.mySlot ? p.myColor : e.color, color2: e.color2 })),
+        { map: false },
+      );
     } catch {
       p.onSimple();
       return;
     }
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-    el.appendChild(renderer.domElement);
-    const scene = new THREE.Scene();
-    sky(scene, p.trackId);
-    const slotAt = (slot: number) => ({ d: g.len - ((slot - 1) * SLOT + 6) / g.m, x: slot % 2 ? 0.35 : -0.35 }); // pole on the left of the road
-    const back = slotAt(Math.max(22, p.mySlot) + 2).d;
-    const f0 = frame(g, 0, 0);
-    const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: groundOf(p.trackId), side: THREE.DoubleSide }));
-    grass.rotation.x = -Math.PI / 2;
-    grass.position.set(f0.px, -0.03, f0.pz);
-    scene.add(grass);
-    scene.add(road(g, back - 40 / g.m, g.len + 600 / g.m, zones(g).filter((z) => z.brakeD < 600 / g.m).map((z) => ({ ...z, brakeD: z.brakeD + g.len })), p.trackId));
-    // the grid boxes and the field
-    const cars = p.grid.map((e) => {
-      const c = car(e.slot === p.mySlot ? p.myColor : e.color, true, e.color2, e.num);
-      if (e.slot === p.mySlot) inside(c, true);
-      scene.add(c);
-      return { c, slot: e.slot, react: 0.18 + ((e.slot * 37) % 17) / 100, d: slotAt(e.slot).d, x: slotAt(e.slot).x, v: 0 };
-    });
-    const white = new THREE.MeshBasicMaterial({ color: "#f1f5f9" });
-    for (const e of cars) {
-      const f = frame(g, e.d - 2.2 / g.m, e.x);
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.25), white);
-      line.rotation.x = -Math.PI / 2;
-      line.rotation.z = f.yaw;
-      line.position.set(f.px, 0.02, f.pz);
-      scene.add(line);
-    }
-    // the gantry over the line, five pairs of lights facing the grid
-    const gf = frame(g, g.len + 4 / g.m, 0);
-    const gantry = new THREE.Group();
-    const dark = new THREE.MeshLambertMaterial({ color: "#111318", side: THREE.DoubleSide });
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(HALF_M * 2 + 4, 2.2, 0.6), dark);
-    gantry.add(beam);
-    for (const s of [-1, 1]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 7, 0.5), dark);
-      post.position.set(s * (HALF_M + 2), -3.5, 0);
-      gantry.add(post);
-    }
-    const off = new THREE.MeshBasicMaterial({ color: "#2a1215" });
-    const on = new THREE.MeshBasicMaterial({ color: "#ff1a1a" });
-    const lamps: THREE.Mesh[][] = [];
-    for (let k = 0; k < 5; k++) {
-      const col: THREE.Mesh[] = [];
-      for (const y of [0.35, -0.35]) {
-        const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.42, 18), off);
-        lamp.position.set((k - 2) * 1.35, y * 1.4, 0.31);
-        gantry.add(lamp);
-        col.push(lamp);
-      }
-      lamps.push(col);
-    }
-    gantry.position.set(gf.px, 6.5, gf.pz);
-    gantry.rotation.y = gf.yaw; // local +z points back down the grid, where the lamps face
-    scene.add(gantry);
-    const cam = new THREE.PerspectiveCamera(70, 1, 0.05, 1500);
+    const cars = p.grid.map((e, idx) => ({ idx, slot: e.slot, react: 0.18 + ((e.slot * 37) % 17) / 100, d: slotAt(e.slot).d, x: slotAt(e.slot).x, v: 0 }));
+    const follow = Math.max(0, cars.findIndex((e) => e.slot === p.mySlot));
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      renderer.setSize(w, h, false);
-      renderer.domElement.style.width = "100%";
-      renderer.domElement.style.height = "100%";
-      cam.aspect = w / h;
-      cam.updateProjectionMatrix();
-      lamps.forEach((col, k) => col.forEach((m) => (m.material = lit.current > k ? on : off)));
-      // after lights out everyone launches; you go when you went (a jump start: early)
       const ph = phaseRef.current;
       const out = outAt.current;
       for (const e of cars) {
@@ -130,21 +72,18 @@ export default function Start3D(p: Start3DProps) {
         const t0 = mine ? goAt.current : out ? out + e.react * 1000 : 0;
         if (t0 && now > t0 && (ph === "out" || ph === "done" || ph === "jump" || mine)) e.v = Math.min(70, e.v + 11 * dt);
         e.d += (e.v * dt) / g.m;
-        const f = frame(g, e.d, e.x);
-        e.c.position.set(f.px, 0, f.pz);
-        e.c.rotation.y = f.yaw;
       }
-      const me = cars.find((e) => e.slot === p.mySlot)!;
-      const f = frame(g, me.d, me.x);
-      cam.position.set(f.px - f.dx * EYE.z, EYE.y, f.pz - f.dz * EYE.z);
-      cam.lookAt(f.px + f.dx * 40, 2.2, f.pz + f.dz * 40);
-      renderer.render(scene, cam);
+      view.draw(
+        cars.map((e) => ({ idx: e.idx, d: e.d, x: e.x, v: e.v })),
+        follow,
+        "chase",
+        ph === "lights" ? lit.current : 0,
+      );
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      renderer.dispose();
-      el.removeChild(renderer.domElement);
+      view.dispose();
     };
   }, [track]); // eslint-disable-line react-hooks/exhaustive-deps
 

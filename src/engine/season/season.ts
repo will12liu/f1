@@ -1,15 +1,16 @@
 // The season: run the next round (qualifying + race), standings, in-season car development.
 import { hashString, makeRng } from "../rng";
 import { carPace } from "../ratings";
-import { dayForms } from "../race/model";
-import { qualify } from "../race/qualifying";
+import { dayForms, POINTS } from "../race/model";
+import type { DrivenRace, DrivenRound } from "../race/driven";
+import { applyDrivenQuali, qualify } from "../race/qualifying";
 import type { Command } from "../race/dials";
 import type { MomentChoice } from "../race/moments";
 import { planEffects, type WeekendPlan } from "../race/weekend";
 import { simRace, type Entry, type RaceInput } from "../race/race";
 import type { Circuit, Driver, RaceSummary, Replay, Team, World } from "../types";
 import { developCarsAfterRound } from "./development";
-import { simJuniorRound, type JuniorLive } from "./juniors";
+import { juniorResultFrom, simJuniorRound, type JuniorLive } from "./juniors";
 import { careerAfterRound, moraleForm } from "../career/career";
 import { ensureSeats, managerAfterRound, raceBoost } from "../manager/manager";
 
@@ -65,8 +66,9 @@ export interface PreparedRound {
   standIns: { driverId: string; for: string }[];
 }
 
-/** Qualifying for the next round and the race input. Doesn't change the world. */
-export function prepareNextRound(w: World, plan?: WeekendPlan): PreparedRound | null {
+/** Qualifying for the next round and the race input. Doesn't change the world.
+ *  `qualiTimes` is a session the player drove: those times replace the knockout laps (same draws). */
+export function prepareNextRound(w: World, plan?: WeekendPlan, qualiTimes?: Record<string, number>): PreparedRound | null {
   const r = nextRound(w);
   if (!r) return null;
   const circuit = circuitOf(w, r.circuitId);
@@ -78,7 +80,7 @@ export function prepareNextRound(w: World, plan?: WeekendPlan): PreparedRound | 
   // the player's weekend plan (practice programme, setup, qualifying calls)
   const fx = field.map(({ driver }) => (plan?.[driver.id] ? planEffects(seed, circuit, plan[driver.id]) : null));
   const form = dayForms(seed, field.length).map((f, i) => f + boost.get(field[i].team.id)!.form + moraleForm(w, field[i].driver.id) + (fx[i]?.form ?? 0));
-  const quali = qualify(
+  let quali = qualify(
     seed,
     circuit,
     field.map(({ team, driver }, i) => ({
@@ -90,6 +92,7 @@ export function prepareNextRound(w: World, plan?: WeekendPlan): PreparedRound | 
       plan: plan?.[driver.id] ? { risk: plan[driver.id].risk, late: plan[driver.id].late, laps: plan[driver.id].laps } : undefined,
     })),
   );
+  if (qualiTimes) quali = applyDrivenQuali(quali, qualiTimes);
   const gridPos = new Map(quali.map((q) => [q.driverId, q.pos]));
   const entries: Entry[] = field
     .map(({ team, driver }, i) => ({
@@ -120,30 +123,17 @@ export interface LiveAnswers {
   launch?: Record<number, number>;
 }
 
-export function simNextRound(w: World, commands?: Command[], live?: LiveAnswers, junior?: JuniorLive, plan?: WeekendPlan): RaceSummary | null {
-  const prep = prepareNextRound(w, plan);
-  if (!prep) return null;
-  const { quali, input } = prep;
-  const r = { round: prep.round };
-  const circuit = circuitOf(w, input.circuit.id);
-  const seed = input.seed;
-  const entries = input.entries;
-  const { result, state } = simRace({ ...input, commands, ...(live ? { choices: live.choices, focus: live.focus, moments: live.moments, reads: w.reads, duelEdge: live.duelEdge, launch: live.launch } : {}) });
-  // what the player learned of other drivers' habits
-  for (const x of state.seen) {
-    const r = ((w.reads ??= {})[x.driverId] ??= { def: {}, att: {} });
-    r[x.role][x.move] = (r[x.role][x.move] ?? 0) + 1;
-  }
-
-  const summary: RaceSummary = {
-    round: r.round,
-    circuitId: circuit.id,
+function summaryFromDriven(w: World, prep: PreparedRound, race: DrivenRace): RaceSummary {
+  const fastest = race.rows.reduce((best, row) => (row.best > 0 && (best.best === 0 || row.best < best.best) ? row : best), race.rows[0]);
+  return {
+    round: prep.round,
+    circuitId: prep.input.circuit.id,
     season: w.season,
-    quali: quali.map((q) => ({ driverId: q.driverId, pos: q.pos, q: q.q })),
-    pole: quali[0].driverId,
-    winner: result.rows[0].driverId,
-    fastestLap: result.fastest ? { driverId: entries[result.fastest.idx].driverId, time: result.fastest.time } : { driverId: "", time: 0 },
-    classification: result.rows.map((x) => ({
+    quali: prep.quali.map((q) => ({ driverId: q.driverId, pos: q.pos, q: q.q })),
+    pole: prep.quali[0].driverId,
+    winner: race.rows[0].driverId,
+    fastestLap: fastest ? { driverId: fastest.driverId, time: fastest.best } : { driverId: "", time: 0 },
+    classification: race.rows.map((x) => ({
       driverId: x.driverId,
       teamId: x.teamId,
       grid: x.grid,
@@ -152,47 +142,113 @@ export function simNextRound(w: World, commands?: Command[], live?: LiveAnswers,
       time: x.time,
       gap: x.gap,
       status: x.status,
-      points: x.points,
-      pits: x.pits,
-      fastest: x.fastest,
+      points: x.pos <= POINTS.length ? POINTS[x.pos - 1] : 0,
+      pits: 0,
+      fastest: x.best,
       passes: x.passes,
-      pens: x.pens.length ? x.pens : undefined,
-      pp: x.pp || undefined,
     })),
-    sc: result.sc,
-    vsc: result.vsc,
-    red: result.red || undefined,
+    sc: 0,
+    vsc: 0,
     stand_ins: prep.standIns.length ? prep.standIns : undefined,
-    overtakes: result.passes,
+    overtakes: race.rows.reduce((s, row) => s + row.passes, 0),
   };
-  const replay: Replay = {
+}
+
+function replayFromDriven(w: World, prep: PreparedRound, race: DrivenRace): Replay {
+  const teamOf = new Map(race.rows.map((r) => [r.driverId, r.teamId]));
+  return {
     season: w.season,
-    round: r.round,
-    circuitId: circuit.id,
-    laps: state.laps,
-    cars: entries.map((e) => ({ driverId: e.driverId, teamId: e.teamId })),
-    grid: entries.map((e) => e.driverId),
-    lapEnd: state.lapEnd.map((a) => a.map((t) => Math.round(t * 1000) / 1000)),
-    events: state.events,
-    flags: state.flagLog.filter((f) => f.flag !== "green") as Replay["flags"],
-    stints: state.cars.map((c) => c.stints),
+    round: prep.round,
+    circuitId: prep.input.circuit.id,
+    laps: race.laps,
+    cars: race.gridIds.map((id) => ({ driverId: id, teamId: teamOf.get(id) ?? "" })),
+    grid: race.gridIds,
+    lapEnd: race.lapEnd,
+    events: [],
+    flags: [],
+    stints: race.gridIds.map(() => [{ c: "M" as const, from: 1, to: race.laps }]),
   };
-  // licence points; 12 in 12 months = a ban from the next round
-  const dm = driverMap(w);
-  for (const x of result.rows) {
-    if (!x.pp) continue;
-    const d = dm.get(x.driverId);
-    if (!d) continue;
-    (d.licence ??= []).push({ season: w.season, round: r.round, pts: x.pp });
-    if (licencePoints(d, w.season, r.round) >= BAN_POINTS) {
-      for (const e of d.licence) e.spent = true;
-      d.bannedFor = { season: w.season, round: r.round + 1 };
+}
+
+export function simNextRound(w: World, commands?: Command[], live?: LiveAnswers, junior?: JuniorLive, plan?: WeekendPlan, qualiTimes?: Record<string, number>, driven?: DrivenRound): RaceSummary | null {
+  const prep = prepareNextRound(w, plan, qualiTimes);
+  if (!prep) return null;
+  const { quali, input } = prep;
+  const r = { round: prep.round };
+  const circuit = circuitOf(w, input.circuit.id);
+  const seed = input.seed;
+  const entries = input.entries;
+  let summary: RaceSummary;
+  let replay: Replay;
+  // a race the player drove themselves is the result; the lap engine does not run it again
+  if (driven && !driven.series) {
+    summary = summaryFromDriven(w, prep, driven.race);
+    replay = replayFromDriven(w, prep, driven.race);
+  } else {
+    const { result, state } = simRace({ ...input, commands, ...(live ? { choices: live.choices, focus: live.focus, moments: live.moments, reads: w.reads, duelEdge: live.duelEdge, launch: live.launch } : {}) });
+    for (const x of state.seen) {
+      const read = ((w.reads ??= {})[x.driverId] ??= { def: {}, att: {} });
+      read[x.role][x.move] = (read[x.role][x.move] ?? 0) + 1;
+    }
+    summary = {
+      round: r.round,
+      circuitId: circuit.id,
+      season: w.season,
+      quali: quali.map((q) => ({ driverId: q.driverId, pos: q.pos, q: q.q })),
+      pole: quali[0].driverId,
+      winner: result.rows[0].driverId,
+      fastestLap: result.fastest ? { driverId: entries[result.fastest.idx].driverId, time: result.fastest.time } : { driverId: "", time: 0 },
+      classification: result.rows.map((x) => ({
+        driverId: x.driverId,
+        teamId: x.teamId,
+        grid: x.grid,
+        pos: x.pos,
+        laps: x.laps,
+        time: x.time,
+        gap: x.gap,
+        status: x.status,
+        points: x.points,
+        pits: x.pits,
+        fastest: x.fastest,
+        passes: x.passes,
+        pens: x.pens.length ? x.pens : undefined,
+        pp: x.pp || undefined,
+      })),
+      sc: result.sc,
+      vsc: result.vsc,
+      red: result.red || undefined,
+      stand_ins: prep.standIns.length ? prep.standIns : undefined,
+      overtakes: result.passes,
+    };
+    replay = {
+      season: w.season,
+      round: r.round,
+      circuitId: circuit.id,
+      laps: state.laps,
+      cars: entries.map((e) => ({ driverId: e.driverId, teamId: e.teamId })),
+      grid: entries.map((e) => e.driverId),
+      lapEnd: state.lapEnd.map((a) => a.map((t) => Math.round(t * 1000) / 1000)),
+      events: state.events,
+      flags: state.flagLog.filter((f) => f.flag !== "green") as Replay["flags"],
+      stints: state.cars.map((c) => c.stints),
+    };
+    const dm = driverMap(w);
+    for (const x of result.rows) {
+      if (!x.pp) continue;
+      const d = dm.get(x.driverId);
+      if (!d) continue;
+      (d.licence ??= []).push({ season: w.season, round: r.round, pts: x.pp });
+      if (licencePoints(d, w.season, r.round) >= BAN_POINTS) {
+        for (const e of d.licence) e.spent = true;
+        d.bannedFor = { season: w.season, round: r.round + 1 };
+      }
     }
   }
   w.results.push(summary);
   w.replays[r.round] = replay;
   developCarsAfterRound(w, makeRng(seed ^ 0xdee));
-  simJuniorRound(w, r.round, circuit, junior);
+  const replace = driven?.series ? juniorResultFrom(driven.series, r.round, circuit.id, driven.race) : undefined;
+  simJuniorRound(w, r.round, circuit, junior, replace, qualiTimes);
   managerAfterRound(w, summary);
   careerAfterRound(w);
   return summary;

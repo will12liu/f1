@@ -30,6 +30,8 @@ export function Weekend({
   driverId,
   engineer,
   onRun,
+  onDrive,
+  drivenNote,
   busy,
   ratings,
   color,
@@ -39,6 +41,8 @@ export function Weekend({
   driverId: string;
   engineer: number;
   onRun: (p: CarPlan) => void;
+  onDrive?: () => void;
+  drivenNote?: string;
   busy?: boolean;
   ratings?: { quali: number; pace: number }; // the driver's one-lap and race pace: a little more grip in the lap game
   color?: string; // the car's colour in the lap game
@@ -97,10 +101,17 @@ export function Weekend({
                   <div className="font-display text-xl font-bold uppercase leading-tight">{late[i] ? "Late run" : "Early run"}</div>
                   <div className={`text-sm ${late[i] ? "text-ink-700" : "text-slate-500"}`}>{late[i] ? "Fast track, traffic" : "Clear track"}</div>
                 </button>
-                <button onClick={() => laps[i] === null && setDriving(i)} disabled={laps[i] !== null} className={`rounded-lg px-4 py-3 text-left max-sm:col-start-2 ${laps[i] !== null ? "bg-emerald-400 text-ink-950" : "border-2 border-race bg-ink-900 text-white hover:bg-ink-800"}`}>
-                  <div className="font-display text-xl font-bold uppercase leading-tight">{laps[i] !== null ? lapLabels[i] || `Lap ${Math.round(laps[i]! * 100)}%` : "Drive the lap"}</div>
-                  <div className={`text-sm ${laps[i] !== null ? "text-ink-800" : "text-slate-400"}`}>{laps[i] !== null ? "Driven: one try per session" : "Or leave it to instinct"}</div>
-                </button>
+                {laps[i] !== null ? (
+                  <div className="rounded-lg bg-emerald-400 px-4 py-3 text-left text-ink-950 max-sm:col-start-2">
+                    <div className="font-display text-xl font-bold uppercase leading-tight">{lapLabels[i] || `Lap ${Math.round(laps[i]! * 100)}%`}</div>
+                    <div className="text-sm text-ink-800">Saved. Counts for {s}</div>
+                  </div>
+                ) : (
+                  <button onClick={() => setDriving(i)} className="rounded-lg border-2 border-race bg-ink-900 px-4 py-3 text-left text-white hover:bg-ink-800 max-sm:col-start-2">
+                    <div className="font-display text-xl font-bold uppercase leading-tight">Drive the lap</div>
+                    <div className="text-sm text-slate-400">Or leave it to instinct</div>
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -161,10 +172,18 @@ export function Weekend({
 
         </>
       )}
-      <div>
-        <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={busy} onClick={() => onRun({ program, setup, risk, late, laps })}>
-          Run qualifying ›
-        </button>
+      <div className="grid gap-3">
+        {drivenNote && <div className="text-lg text-white">{drivenNote}</div>}
+        <div className="flex flex-wrap gap-3">
+          {onDrive && (
+            <button className="btn-xl bg-white text-ink-950 hover:bg-slate-200" onClick={onDrive}>
+              Drive qualifying
+            </button>
+          )}
+          <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={busy} onClick={() => onRun({ program, setup, risk, late, laps })}>
+            Run qualifying ›
+          </button>
+        </div>
       </div>
     </div>
   );

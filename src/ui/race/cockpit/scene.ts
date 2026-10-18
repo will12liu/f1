@@ -620,7 +620,7 @@ export function road(g: Geo, d0: number, d1: number, zs: { brakeD: number; turn:
 }
 
 /** The guide for the qualifying lap: the racing line painted on the road, red where the reference lap brakes. */
-function guideMesh(g: Geo): THREE.Mesh {
+export function guideMesh(g: Geo): THREE.Mesh {
   const pos: number[] = [];
   const col: number[] = [];
   const red = new THREE.Color("#ef4444");
@@ -715,7 +715,8 @@ export function onboard(el: HTMLElement, g: Geo, color: string, trackId = "") {
 }
 
 /** The whole race from one car (the race view's "Onboard"): every car placed from the replay (lap fraction,
- *  racing line, pairs that are close side by side), the camera in the followed car. */
+ *  racing line, pairs that are close side by side), the camera in the followed car.
+ *  A driven race can pass each car's real x and a chase camera. The road runs back past the grid. */
 export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: { color: string; color2?: string; num?: number }[]) {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
@@ -729,7 +730,7 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: { 
   grass.rotation.x = -Math.PI / 2;
   grass.position.set((g.w / 2) * g.m, -0.03, (g.h / 2) * g.m);
   scene.add(grass);
-  scene.add(road(g, -200 / g.m, g.len + 300 / g.m, zones(g), trackId));
+  scene.add(road(g, -320 / g.m, g.len + 300 / g.m, zones(g), trackId));
   const cars = colors.map((c) => {
     const m = car(c.color, true, c.color2, c.num);
     scene.add(m);
@@ -740,7 +741,7 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: { 
   let h = 0;
   let rider = -1;
   return {
-    draw(list: { idx: number; frac: number; pit: boolean; out: boolean }[], follow: number) {
+    draw(list: { idx: number; frac: number; pit: boolean; out: boolean; x?: number }[], follow: number, camMode: "onboard" | "chase" = "onboard") {
       if (el.clientWidth !== w || el.clientHeight !== h) {
         w = el.clientWidth;
         h = el.clientHeight;
@@ -748,17 +749,21 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: { 
         cam.aspect = w / h;
         cam.updateProjectionMatrix();
       }
-      if (rider !== follow) {
-        for (const [i, m] of cars.entries()) inside(m, i === follow);
-        rider = follow;
+      const riderKey = follow + (camMode === "chase" ? 10000 : 0);
+      if (rider !== riderKey) {
+        for (const [i, m] of cars.entries()) inside(m, camMode === "onboard" && i === follow);
+        rider = riderKey;
+        cam.fov = camMode === "chase" ? 58 : 72;
+        cam.updateProjectionMatrix();
       }
-      // along the lap, then cars within a car length or two of the one ahead move across
+      // along the lap, then cars within a car length or two of the one ahead move across.
+      // a driven race passes x (where that car actually is); the replay invents a side-by-side
       const on = list.filter((c) => !c.pit).map((c) => ({ ...c, d: c.frac * g.len })).sort((a, b) => b.d - a.d);
       let side = 1;
       for (const [k, c] of on.entries()) {
         const near = k > 0 && (on[k - 1].d - c.d) * g.m < 7;
         side = near ? -side : 1;
-        const x = at(g, g.line, c.d) * 0.6 + (near ? side * 0.45 : 0);
+        const x = c.x !== undefined ? c.x : at(g, g.line, c.d) * 0.6 + (near ? side * 0.45 : 0);
         const f = frame(g, c.d, Math.max(-1, Math.min(1, x)));
         const m = cars[c.idx];
         if (!m) continue;
@@ -766,8 +771,13 @@ export function raceOnboard(el: HTMLElement, g: Geo, trackId: string, colors: { 
         m.position.set(f.px, 0, f.pz);
         m.rotation.y = f.yaw;
         if (c.idx === follow) {
-          cam.position.set(f.px - f.dx * EYE.z, EYE.y, f.pz - f.dz * EYE.z);
-          cam.lookAt(f.px + f.dx * 30, EYE.y - 0.35, f.pz + f.dz * 30);
+          if (camMode === "chase") {
+            cam.position.set(f.px - f.dx * 18, 6.2, f.pz - f.dz * 18);
+            cam.lookAt(f.px + f.dx * 16, 1.1, f.pz + f.dz * 16);
+          } else {
+            cam.position.set(f.px - f.dx * EYE.z, EYE.y, f.pz - f.dz * EYE.z);
+            cam.lookAt(f.px + f.dx * 30, EYE.y - 0.35, f.pz + f.dz * 30);
+          }
         }
       }
       for (const c of list) if (c.pit && cars[c.idx]) cars[c.idx].visible = false;

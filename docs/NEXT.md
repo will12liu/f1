@@ -11,7 +11,13 @@ via Comlink, Vitest). Three modes from the full-screen start menu: driver career
 sandbox. The race engine is a seeded lap-by-lap runner (`src/engine/race/race.ts`); live races run it on the main
 thread one lap ahead of the 2D canvas (`src/ui/race/RaceViewer.tsx`) and re-sim it in the worker on save.
 Mini-games feed scores (0-1) into the engine: lights-out start, duel braking bar, pit stop (wheel guns +
-release), qualifying lap (onboard chase cam on the real track), training hot lap + reaction test. Key moments
+release), qualifying lap (onboard chase cam on the real track), training hot lap + reaction test. You can also
+drive qualifying outright (best clean lap is the time, the field runs with you) and drive the race yourself
+(5, 15 or full distance, from the grid). That session, the qualifying lap's 3D view, the lights-out start, the duel and its TV replay, and the race
+onboard all use the generated picture from the MIT game hirosichen/ai-f1-racing-game (cars, road, kerbs,
+boards, grandstand, gantry) on the real circuit.
+That result is stored as the round; key moments and the pit wall stay
+the other way to race. Key moments
 slow to 1x, zoom on the two cars and end with a result panel. Team radio. A phone (life layer: messages,
 contacts/partner/family, stocks, crypto, homes, cars, businesses, social). Life events live in a spreadsheet
 (`data/manual/events.csv`, `npm run events`). Creator: build points or editable archetype presets.
@@ -80,11 +86,11 @@ Duel moments open `MomentCard` -> pick a move -> `BrakeBar` (a flat timing bar).
   brake), then add steering.
 
 Built 2026-10-16 (Claude, see CLAUDE.md "Cockpit duels"): `src/ui/race/cockpit/` (`duel.ts` pure + tested at
-every circuit, `scene.ts` road/cars/sky/onboard, `Cockpit3D.tsx`), the TV replay after each duel, sound, mirrors,
-night races, phone pads + tilt, the moments-view picker on the pre-race screen, duel practice on the Training
+every circuit, `scene.ts` road/cars/sky, `Cockpit3D.tsx`), the TV replay after each duel, sound,
+phone pads + tilt, the moments-view picker on the pre-race screen, duel practice on the Training
 page, and an "Onboard" view for the qualifying lap. Also built: the 3D start (`Start3D.tsx`: grid slot, field, gantry), the
-race view's "Onboard" ride-along (`RaceOnboard.tsx`), street-circuit scenery, the guide painted on the road in
-onboard qualifying. Still open: tune `duelScore` from real play (the user hasn't driven it yet), landmarks that
+race view's "Onboard" ride-along (`RaceOnboard.tsx`). The qualifying 3D view, the start, the duel and its TV replay,
+and the race onboard all use the generated picture in `ui/race/look.ts` (the same one as "Race it yourself"). Still open: tune `duelScore` from real play (the user hasn't driven it yet), landmarks that
 differ per circuit (shared scenery is in: asphalt, rubber line, kerbs, sausage kerbs, green paint, runoff, gravel,
 mown grass, armco, catch fence, hoardings, trees, start line), a better car model (wheels that turn, a livery stripe), the duel at the corner where the
 fight actually is, cars in the race onboard using real lateral positions (now: racing line + side-by-side nudge).

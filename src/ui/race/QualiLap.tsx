@@ -109,9 +109,24 @@ export function QualiLap({
     if (!onboard || !geo || !host.current) return;
     let live = true;
     const el = host.current;
-    import("./cockpit/scene")
-      .then(({ onboard: make }) => {
-        if (live) w3d.current = make(el, geo, color, trackId);
+    import("./look")
+      .then(({ auroraView }) => {
+        if (!live || !el.isConnected) return;
+        const view = auroraView(el, geo, "", [{ color }, { color: "#e2e8f0", color2: "#e2e8f0" }], { map: false });
+        w3d.current = {
+          draw(s, gp, showGuide) {
+            view.setGuide(!!showGuide);
+            view.draw(
+              [{ idx: 0, d: s.d, x: s.x, v: s.v, slip: s.v > 1 ? s.vlat / s.v : 0 }, ...(gp ? [{ idx: 1, d: gp.d, x: gp.x, ghost: true }] : [{ idx: 1, d: 0, hide: true }])],
+              0,
+              "chase",
+              0,
+            );
+          },
+          dispose() {
+            view.dispose();
+          },
+        };
       })
       .catch(() => live && setOnboard(false));
     return () => {
@@ -124,6 +139,7 @@ export function QualiLap({
   const [ghost, setGhost] = useState<Ghost | null>(null);
   const car = useRef<CarState | null>(null);
   const abort = useRef(false);
+  const keepRef = useRef<() => void>(() => undefined);
   const grip = gripOf(ratings);
 
   useEffect(() => {
@@ -151,6 +167,15 @@ export function QualiLap({
   useEffect(() => {
     const c = ctl.current;
     const down = (e: KeyboardEvent) => {
+      // the lap is over: Enter or Space saves it. Don't treat those keys as throttle or brake,
+      // or the focused Save button never activates.
+      if (phase === "done") {
+        if ((e.code === "Enter" || e.code === "Space") && !e.repeat) {
+          e.preventDefault();
+          keepRef.current();
+        }
+        return;
+      }
       if (e.code === "KeyG" && !e.repeat) setGuide((v) => !v);
       if (e.code === "KeyV" && !e.repeat) setOnboard((v) => saveOnboard(!v));
       if ((e.code === "Enter" || e.code === "Space" || e.code === "ArrowUp" || e.code === "KeyW") && phase === "wait" && geo) start();
@@ -504,7 +529,15 @@ export function QualiLap({
   const fmt2 = (sec: number) => `${sec <= 0 ? "-" : "+"}${Math.abs(sec).toFixed(2)}s`;
   const toneOf = (k: number, t: number) => TONE[sectorTone(t, refSecs[k] ?? Infinity, ghost?.sectors[k])];
 
+  const keep = () => {
+    if (phase !== "done" || !result) return;
+    onDone(result.q, result.deleted ? "Deleted" : lapTime(result.time).slice(0, -1));
+  };
+  keepRef.current = keep;
+
   const pointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // capturing the pointer retargets the click, so a button under this surface (Start, Save) never fires
+    if (phase === "done" || (e.target as HTMLElement).closest("button")) return;
     const r = e.currentTarget.getBoundingClientRect();
     const side = e.clientX - r.left < r.width / 2 ? "brake" : "throttle";
     ctl.current.pointers.set(e.pointerId, { side, x0: e.clientX, dx: 0 });
@@ -560,18 +593,17 @@ export function QualiLap({
             <button className="text-lg text-slate-400 hover:text-white" onClick={onQuit}>
               Don't drive it
             </button>
-          ) : null}
+          ) : (
+            <button type="button" className="btn-xl bg-race py-2 text-white hover:bg-red-500" onClick={keep}>
+              Save lap ›
+            </button>
+          )}
         </div>
       </div>
-      <div className="relative min-h-0 flex-1 select-none overflow-hidden" style={{ touchAction: "none" }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
+      <div className="relative min-h-0 flex-1">
+      <div className="absolute inset-0 select-none overflow-hidden" style={{ touchAction: "none" }} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp}>
         <div ref={host} className="absolute inset-0" />
         <canvas ref={ref} className="relative h-full w-full" />
-        {onboard && (
-          <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 60" preserveAspectRatio="none">
-            <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
-            <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
-          </svg>
-        )}
         {phase === "wait" && (
           <div className="absolute inset-x-0 bottom-0 bg-ink-950/90 p-6 text-center">
             <div className="headline text-5xl">Drive the lap</div>
@@ -579,13 +611,14 @@ export function QualiLap({
               Up or W is the throttle, Down, S or Space the brake, Left and Right (or A and D) steer. On a phone: hold the right half to accelerate, the left half to brake, drag or tilt to steer. Brake for the red parts of the line, carry too much speed and you run wide. All four wheels off the kerb and the lap is deleted.
               Once you start, the lap counts.
             </p>
-            <button className="btn-xl mt-4 bg-race text-white hover:bg-red-500" disabled={!geo} onClick={start}>
+            <button type="button" className="btn-xl mt-4 bg-race text-white hover:bg-red-500" disabled={!geo} onPointerDown={(e) => e.stopPropagation()} onClick={start}>
               {geo ? "Start the lap ›" : "Loading the track…"}
             </button>
           </div>
         )}
+      </div>
         {phase === "done" && result && (
-          <div className="absolute inset-0 grid place-items-center bg-ink-950/85 p-6 text-center">
+          <div className="absolute inset-0 z-20 grid place-items-center bg-ink-950/85 p-6 text-center">
             <div>
               {result.deleted ? (
                 <>
@@ -615,8 +648,8 @@ export function QualiLap({
                   </div>
                 </>
               )}
-              <button autoFocus className="btn-xl mt-6 bg-race text-white hover:bg-red-500" onClick={() => onDone(result.q, result.deleted ? "Deleted" : lapTime(result.time).slice(0, -1))}>
-                Keep this lap ›
+              <button type="button" autoFocus className="btn-xl mt-6 bg-race text-white hover:bg-red-500" onClick={keep}>
+                Save lap ›
               </button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import * as Acad from "./manager/academy";
 const A = { ...Act, answerEvent: Ev.answerEvent, negotiateSeat: Car.negotiateSeat, buyItem: Shop.buyItem, lifeInit: Life.lifeInit, lifeTrade: Life.lifeTrade, lifeBuy: Life.lifeBuy, lifeSell: Life.lifeSell, lifeHome: Life.lifeHome, lifeCarDrive: Life.lifeCarDrive, lifeBizUp: Life.lifeBizUp, lifePerson: Life.lifePerson, lifeMeet: Life.lifeMeet, lifeRead: Life.lifeRead, lifeReply: Life.lifeReply, lifePost: Life.lifePost, sellItem: Shop.sellItem, spendPoint: Car.spendPoint, simSession: Car.simSession, autoSpend: Car.autoSpend, signDeal: Car.signDeal, acceptSeat: Car.acceptSeat, markCareerRead: (w: World) => { for (const m of w.careerState?.inbox ?? []) m.read = true; return { ok: true, msg: "" }; }, hireScout: Acad.hireScout, fireScout: Acad.fireScout, setScoutFocus: Acad.setScoutFocus, signAcademy: Acad.signAcademy, releaseAcademy: Acad.releaseAcademy, buyJuniorTeam: Acad.buyJuniorTeam, placeDriver: Acad.placeDriver, upgradeProgram: Acad.upgradeProgram, scoutMarket: (w: Parameters<typeof Acad.scoutMarket>[0]) => (Acad.scoutMarket(w), { ok: true, msg: "" }) };
 import { startManager } from "./manager/manager";
 import type { Command } from "./race/dials";
+import type { DrivenRound } from "./race/driven";
 import { circuitOf, nextRound, prepareNextRound, seasonOver, simNextRound } from "./season/season";
 import * as Car from "./career/career";
 import * as Ev from "./career/events";
@@ -28,12 +29,12 @@ const api = {
     return { world, done };
   },
   /** Qualifying and the race input for the next round, to drive it live. */
-  prepareRound(world: World, plan?: WeekendPlan) {
-    return prepareNextRound(world, plan);
+  prepareRound(world: World, plan?: WeekendPlan, qualiTimes?: Record<string, number>) {
+    return prepareNextRound(world, plan, qualiTimes);
   },
-  /** Records the next round as driven live: the same race replayed with the player's commands. */
-  commitRound(world: World, commands: Command[], live?: Parameters<typeof simNextRound>[2], junior?: Parameters<typeof simNextRound>[3], plan?: WeekendPlan) {
-    const summary = simNextRound(world, commands, live, junior, plan);
+  /** Records the next round. A driven race is the classification the player just drove; otherwise the lap engine replays their commands. */
+  commitRound(world: World, commands: Command[], live?: Parameters<typeof simNextRound>[2], junior?: Parameters<typeof simNextRound>[3], plan?: WeekendPlan, qualiTimes?: Record<string, number>, driven?: DrivenRound) {
+    const summary = simNextRound(world, commands, live, junior, plan, qualiTimes, driven);
     return { world, summary };
   },
   /** Driver career: create the driver and his first seat. */
@@ -42,12 +43,12 @@ const api = {
     return world;
   },
   /** The player's junior race this round (if his series races), to drive it live. */
-  prepareJunior(world: World, plan?: WeekendPlan) {
+  prepareJunior(world: World, plan?: WeekendPlan, qualiTimes?: Record<string, number>) {
     const d = meOf(world);
     const r = nextRound(world);
     if (!d || !r || (d.series !== "F2" && d.series !== "F3") || !isJuniorRound(world, d.series, r.round)) return null;
     const circuit = circuitOf(world, r.circuitId);
-    return { round: r.round, series: d.series as "F2" | "F3", input: juniorInput(world, d.series, r.round, circuit, plan) };
+    return { round: r.round, series: d.series as "F2" | "F3", input: juniorInput(world, d.series, r.round, circuit, plan, qualiTimes) };
   },
   /** Team-principal mode: take over a team. */
   startManager(world: World, teamId: string, name: string) {

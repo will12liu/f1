@@ -3,13 +3,12 @@
 // on drive.ts physics, the other car on the reference lap (duel.ts). Throttle is held for you until you first
 // brake; then it's yours. The result (duelScore) is the same 0-1 the braking bar gives.
 import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
 import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
 import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "../assist";
+import { auroraView } from "../look";
 import { aheadOf, inferMove, startDuel, stepDuel, type Duel, type Side } from "./duel";
-import { car, EYE, frame, groundOf, inside, road, sky, steerWheels } from "./scene";
 
 export interface CockpitProps {
   trackId: string;
@@ -65,40 +64,16 @@ export default function Cockpit3D(p: CockpitProps) {
     const g = build(track, p.km, p.target);
     const s: Duel = startDuel(g, p.side, p.move, p.pick, p.habit);
     const el = host.current;
-    let renderer: THREE.WebGLRenderer;
+    let view: ReturnType<typeof auroraView>;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      view = auroraView(el, g, "", [
+        { color: p.myColor, color2: p.myColor2 },
+        { color: p.oppColor, color2: p.oppColor2 },
+      ], { map: false });
     } catch {
       p.onSimple();
       return;
     }
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-    el.appendChild(renderer.domElement);
-    const scene = new THREE.Scene();
-    sky(scene, p.trackId);
-    const f0 = frame(g, s.zone.brakeD, 0);
-    const grass = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: groundOf(p.trackId), side: THREE.DoubleSide }));
-    grass.rotation.x = -Math.PI / 2;
-    grass.position.set(f0.px, -0.03, f0.pz);
-    scene.add(grass);
-    scene.add(road(g, s.me.d - 60 / g.m, s.endD + 500 / g.m, [s.zone], p.trackId));
-    const mine = car(p.myColor, true, p.myColor2, p.myNum);
-    inside(mine, true); // the overlay draws the halo and wheel from inside
-    const opp = car(p.oppColor, true, p.oppColor2, p.oppNum);
-    scene.add(mine, opp);
-    const cam = new THREE.PerspectiveCamera(72, 1, 0.05, 1500);
-    const mirror = new THREE.PerspectiveCamera(40, 2, 0.5, 400);
-    mirror.projectionMatrix.multiply(new THREE.Matrix4().makeScale(-1, 1, 1)); // a mirror, not a rear camera
-
-    const resize = () => {
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      renderer.setSize(w, h);
-      cam.aspect = w / h;
-      cam.updateProjectionMatrix();
-    };
-    resize();
-    window.addEventListener("resize", resize);
 
     // engine note: a sawtooth through a low-pass, pitch from the revs in the current gear
     let audio: AudioContext | null = null;
@@ -150,7 +125,6 @@ export default function Cockpit3D(p: CockpitProps) {
     const rec: number[][] = [];
     let n = 0;
     let replayAt = 0;
-    const tv = new THREE.PerspectiveCamera(38, 1, 0.5, 1500);
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -193,57 +167,27 @@ export default function Cockpit3D(p: CockpitProps) {
       const at_ = rp >= 0 ? rec[Math.min(rec.length - 1, from + rp)] : null;
       if (rp >= 0 && !replaying.current) {
         replaying.current = true;
-        inside(mine, false);
         setReplay(true);
       }
-      const me = at_ ? frame(g, at_[0], at_[1], at_[2]) : frame(g, s.me.d, s.me.x, s.me.v > 1 ? s.me.vlat / s.me.v : 0);
-      mine.position.set(me.px, 0, me.pz);
-      mine.rotation.y = me.yaw;
-      steerWheels(mine, at_ ? 0 : steer);
-      const o = at_ ? frame(g, at_[3], at_[4]) : frame(g, s.opp.d, s.opp.x);
-      opp.position.set(o.px, 0, o.pz);
-      opp.rotation.y = o.yaw;
+      const meD = at_ ? at_[0] : s.me.d;
+      const meX = at_ ? at_[1] : s.me.x;
+      const slip = at_ ? at_[2] : s.me.v > 1 ? s.me.vlat / s.me.v : 0;
+      const oppD = at_ ? at_[3] : s.opp.d;
+      const oppX = at_ ? at_[4] : s.opp.x;
+      view.draw(
+        [
+          { idx: 0, d: meD, x: meX, v: at_ ? 0 : s.me.v, slip },
+          { idx: 1, d: oppD, x: oppX },
+        ],
+        0,
+        at_ ? "tv" : "chase",
+        0,
+      );
       if (at_) {
-        const w = el.clientWidth;
-        const h = el.clientHeight;
-        tv.aspect = w / h;
-        tv.updateProjectionMatrix();
-        // a helicopter shot: behind and to the outside of the pair, looking down at them
-        const mx = (me.px + o.px) / 2;
-        const mz = (me.pz + o.pz) / 2;
-        const out = s.zone.turn; // + = left of the road, the outside of a right-hander
-        tv.position.set(mx - me.dx * 22 + me.nx * out * 14, 11, mz - me.dz * 22 + me.ny * out * 14);
-        tv.lookAt(mx, 0.5, mz);
-        renderer.setScissorTest(false);
-        renderer.setViewport(0, 0, w, h);
-        renderer.render(scene, tv);
         osc?.frequency.setTargetAtTime(60, audio!.currentTime, 0.1);
         squealVol?.gain.setTargetAtTime(0, audio!.currentTime, 0.05);
         rumbleVol?.gain.setTargetAtTime(0, audio!.currentTime, 0.05);
         return;
-      }
-      // the driver's eyes: low, in front of the airbox, the nose and front wheels below
-      cam.position.set(me.px - me.dx * EYE.z, EYE.y, me.pz - me.dz * EYE.z);
-      cam.lookAt(me.px + me.dx * 30, EYE.y - 0.35, me.pz + me.dz * 30);
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      renderer.setScissorTest(false);
-      renderer.setViewport(0, 0, w, h);
-      renderer.render(scene, cam);
-      // two mirrors on the sidepods
-      renderer.setScissorTest(true);
-      const mw = Math.round(w * 0.16);
-      const mh = Math.round(mw / 2);
-      for (const sd of [1, -1]) {
-        const lx = me.px + me.nx * sd * 0.7;
-        const lz = me.pz + me.ny * sd * 0.7;
-        mirror.position.set(lx, 0.8, lz);
-        mirror.lookAt(me.px - me.dx * 30, 0.6, me.pz - me.dz * 30); // toward the middle behind you
-        const x0 = sd > 0 ? Math.round(w * 0.06) : Math.round(w * 0.94) - mw;
-        const y0 = Math.round(h * 0.36);
-        renderer.setViewport(x0, y0, mw, mh);
-        renderer.setScissor(x0, y0, mw, mh);
-        renderer.render(scene, mirror);
       }
       if (osc && audio) {
         const kmh = s.me.v * 3.6;
@@ -264,10 +208,8 @@ export default function Cockpit3D(p: CockpitProps) {
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
       audio?.close();
-      renderer.dispose();
-      el.removeChild(renderer.domElement);
+      view.dispose();
     };
   }, [track]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -314,33 +256,10 @@ export default function Cockpit3D(p: CockpitProps) {
       {!track && <div className="absolute inset-0 grid place-items-center text-2xl text-slate-400">Loading the track...</div>}
       {!replay && (
         <>
-      {/* halo */}
-      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 60" preserveAspectRatio="none">
-        <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
-        <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
-      </svg>
-      {/* steering wheel */}
-      <div className="pointer-events-none absolute bottom-[-4%] left-1/2 w-[min(46vw,520px)] -translate-x-1/2" style={{ transform: `translateX(-50%) rotate(${-hud.steer * 80}deg)` }}>
-        <svg viewBox="0 0 200 110" className="w-full">
-          <path d="M20 40 Q20 8 52 8 H148 Q180 8 180 40 V96 Q180 108 166 108 H140 L128 80 H72 L60 108 H34 Q20 108 20 96 Z" fill="#141619" stroke="#2a2e34" strokeWidth="3" />
-          <rect x="68" y="18" width="64" height="40" rx="4" fill="#05070a" />
-          <text x="100" y="40" textAnchor="middle" fill="#f8fafc" fontSize="18" fontWeight="900" fontFamily="sans-serif">
-            {Math.round(hud.kmh)}
-          </text>
-          <text x="100" y="54" textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="sans-serif">
-            KM/H · GEAR {hud.gear}
-          </text>
-          <text x="46" y="44" textAnchor="middle" fill={gap > 0 ? "#34d399" : "#fbbf24"} fontSize="13" fontWeight="900" fontFamily="sans-serif">
-            {gap > 0 ? "+" : ""}
-            {gap.toFixed(0)}m
-          </text>
-          <circle cx="154" cy="40" r="7" fill={hud.braked ? "#ef4444" : "#334155"} />
-        </svg>
-      </div>
-      <div className="pointer-events-none absolute left-4 top-4 max-w-md rounded-md bg-ink-950/85 px-4 py-3">
+      <div className="pointer-events-none absolute left-4 top-4 max-w-md bg-ink-950 px-4 py-3">
         <div className="font-display text-3xl font-black uppercase text-race">{p.label}</div>
         <div className="mt-1 text-base text-white">
-          {p.side === "attack" ? "Get past him. " : "Keep him behind (mirrors). "}
+          {p.side === "attack" ? "Get past him. " : "Keep him behind. "}
           {assist === "full"
             ? "The car brakes and accelerates: steer left or right to pick your side."
             : assist === "medium"
@@ -349,7 +268,8 @@ export default function Cockpit3D(p: CockpitProps) {
                 ? "Throttle is yours now: W / Up."
                 : "Brake near the 50 board (later is braver): S / Down / Space."}
         </div>
-        <div className="mt-1 text-sm text-slate-400">Steer with A D or the arrows (on a phone: tilt or the pads). Off the road or into him and it's over.</div>
+        <div className="mt-2 font-display text-2xl font-black text-white">{Math.round(hud.kmh)} km/h · gear {hud.gear} · {gap > 0 ? "+" : ""}{gap.toFixed(0)} m</div>
+        <div className="mt-1 text-sm text-slate-400">W throttle. S, Down or Space brakes. A and D steer. Off the road or into him and it's over.</div>
       </div>
         </>
       )}

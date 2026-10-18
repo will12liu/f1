@@ -3,19 +3,19 @@
 // exactly as you saw it.
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { createRace, type RaceRunner } from "../../engine/race/race";
-import type { RaceInput } from "../../engine/race/race";
+import { createRace, type Entry, type RaceRunner, type RaceInput } from "../../engine/race/race";
 import { careerOf, DIFFICULTY } from "../../engine/career/career";
 import { Weekend } from "../race/Weekend";
 import type { CarPlan, WeekendPlan } from "../../engine/race/weekend";
-import { circuitOf, nextRound, roundSeed } from "../../engine/season/season";
+import { carPace } from "../../engine/ratings";
+import { circuitOf, nextRound, raceLineup, roundSeed } from "../../engine/season/season";
 import { hashString } from "../../engine/rng";
 import { isJuniorRound } from "../../engine/season/juniors";
 import { teamStaff } from "../../engine/manager/manager";
 
 /** What the live page races: the F1 race, or the player's junior race in career mode. */
 type PreparedRound = { round: number; input: RaceInput; series?: "F2" | "F3" };
-import type { Replay } from "../../engine/types";
+import type { Replay, World } from "../../engine/types";
 import { useGame } from "../../state/game";
 import { PitWall } from "../race/PitWall";
 import { MomentCard } from "../race/MomentCard";
@@ -24,7 +24,8 @@ import { verdict, verdictColor } from "../race/BrakeBar";
 import { Reaction } from "../career/SimGames";
 import { tendencies, type PendingMoment } from "../../engine/race/moments";
 import { gripOf } from "../race/drive";
-
+import { SelfDrive, type SelfDone } from "../race/SelfDrive";
+import { selfSkill, type SelfSpec } from "../race/self";
 import { RaceViewer, type LiveSource } from "../race/RaceViewer";
 import { TeamBar, TrackOutline, useMaps } from "../components/bits";
 
@@ -57,6 +58,47 @@ const savePick = (id: string) => {
     /* private mode */
   }
 };
+
+function specOf(id: string, teamId: string, grid: number, car: number, seed: number, playerId: string, drivers: ReturnType<typeof useMaps>["drivers"], team: ReturnType<typeof useMaps>["team"]): SelfSpec {
+  const d = drivers.get(id);
+  const t = team(teamId);
+  return {
+    id,
+    teamId,
+    name: d ? `${d.first} ${d.last}` : id,
+    code: d?.code ?? "---",
+    grid,
+    skill: selfSkill(car, d?.ratings.pace ?? 75, seed, id),
+    player: id === playerId,
+    grip: gripOf(d?.ratings),
+    color: t?.color ?? "#94a3b8",
+    color2: t?.color2,
+    num: d?.num,
+  };
+}
+
+/** The cars for a qualifying session you drive, before the grid exists. Start slots are just boxes; the times set the grid. */
+function qualiSpecs(world: World, seed: number, playerId: string, series: "F2" | "F3" | undefined, drivers: ReturnType<typeof useMaps>["drivers"], team: ReturnType<typeof useMaps>["team"]): SelfSpec[] {
+  const round = nextRound(world);
+  if (!round) return [];
+  const circuit = circuitOf(world, round.circuitId);
+  if (series) {
+    const out: SelfSpec[] = [];
+    for (const t of world.teams.filter((x) => x.series === series)) {
+      for (const id of t.drivers) {
+        const d = drivers.get(id);
+        if (!d || d.retired) continue;
+        out.push(specOf(d.id, t.id, out.length + 1, 80 + (carPace(t.car, circuit) - 80) * 0.6, seed, playerId, drivers, team));
+      }
+    }
+    return out;
+  }
+  return raceLineup(world, round.round).map((row, i) => specOf(row.driver.id, row.team.id, i + 1, carPace(row.team.car, circuit), seed, playerId, drivers, team));
+}
+
+function raceSpecs(entries: Entry[], seed: number, playerId: string, drivers: ReturnType<typeof useMaps>["drivers"], team: ReturnType<typeof useMaps>["team"]): SelfSpec[] {
+  return entries.map((e) => specOf(e.driverId, e.teamId, e.grid || 1, e.car, seed, playerId, drivers, team));
+}
 
 function snapshot(r: RaceRunner, prep: PreparedRound, season: number): Replay {
   const s = r.state;
@@ -91,6 +133,9 @@ export function LiveRace() {
   // career and team-principal: practice and qualifying calls first; sandbox goes straight to the grid
   const planned = !!career || !!(world?.manager && !world.manager.fired);
   const [plan, setPlan] = useState<WeekendPlan | null>(null);
+  const [qualiTimes, setQualiTimes] = useState<Record<string, number> | undefined>(undefined);
+  const [drive, setDrive] = useState<null | { mode: "quali" } | { mode: "race"; laps: number }>(null);
+  const [seat, setSeat] = useState<string | null>(null);
   const planIds = career ? [meId!] : world?.manager ? (world.teams.find((t) => t.id === world.manager!.teamId)?.drivers ?? []) : [];
   const runQuali = (p: CarPlan) => setPlan(Object.fromEntries(planIds.map((id) => [id, p])));
   useEffect(() => {
@@ -100,11 +145,12 @@ export function LiveRace() {
     }
     let on = true;
     const junior = career && (meSeries === "F2" || meSeries === "F3");
-    (junior ? prepareJunior(plan ?? undefined) : prepareLive(plan ?? undefined)).then((p) => on && setPrep(p));
+    const times = qualiTimes;
+    (junior ? prepareJunior(plan ?? undefined, times) : prepareLive(plan ?? undefined, times)).then((p) => on && setPrep(p));
     return () => {
       on = false;
     };
-  }, [prepareLive, prepareJunior, world?.results.length, plan]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [prepareLive, prepareJunior, world?.results.length, plan, qualiTimes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { drivers, team } = useMaps(world!);
   const entries = prep?.input.entries ?? [];
@@ -197,6 +243,44 @@ export function LiveRace() {
   }, [runner, refresh]);
 
   if (!world) return null;
+  const playerId = career ? (meId ?? "") : myTeamId ? (seat ?? planIds[0] ?? "") : (pick ?? "");
+  const seriesNow = career && (meSeries === "F2" || meSeries === "F3") ? meSeries : undefined;
+  if (drive) {
+    const r = nextRound(world);
+    const track = drive.mode === "race" && prep ? prep.input.circuit : r ? circuitOf(world, r.circuitId) : null;
+    const seed = drive.mode === "race" && prep ? prep.input.seed : r ? (seriesNow ? hashString(`${world.seed}:${world.season}:${r.round}:${seriesNow}`) : roundSeed(world, r.round)) : 1;
+    const specs = drive.mode === "race" && prep ? raceSpecs(prep.input.entries, seed, playerId, drivers, team) : qualiSpecs(world, seed, playerId, seriesNow, drivers, team);
+    if (track && specs.some((s) => s.player)) {
+      const finish = async (out: SelfDone) => {
+        if (out.kind === "quali") {
+          setQualiTimes(out.times);
+          setPrep(undefined);
+          setDrive(null);
+          return;
+        }
+        const series = prep?.series;
+        await commitLive([], undefined, undefined, series ? undefined : plan ?? undefined, qualiTimes, series ? { series, race: out.race } : { race: out.race });
+        setDrive(null);
+        if (series) nav(base);
+        else if (prep) nav(`${base}/race/${prep.round}`);
+      };
+      return (
+        <SelfDrive
+          key={`${drive.mode}-${drive.mode === "race" ? drive.laps : 0}-${playerId}`}
+          title={track.gp}
+          trackId={track.id}
+          km={track.km}
+          target={track.base - 0.4}
+          seed={seed}
+          specs={specs}
+          mode={drive.mode}
+          laps={drive.mode === "race" ? drive.laps : 0}
+          onQuit={() => setDrive(null)}
+          onDone={finish}
+        />
+      );
+    }
+  }
   if (planned && !plan && world) {
     const r = nextRound(world);
     if (!r) return <div className="text-slate-400">No race left this season.</div>;
@@ -224,12 +308,23 @@ export function LiveRace() {
           </div>
           <TrackOutline id={circuit.id} className="h-36 w-56" stroke="#e2e8f0" />
         </div>
+        {planIds.length > 1 && (
+          <div className="flex flex-wrap gap-2">
+            {planIds.map((id) => (
+              <button key={id} onClick={() => setSeat(id)} className={`rounded-lg px-4 py-3 font-display text-xl font-bold uppercase ${(seat ?? planIds[0]) === id ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                Drive {drivers.get(id)?.last ?? id}
+              </button>
+            ))}
+          </div>
+        )}
         <Weekend
           seed={seed}
           circuit={circuit}
           driverId={planIds[0] ?? ""}
           engineer={engineer}
           onRun={runQuali}
+          onDrive={() => setDrive({ mode: "quali" })}
+          drivenNote={qualiTimes ? "Qualifying is driven. Run qualifying and the grid uses those times." : undefined}
           busy={!!busy}
           ratings={drivers.get(planIds[0] ?? "")?.ratings}
           color={world.teams.find((t) => t.drivers.includes(planIds[0] ?? ""))?.color}
@@ -332,6 +427,32 @@ export function LiveRace() {
               onDone={(q, jumped) => (setStartGame(false), start({ [chosen]: jumped ? -1 : q }))}
             />
           )}
+          <div className="grid gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
+            <div className="font-display text-2xl font-extrabold uppercase text-white">Race it yourself</div>
+            <p className="max-w-3xl text-base text-slate-400">You drive every lap, lights to flag. The field races with you. No pit stops. Lights out below is the pit wall and the key moments.</p>
+            {myTeamId && planIds.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {planIds.map((id) => (
+                  <button key={id} onClick={() => setSeat(id)} className={`rounded-lg px-4 py-3 font-display text-xl font-bold uppercase ${(seat ?? planIds[0]) === id ? "bg-race text-white" : "bg-ink-800 text-slate-300 hover:bg-ink-700"}`}>
+                    {drivers.get(id)?.code ?? id}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {[5, 15, prep.input.laps ?? circuit.laps].filter((n, i, a) => a.indexOf(n) === i).map((n) => {
+                const full = prep.input.laps ?? circuit.laps;
+                return (
+                  <button key={n} className="btn-xl bg-white text-ink-950 hover:bg-slate-200" disabled={!playerId} onClick={() => setDrive({ mode: "race", laps: n })}>
+                    {n === full ? `Full, ${n} laps` : `${n} laps`}
+                  </button>
+                );
+              })}
+            </div>
+            <button className="btn bg-ink-800 text-white hover:bg-ink-700" onClick={() => setDrive({ mode: "quali" })}>
+              {qualiTimes ? "Drive qualifying again" : "Drive qualifying"}
+            </button>
+          </div>
           <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={chosen < 0} onClick={() => (career ? setStartGame(true) : start())}>
             Lights out{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""} ›
           </button>
@@ -377,10 +498,10 @@ export function LiveRace() {
               onClick={async () => {
                 const live = { choices: runner.state.choices, focus: runner.input.focus ?? [], moments: runner.input.moments ?? "off", duelEdge: runner.input.duelEdge, launch: runner.input.launch };
                 if (prep.series) {
-                  await commitLive([], undefined, { series: prep.series, commands: runner.state.commands, ...live, plan: plan ?? undefined });
+                  await commitLive([], undefined, { series: prep.series, commands: runner.state.commands, ...live, plan: plan ?? undefined }, undefined, qualiTimes);
                   nav(base);
                 } else {
-                  const round = await commitLive(runner.state.commands, live, undefined, plan ?? undefined);
+                  const round = await commitLive(runner.state.commands, live, undefined, plan ?? undefined, qualiTimes);
                   if (round) nav(`${base}/race/${round}`);
                 }
               }}
