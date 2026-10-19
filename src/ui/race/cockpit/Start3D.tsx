@@ -4,6 +4,7 @@
 // here never touches the race.
 import { useEffect, useRef, useState } from "react";
 import { reactionScore } from "../../career/SimGames";
+import { readCam } from "../assist";
 import { useTrack } from "../../components/bits";
 import { verdictColor } from "../BrakeBar";
 import { build } from "../drive";
@@ -23,6 +24,7 @@ export interface Start3DProps {
 const SLOT = 8; // metres between grid slots (16 m between rows, staggered)
 
 export default function Start3D(p: Start3DProps) {
+  const [cam] = useState(readCam); // the saved camera; the halo is drawn only from the cockpit
   const track = useTrack(p.trackId);
   const host = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<"ready" | "lights" | "out" | "done" | "jump">("ready");
@@ -76,7 +78,7 @@ export default function Start3D(p: Start3DProps) {
       view.draw(
         cars.map((e) => ({ idx: e.idx, d: e.d, x: e.x, v: e.v })),
         follow,
-        "chase",
+        cam,
         ph === "lights" ? lit.current : 0,
       );
     };
@@ -137,10 +139,12 @@ export default function Start3D(p: Start3DProps) {
   return (
     <div className="fixed inset-0 z-[60] select-none bg-ink-950" onPointerDown={phase === "lights" || phase === "out" ? go : undefined} style={{ touchAction: "manipulation" }}>
       <div ref={host} className="absolute inset-0" />
-      <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 60" preserveAspectRatio="none">
+      {cam === "onboard" && (
+        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 100 60" preserveAspectRatio="none">
         <path d="M50 -2 V13" stroke="#0b0d10" strokeWidth="2.4" />
         <path d="M2 62 C 8 26, 28 12, 50 12 C 72 12, 92 26, 98 62" fill="none" stroke="#0b0d10" strokeWidth="2.2" />
       </svg>
+      )}
       <div className="absolute left-4 top-4 rounded-md bg-ink-950/85 px-4 py-3">
         <div className="kicker">The start · P{p.mySlot} on the grid</div>
         <div className="mt-1 text-lg text-white">Five red lights. When they all go out, launch: W (throttle), Space or tap. Go early and it's five seconds.</div>

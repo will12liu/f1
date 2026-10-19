@@ -220,7 +220,7 @@ export function RaceViewer({
               <RaceOnboard trackId={circ.id} km={circ.km} target={circ.base - 0.4} colors={replay.cars.map((c, i) => ({ color: cars[i].color, color2: cars[i].color2, num: drivers.get(c.driverId)?.num }))} view={view} follow={follow} code={cars[follow]?.code ?? ""} />
             </Suspense>
           )}
-          {radio && radio.car >= 0 && <Radio replay={replay} view={view} t={t} car={radio.car} code={cars[radio.car]?.code ?? ""} engineer={radio.engineer} forecast={radio.forecast} />}
+          {radio && radio.car >= 0 && !overlay && <Radio replay={replay} view={view} t={t} car={radio.car} code={cars[radio.car]?.code ?? ""} engineer={radio.engineer} forecast={radio.forecast} />}
           {near(t) && !overlay && !bannerOn && <div className="pointer-events-none absolute bottom-4 left-4 rounded-md bg-race px-3 py-1 font-display text-lg font-black uppercase tracking-wider text-white">Key moment · 1x</div>}
           {bannerOn && !overlay && (
             <div className="absolute inset-x-0 bottom-0 cursor-pointer p-3 sm:p-4" onClick={() => setShown((x) => (x ? { ...x, at: -1e9 } : x))}>
