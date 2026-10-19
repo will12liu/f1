@@ -67,6 +67,7 @@ export interface SelfCar {
   brk: number;
   steer: number;
   cue: boolean; // the assists' brake cue
+  slip: number; // the drawn nose angle into a slide, eased
 }
 
 export interface SelfState {
@@ -158,6 +159,7 @@ export function createSelf(seed: number, g: Geo, specs: SelfSpec[], mode: "race"
       brk: 0,
       steer: 0,
       cue: false,
+      slip: 0,
     };
   });
   for (const car of cars) if (car.player) seat(g, car);
@@ -265,10 +267,12 @@ function pose(g: Geo, d: number, xHalf: number) {
   const u = f - Math.floor(f);
   const nx = g.nx[i] * (1 - u) + g.nx[j] * u;
   const ny = g.ny[i] * (1 - u) + g.ny[j] * u;
-  const i0 = (i - 1 + n) % n;
-  const i1 = (i + 1) % n;
-  let tx = g.px[i1] - g.px[i0];
-  let tz = g.py[i1] - g.py[i0];
+  // the direction blends between the two points either side, so the heading turns smoothly (no step at each point)
+  const tan = (k: number) => [g.px[(k + 1) % n] - g.px[(k - 1 + n) % n], g.py[(k + 1) % n] - g.py[(k - 1 + n) % n]];
+  const [ax, az] = tan(i);
+  const [bx, bz] = tan(j);
+  let tx = ax * (1 - u) + bx * u;
+  let tz = az * (1 - u) + bz * u;
   const l = Math.hypot(tx, tz) || 1;
   tx /= l;
   tz /= l;
@@ -359,11 +363,13 @@ function stepPlayer(state: SelfState, g: Geo, car: SelfCar, inp: Input, dt: numb
     finishLap(car, state);
   }
   // where the picture draws it: on the road, the nose turned a little into a slide
+  // the nose turns a little into the slide, eased so it never snaps (the camera follows the nose)
   const p = pose(g, car.d, car.x);
-  const slip = car.v > 1 ? car.vlat / car.v : 0;
+  const slip = car.v > 8 ? clamp((car.vlat / car.v) * 0.6, -0.12, 0.12) : 0;
+  car.slip += (slip - car.slip) * Math.min(1, dt * 6);
   car.wx = p.wx;
   car.wz = p.wz;
-  car.head = Math.atan2(p.tx + p.nx * slip, p.tz + p.ny * slip);
+  car.head = Math.atan2(p.tx + p.nx * car.slip, p.tz + p.ny * car.slip);
   car.pi = p.pi;
 }
 

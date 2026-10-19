@@ -106,11 +106,11 @@ describe("self driven race", () => {
 });
 
 describe("self driven race with assists", () => {
-  it("full assists, hands off: the player's car laps cleanly, on a front-runner's pace, not faster than a same-skill car", () => {
+  it("full assists, holding only W: the player's car laps cleanly, on a front-runner's pace, not faster than a same-skill car", () => {
     for (const [id, km, base] of [["monza", 5.793, 83.1], ["monaco", 3.337, 75.1], ["silverstone", 5.891, 87.3]] as const) {
       const g = build(JSON.parse(readFileSync(`public/data/tracks/${id}.json`, "utf8")) as TrackFile, km, base);
       const state = createSelf(5, g, [spec("me", 2, 0.97, true), spec("ai", 1, 0.97)], "race", 1, "full");
-      run(g, state, () => ZERO, 120 * 200);
+      run(g, state, () => ({ throttle: 1, brake: 0, steer: 0 }), 120 * 200);
       const me = state.cars.find((c) => c.player)!;
       const ai = state.cars.find((c) => !c.player)!;
       expect(me.finished).toBe(true);
@@ -119,5 +119,14 @@ describe("self driven race with assists", () => {
       expect(me.finishT / ai.finishT).toBeGreaterThan(0.97);
       expect(me.finishT / ai.finishT).toBeLessThan(1.05);
     }
+  });
+});
+
+describe("nothing moves without the throttle", () => {
+  it("full assists and no W: the car stays on the grid", () => {
+    const g = monza();
+    const state = createSelf(5, g, [spec("me", 1, 0.97, true)], "race", 1, "full");
+    run(g, state, () => ZERO, 120 * 12);
+    expect(state.cars[0].v).toBeLessThan(0.5);
   });
 });

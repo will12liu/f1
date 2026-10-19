@@ -79,13 +79,13 @@ export const aheadOf = (s: Duel): number | null => {
   return gap > 0 && Math.abs(s.opp.x - s.me.x) * HALF_M < WIDE + 0.3 ? gap - LEN : null;
 };
 
-/** One step. `inp` is the player's; until the first brake press the throttle is held for them. */
+/** One step. `inp` is the player's (after the assists). */
 export function stepDuel(s: Duel, inp: Input, dt: number, grip = 1): void {
   if (s.result) return;
   const { g, zone } = s;
   if (inp.brake > 0) s.braked = true;
   const ers = (s.move === "ers" || s.move === "ersDef") && !s.braked ? 1.06 : 1;
-  const mine: Input = { throttle: s.braked ? inp.throttle : 1, brake: inp.brake, steer: inp.steer };
+  const mine: Input = { throttle: inp.throttle, brake: inp.brake, steer: inp.steer }; // nothing moves without W
   stepCar(g, s.me, mine, dt, grip * ers);
   s.t += dt;
 

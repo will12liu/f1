@@ -72,12 +72,12 @@ describe("driving assists", async () => {
     for (let i = 0; i < 120 * 30 && !s.result; i++) stepDuel(s, assisted(s.g, s.me, inp, level, 1, aheadOf(s)).inp, 1 / 120);
     return s.result!;
   };
-  it("full: hands off the wheel, the car makes every braking zone cleanly; medium: never braking, it still brakes for you", () => {
+  it("full: only W held, the car makes every braking zone cleanly; medium: never braking, it still brakes for you", () => {
     const bad: string[] = [];
     for (const c of CIRCUITS) {
       const g = build(track(c.id), c.km, c.base - 0.4);
       for (const side of ["attack", "defend"] as const) {
-        const a = drive(startDuel(g, side, "hold", 0), "full", { throttle: 0, brake: 0, steer: 0 });
+        const a = drive(startDuel(g, side, "hold", 0), "full", { throttle: 1, brake: 0, steer: 0 });
         if (a.why === "Contact" || a.why === "Ran wide") bad.push(`${c.id} full ${side}: ${a.why}`);
         const b = drive(startDuel(g, side, "hold", 1), "medium", { throttle: 1, brake: 0, steer: 0 });
         if (b.why === "Contact" || b.why === "Ran wide") bad.push(`${c.id} medium ${side}: ${b.why}`);

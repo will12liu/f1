@@ -17,7 +17,7 @@ class Controls {
   steer = 0;
   throttle = 0;
   brake = 0;
-  read() {
+  read(dt: number) {
     const k = this.keys;
     let steerT = (k.has("ArrowLeft") || k.has("KeyA") ? 1 : 0) - (k.has("ArrowRight") || k.has("KeyD") ? 1 : 0);
     let brk = k.has("ArrowDown") || k.has("KeyS") ? 1 : 0;
@@ -27,7 +27,10 @@ class Controls {
       else brk = 1;
       steerT -= Math.max(-1, Math.min(1, p.dx / 90));
     }
-    this.steer = Math.max(-1, Math.min(1, steerT));
+    // the wheel eases in (4 a second) and comes back quicker (7), like the cockpit duel: a key never snaps to full lock
+    steerT = Math.max(-1, Math.min(1, steerT));
+    const rate = (Math.abs(steerT) < Math.abs(this.steer) || steerT * this.steer < 0 ? 7 : 4) * dt;
+    this.steer += Math.max(-rate, Math.min(rate, steerT - this.steer));
     this.throttle = gas ? 1 : 0;
     this.brake = brk;
   }
@@ -242,7 +245,7 @@ export function SelfDrive({
       const readPhase = (s: SelfState): SelfState["phase"] => s.phase;
       if (st && readPhase(st) !== "done") {
         const c = ctl.current;
-        c.read();
+        c.read(dt);
         const fast = settling(st) ? 8 : 1;
         acc += dt * fast;
         let n = 0;

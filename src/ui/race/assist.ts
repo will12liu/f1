@@ -5,8 +5,8 @@ import { at, braking, clamp, type CarState, type Geo, type Input } from "./drive
 
 export type Assist = "full" | "medium" | "light" | "off";
 export const ASSISTS: { id: Assist; label: string; hint: string }[] = [
-  { id: "full", label: "Full", hint: "The car brakes and accelerates, you steer and pick your side." },
-  { id: "medium", label: "Medium", hint: "It brakes for you if you're late and keeps you on the road." },
+  { id: "full", label: "Full", hint: "Hold W: the car brakes for every corner and holds the line, you steer to pick your side." },
+  { id: "medium", label: "Medium", hint: "Hold W: it brakes for you if you're late and keeps you on the road." },
   { id: "light", label: "Light", hint: "A brake cue and a steadier car. You do the driving." },
   { id: "off", label: "Off", hint: "No help. The best scores." },
 ];
@@ -34,37 +34,45 @@ export function saveAssist(a: Assist): Assist {
 }
 export const nextAssist = (a: Assist): Assist => ASSISTS[(ASSISTS.findIndex((x) => x.id === a) + 1) % ASSISTS.length].id;
 
-/** Must we brake now to make the slowest point in the next 300 m at `margin` x the reference speed? */
-export function mustBrake(g: Geo, s: CarState, grip: number, margin = 1): boolean {
-  for (let look = 0; look <= 300; look += 5) {
+/** How hard we need to brake now to make the slowest point in the next 300 m at `margin` x the reference speed:
+ *  the deceleration it takes over the share of the brakes we plan to use (1 = right on it, above = late). */
+export function brakeNeed(g: Geo, s: CarState, grip: number, margin = 1): number {
+  let need = 0;
+  const avail = 0.72 * braking(s.v, g.g * grip);
+  for (let look = 5; look <= 300; look += 5) {
     const want = at(g, g.ref.v, s.d + look / g.m) * margin;
-    const can = Math.sqrt(Math.max(0, s.v * s.v - 2 * 0.72 * braking(s.v, g.g * grip) * look));
-    if (can > want) return true;
+    if (s.v <= want) continue;
+    need = Math.max(need, (s.v * s.v - want * want) / (2 * look) / avail);
   }
-  return false;
+  return need;
 }
+export const mustBrake = (g: Geo, s: CarState, grip: number, margin = 1) => brakeNeed(g, s, grip, margin) >= 1;
+
+/** Brake pressure from the need: squeezes on near the limit and settles at what the corner takes (no on/off chatter). */
+const pressure = (need: number, from: number) => clamp((need - from) / 0.2, 0, 1);
 
 /** The inputs after the assist. `inp.steer` still picks the side (full) or steers (the rest). */
 export function assisted(g: Geo, s: CarState, inp: Input, level: Assist, grip = 1, ahead: number | null = null): { inp: Input; cue: boolean } {
   if (level === "off") return { inp, cue: false };
   // a car right ahead in your lane counts as a corner: full and medium won't drive into its back
   const close = (level === "full" || level === "medium") && ahead !== null && ahead < 9;
-  const cue = mustBrake(g, s, grip) || close;
+  const need = brakeNeed(g, s, grip);
+  const cue = need >= 0.95 || close;
   // where the car should sit: the racing line, moved across by the stick on full assist
   const line = at(g, g.line, s.d) * 0.6;
   const hold = (lane: number) => clamp((lane - s.x) * 2.2 - s.vlat * 0.18, -1, 1);
   if (level === "full") {
     const lane = clamp(line + inp.steer * 0.85, -0.95, 0.95);
-    const brake = cue ? 1 : 0;
-    return { inp: { throttle: brake ? 0 : 1, brake, steer: hold(lane) }, cue };
+    const brake = Math.max(inp.brake, close ? 1 : pressure(need, 0.85));
+    return { inp: { throttle: brake > 0.05 ? 0 : inp.throttle, brake, steer: hold(lane) }, cue }; // the throttle is always yours
   }
   if (level === "medium") {
-    const late = mustBrake(g, s, grip, 1.03) || close; // you've missed it: it brakes for you
-    const brake = Math.max(inp.brake, late ? 1 : 0);
+    // you've missed it: it brakes for you, as hard as it takes
+    const brake = Math.max(inp.brake, close ? 1 : pressure(brakeNeed(g, s, grip, 1.03), 0.95));
     const steer = Math.abs(inp.steer) > 0.1 ? clamp(inp.steer + hold(line) * 0.3, -1, 1) : hold(s.x * 0.5 + line * 0.5);
     // never let it run off: pull back hard near the edge
     const edge = Math.abs(s.x) > 0.85 ? hold(Math.sign(s.x) * 0.6) : steer;
-    return { inp: { throttle: brake ? 0 : Math.max(inp.throttle, 1), brake, steer: edge }, cue };
+    return { inp: { throttle: brake > 0.05 ? 0 : inp.throttle, brake, steer: edge }, cue };
   }
   // light: only steadies the car when you let go of the wheel
   const steer = Math.abs(inp.steer) > 0.1 ? inp.steer : clamp(-s.vlat * 0.15, -0.4, 0.4);

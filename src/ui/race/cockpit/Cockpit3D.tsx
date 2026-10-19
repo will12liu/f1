@@ -265,12 +265,10 @@ export default function Cockpit3D(p: CockpitProps) {
         <div className="mt-1 text-base text-white">
           {p.side === "attack" ? "Get past him. " : "Keep him behind. "}
           {assist === "full"
-            ? "The car brakes and accelerates: steer left or right to pick your side."
+            ? "Hold W. The car brakes for the corner: steer left or right to pick your side."
             : assist === "medium"
-              ? "Brake when it says BRAKE (it brakes for you if you're late). Steer to pick your side."
-              : hud.braked
-                ? "Throttle is yours now: W / Up."
-                : "Brake near the 50 board (later is braver): S / Down / Space."}
+              ? "Hold W, brake when it says BRAKE (it brakes for you if you're late). Steer to pick your side."
+              : "Hold W, brake near the 50 board (later is braver): S / Down / Space."}
         </div>
         <div className="mt-2 font-display text-2xl font-black text-white">{Math.round(hud.kmh)} km/h · gear {hud.gear} · {gap > 0 ? "+" : ""}{gap.toFixed(0)} m</div>
         <div className="mt-1 text-sm text-slate-400">W throttle. S, Down or Space brakes. A and D steer. Off the road or into him and it's over.</div>

@@ -835,7 +835,7 @@ export function auroraView(el: HTMLElement, g: Geo, title: string, colors: { col
         }
         if (c.hide) continue;
         const x = lane.get(c) ?? 0;
-        const f = frame(g, c.d, Math.max(-1.2, Math.min(1.2, x)), c.slip ?? 0);
+        const f = frame(g, c.d, Math.max(-1.85, Math.min(1.85, x)), c.slip ?? 0); // the physics allows 1.8 half-widths
         const len = Math.hypot(f.dx, f.dz) || 1;
         const dx = f.dx / len;
         const dz = f.dz / len;
