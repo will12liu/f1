@@ -6,7 +6,7 @@ import type { DrivenRace } from "../../engine/race/driven";
 import { lapTime, raceTime } from "../../lib/format";
 import { loadTrack } from "../components/bits";
 import { build, gearOf, type Geo } from "./drive";
-import { ASSISTS, nextAssist, readAssist, saveAssist, type Assist } from "./assist";
+import { ASSISTS, CAM_LABEL, nextAssist, nextCam, readAssist, readCam, saveAssist, saveCam, type Assist, type DriveCam } from "./assist";
 import { createSelf, drivenResult, endQuali, qualiTimesOf, settling, stepSelf, type SelfSpec, type SelfState } from "./self";
 
 const STEP = 1 / 120;
@@ -144,7 +144,7 @@ export function SelfDrive({
   const specsRef = useRef(specs);
   const ctl = useRef(new Controls());
   const [geo, setGeo] = useState<Geo | null>(null);
-  const [cam, setCam] = useState<"chase" | "far" | "onboard">("chase");
+  const [cam, setCam] = useState<DriveCam>(readCam);
   const camRef = useRef(cam);
   camRef.current = cam;
   const [assist, setAssist] = useState<Assist>(readAssist);
@@ -203,7 +203,7 @@ export function SelfDrive({
         }
         return;
       }
-      if (code === "KeyV" && !e.repeat) setCam((v) => (v === "chase" ? "far" : v === "far" ? "onboard" : "chase"));
+      if (code === "KeyV" && !e.repeat) setCam((v) => saveCam(nextCam(v)));
       c.keys.add(code);
       if (code.startsWith("Arrow") || code === "KeyW" || code === "KeyA" || code === "KeyS" || code === "KeyD") e.preventDefault();
     };
@@ -323,8 +323,8 @@ export function SelfDrive({
           >
             Assists: {ASSISTS.find((x) => x.id === assist)?.label}
           </button>
-          <button className="btn bg-ink-800 text-white hover:bg-ink-700" onClick={() => setCam((v) => (v === "chase" ? "far" : v === "far" ? "onboard" : "chase"))}>
-            {cam === "chase" ? "Far view" : cam === "far" ? "Onboard" : "Chase view"}
+          <button className="btn bg-ink-800 text-white hover:bg-ink-700" title="Change the camera (V)" onClick={() => setCam((v) => saveCam(nextCam(v)))}>
+            {CAM_LABEL[cam]}
           </button>
           {mode === "quali" && hud?.phase === "green" && (
             <button className="btn bg-white text-ink-950 hover:bg-slate-200" onClick={() => sim.current && endQuali(sim.current)}>

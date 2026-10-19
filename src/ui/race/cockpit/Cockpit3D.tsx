@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTrack } from "../../components/bits";
 import { verdict, verdictColor } from "../BrakeBar";
 import { build, GEARS, gearOf } from "../drive";
-import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "../assist";
+import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, CAM_LABEL, nextAssist, nextCam, readAssist, readCam, saveAssist, saveCam, type Assist, type DriveCam } from "../assist";
 import { auroraView } from "../look";
 import { aheadOf, inferMove, startDuel, stepDuel, type Duel, type Side } from "./duel";
 
@@ -49,6 +49,9 @@ export default function Cockpit3D(p: CockpitProps) {
   const tilt = useRef(0); // phone tilt steering, -1..1 (+ = left)
   const [hud, setHud] = useState({ kmh: 0, gear: 1, gap: 0, steer: 0, braked: false, go: false, cue: false });
   const [assist, setAssist] = useState<Assist>(readAssist);
+  const [cam, setCam] = useState<DriveCam>(readCam);
+  const camRef = useRef(cam);
+  camRef.current = cam;
   const assistRef = useRef(assist);
   assistRef.current = assist;
   const [res, setRes] = useState<{ q: number; why: string } | null>(null);
@@ -180,7 +183,7 @@ export default function Cockpit3D(p: CockpitProps) {
           { idx: 1, d: oppD, x: oppX },
         ],
         0,
-        at_ ? "tv" : "chase",
+        at_ ? "tv" : camRef.current,
         0,
       );
       if (at_) {
@@ -215,6 +218,7 @@ export default function Cockpit3D(p: CockpitProps) {
 
   useEffect(() => {
     const dn = (e: KeyboardEvent) => {
+      if (e.code === "KeyV" && !e.repeat) setCam((c) => saveCam(nextCam(c)));
       if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
       keys.current.add(e.code);
     };
@@ -285,6 +289,9 @@ export default function Cockpit3D(p: CockpitProps) {
           className="rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800"
         >
           Assists: {ASSISTS.find((x) => x.id === assist)?.label}
+        </button>
+        <button onClick={() => setCam((c) => saveCam(nextCam(c)))} title="Change the camera (V)" className="rounded-md bg-ink-900/90 px-3 py-1.5 text-base font-bold text-white hover:bg-ink-800">
+          {CAM_LABEL[cam]}
         </button>
         <button
           onClick={() => {

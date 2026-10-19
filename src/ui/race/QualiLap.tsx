@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { QUALI } from "../../engine/race/qualifying";
 import { lapTime } from "../../lib/format";
 import { loadTrack } from "../components/bits";
-import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "./assist";
+import { ASSIST_CAP, ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, readCam, saveAssist, type Assist } from "./assist";
 import { at, build, EDGE, fmtDelta, gearOf, GHOST_DT, ghostAt, gripOf, HALF, lapScore, loadGhost, refAt, refLap, refSectors, saveGhost, sectorTone, startState, stepCar, TONE, type CarState, type Geo, type Ghost } from "./drive";
 
 const STEP = 1 / 120; // physics step, seconds
@@ -119,7 +119,7 @@ export function QualiLap({
             view.draw(
               [{ idx: 0, d: s.d, x: s.x, v: s.v, slip: s.v > 1 ? s.vlat / s.v : 0 }, ...(gp ? [{ idx: 1, d: gp.d, x: gp.x, ghost: true }] : [{ idx: 1, d: 0, hide: true }])],
               0,
-              "chase",
+              readCam(),
               0,
             );
           },

@@ -70,3 +70,26 @@ export function assisted(g: Geo, s: CarState, inp: Input, level: Assist, grip = 
   const steer = Math.abs(inp.steer) > 0.1 ? inp.steer : clamp(-s.vlat * 0.15, -0.4, 0.4);
   return { inp: { ...inp, steer }, cue };
 }
+
+// The camera for the driven views (duels, drive it yourself, the qualifying lap), saved: chase behind the car,
+// far chase, or onboard from the cockpit. Here rather than in look.ts so pages can read it without three.js.
+export type DriveCam = "chase" | "far" | "onboard";
+const CAM_KEY = "paddock.cam";
+export function readCam(): DriveCam {
+  try {
+    const v = localStorage.getItem(CAM_KEY);
+    return v === "far" || v === "onboard" ? v : "chase";
+  } catch {
+    return "chase";
+  }
+}
+export function saveCam(c: DriveCam): DriveCam {
+  try {
+    localStorage.setItem(CAM_KEY, c);
+  } catch {
+    /* private mode */
+  }
+  return c;
+}
+export const nextCam = (c: DriveCam): DriveCam => (c === "chase" ? "far" : c === "far" ? "onboard" : "chase");
+export const CAM_LABEL: Record<DriveCam, string> = { chase: "Chase cam", far: "Far cam", onboard: "Onboard" };
