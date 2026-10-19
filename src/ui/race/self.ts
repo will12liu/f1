@@ -1,11 +1,12 @@
 // A race you drive, on the real circuit: grid, five lights, the field racing a line, DRS, gaps.
-// The AI follows the same idea as a real-time race (corner speed, a line, a move for the car ahead).
-// Your car uses the qualifying-lap physics. Fixed steps, so a scripted input always finishes the same way.
-// The season stores the classification; it does not re-sim this race in the lap engine.
+// The AI follows a line. Your car is the arcade one from the driving game the picture came from: throttle and
+// brake ramp, the nose points where you steer, and the barrier pushes you back. Fixed steps, so a scripted
+// input always finishes the same way. The season stores the classification; it does not re-sim this race.
 import { hashString, makeRng } from "../../engine/rng";
 import type { DrivenRace } from "../../engine/race/driven";
 import { RACE } from "../../engine/race/model";
-import { accel, at, braking, clamp, EDGE, gripOf, HALF_M, refLap, stepCar, type CarState, type Geo, type Input } from "./drive";
+import { ASSIST_GRIP, assisted, type Assist } from "./assist";
+import { accel, at, braking, clamp, gripOf, HALF_M, refLap, stepCar, type CarState, type Geo, type Input } from "./drive";
 
 export interface SelfSpec {
   id: string;
@@ -55,6 +56,17 @@ export interface SelfCar {
   passX: number;
   lapMark: number;
   body: CarState;
+  /** Arcade car (the player). World metres, heading atan2(dx, dz), smoothed pedals. */
+  wx: number;
+  wz: number;
+  head: number;
+  yaw: number;
+  pi: number;
+  wallCd: number;
+  thr: number;
+  brk: number;
+  steer: number;
+  cue: boolean; // the assists' brake cue
 }
 
 export interface SelfState {
@@ -70,6 +82,7 @@ export interface SelfState {
   minLap: number; // a crossing shorter than this is a partial lap, not a time
   cars: SelfCar[];
   order: number[]; // indexes, leader first
+  assist: Assist; // driving assists for the player's car (assist.ts)
 }
 
 /** How quick this car is in the field. A front-runner sits just off the perfect lap; the back is a few percent slower. */
@@ -86,7 +99,7 @@ const bodyAt = (d: number, x: number): CarState => ({
   d, x, v: 0, vlat: 0, t: 0, started: false, sector: 0, sectors: [], deleted: false, use: 0, surface: "track", done: false,
 });
 
-export function createSelf(seed: number, g: Geo, specs: SelfSpec[], mode: "race" | "quali", laps: number): SelfState {
+export function createSelf(seed: number, g: Geo, specs: SelfSpec[], mode: "race" | "quali", laps: number, assist: Assist = "medium"): SelfState {
   const rng = makeRng(seed ^ 0x51f1);
   const others = specs.filter((s) => !s.player);
   const cars: SelfCar[] = specs.map((s) => {
@@ -135,12 +148,23 @@ export function createSelf(seed: number, g: Geo, specs: SelfSpec[], mode: "race"
       passX: 0,
       lapMark: 0,
       body,
+      wx: 0,
+      wz: 0,
+      head: 0,
+      yaw: 0,
+      pi: 0,
+      wallCd: 0,
+      thr: 0,
+      brk: 0,
+      steer: 0,
+      cue: false,
     };
   });
+  for (const car of cars) if (car.player) seat(g, car);
   return {
     mode,
     laps: mode === "quali" ? 0 : Math.max(1, laps),
-    phase: "lights",
+    phase: mode === "quali" ? "green" : "lights", // qualifying is a flying lap: no lights
     clock: 0,
     raceT: 0,
     outDelay: 0.4 + rng.next() * 1.05,
@@ -150,6 +174,7 @@ export function createSelf(seed: number, g: Geo, specs: SelfSpec[], mode: "race"
     minLap: g.ref.lap * 0.72,
     cars,
     order: cars.map((_, i) => i).sort((i, j) => cars[j].dist - cars[i].dist),
+    assist,
   };
 }
 
@@ -230,38 +255,116 @@ function stepAI(state: SelfState, g: Geo, car: SelfCar, dt: number) {
   }
 }
 
+
+/** Where a centreline distance and a lateral offset sit, in the same metres the picture uses. */
+function pose(g: Geo, d: number, xHalf: number) {
+  const n = g.n;
+  const f = ((((d % g.len) + g.len) % g.len) / g.len) * n;
+  const i = Math.floor(f) % n;
+  const j = (i + 1) % n;
+  const u = f - Math.floor(f);
+  const nx = g.nx[i] * (1 - u) + g.nx[j] * u;
+  const ny = g.ny[i] * (1 - u) + g.ny[j] * u;
+  const i0 = (i - 1 + n) % n;
+  const i1 = (i + 1) % n;
+  let tx = g.px[i1] - g.px[i0];
+  let tz = g.py[i1] - g.py[i0];
+  const l = Math.hypot(tx, tz) || 1;
+  tx /= l;
+  tz /= l;
+  return {
+    wx: (g.px[i] * (1 - u) + g.px[j] * u) * g.m + nx * xHalf * HALF_M,
+    wz: (g.py[i] * (1 - u) + g.py[j] * u) * g.m + ny * xHalf * HALF_M,
+    head: Math.atan2(tx, tz),
+    pi: i,
+    tx,
+    tz,
+    nx,
+    ny,
+  };
+}
+
+function seat(g: Geo, car: SelfCar) {
+  const p = pose(g, car.d, car.x);
+  car.wx = p.wx;
+  car.wz = p.wz;
+  car.head = p.head;
+  car.pi = p.pi;
+}
+
+/** The circuit as the player's car sees it: grip, power and the reference speeds scaled by how quick this
+ *  driver and car are in this field (`skill`, the same share of the perfect lap the AI runs), so a perfect lap
+ *  with full assists is a front-runner's lap, not faster than everyone. */
+const geoCache = new WeakMap<Geo, Map<number, Geo>>();
+function playerGeo(g: Geo, skill: number): Geo {
+  let m = geoCache.get(g);
+  if (!m) geoCache.set(g, (m = new Map()));
+  let pg = m.get(skill);
+  if (!pg) {
+    pg = { ...g, g: g.g * skill * skill, ref: { ...g.ref, v: g.ref.v.map((v) => v * skill) } };
+    m.set(skill, pg);
+  }
+  return pg;
+}
+
+/** Metres to a car ahead in the player's lane (for the assists), or null. */
+function aheadOf(state: SelfState, car: SelfCar, g: Geo): number | null {
+  let best: number | null = null;
+  for (const o of state.cars) {
+    if (o === car || o.finished) continue;
+    const gap = (o.dist - car.dist) * g.m;
+    if (gap > 0 && gap < 40 && Math.abs(o.x - car.x) * HALF_M < 2.2 && (best === null || gap < best)) best = gap;
+  }
+  return best === null ? null : best - 5.2;
+}
+
+/** The player's car: the same physics as the qualifying lap and the duels (drive.ts), with the assists. */
 function stepPlayer(state: SelfState, g: Geo, car: SelfCar, inp: Input, dt: number) {
-  const body = car.body;
   if (car.finished) {
-    body.v = 0;
     car.v = 0;
+    car.thr = 0;
     return;
   }
   if (car.hold > 0) {
     car.hold -= dt;
-    body.v = 0;
     car.v = 0;
+    car.thr = 0;
     return;
   }
-  body.done = false;
-  stepCar(g, body, inp, dt, car.grip);
-  if (car.drsOpen && inp.throttle > 0.5 && body.v > 20) body.v += 1.05 * dt;
-  if (Math.abs(body.x) > EDGE.limit) car.lapBad = true;
-  body.done = false;
-  if (body.d >= g.len) {
-    body.d -= g.len;
-    finishLap(car, state);
-    body.sector = 0;
-    body.sectors = [];
-    body.started = true;
-    body.deleted = false;
-    body.t = 0;
-    body.done = false;
+  const pg = playerGeo(g, car.skill);
+  const b = car.body;
+  b.d = car.d;
+  b.x = car.x; // the field may have nudged us
+  b.v = car.v;
+  const a = assisted(pg, b, inp, state.assist, car.grip, aheadOf(state, car, g));
+  car.cue = a.cue;
+  car.thr = a.inp.throttle;
+  car.brk = a.inp.brake;
+  car.steer = a.inp.steer;
+  stepCar(pg, b, a.inp, dt, car.grip * ASSIST_GRIP[state.assist]);
+  if (car.drsOpen && a.inp.throttle > 0) b.v += 0.9 * dt; // the flap open: a little more top speed
+  b.started = false; // laps are counted here, not by drive.ts's sectors
+  if (b.deleted) {
+    car.lapBad = true; // all four wheels off: this lap won't count in qualifying
+    b.deleted = false;
   }
-  car.d = body.d;
-  car.x = body.x;
-  car.v = body.v;
-  car.vlat = body.vlat;
+  car.v = b.v;
+  car.vlat = b.vlat;
+  car.x = b.x;
+  const before = car.d;
+  car.d = b.d;
+  if (before < g.len && car.d >= g.len) {
+    car.d -= g.len;
+    b.d = car.d;
+    finishLap(car, state);
+  }
+  // where the picture draws it: on the road, the nose turned a little into a slide
+  const p = pose(g, car.d, car.x);
+  const slip = car.v > 1 ? car.vlat / car.v : 0;
+  car.wx = p.wx;
+  car.wz = p.wz;
+  car.head = Math.atan2(p.tx + p.nx * slip, p.tz + p.ny * slip);
+  car.pi = p.pi;
 }
 
 function separate(state: SelfState, g: Geo) {
@@ -274,16 +377,17 @@ function separate(state: SelfState, g: Geo) {
       const gap = (b.dist - a.dist) * g.m;
       if (Math.abs(gap) > 6.5 || Math.abs(a.x - b.x) > 0.3) continue;
       const sg = Math.sign(a.x - b.x) || 1;
-      const nudge = (c: SelfCar, dir: number) => {
-        if (c.player) c.body.x = clamp(c.body.x + dir, -1.2, 1.2);
-        else c.x = clamp(c.x + dir, -0.9, 0.9);
+      const shove = (c: SelfCar, dir: number) => {
+        if (c.player) {
+          c.x = clamp(c.x + dir, -1.6, 1.6);
+          c.v *= 0.99;
+        } else c.x = clamp(c.x + dir, -0.9, 0.9);
       };
-      nudge(a, sg * 0.03);
-      nudge(b, -sg * 0.03);
+      shove(a, sg * 0.08);
+      shove(b, -sg * 0.08);
       const back = gap >= 0 ? a : b;
       const front = gap >= 0 ? b : a;
-      if (back.player) back.body.v *= 0.99;
-      else if (back.v > front.v) back.v = front.v;
+      if (!back.player && back.v > front.v) back.v = front.v;
     }
   }
 }
@@ -339,14 +443,7 @@ export function stepSelf(state: SelfState, g: Geo, inp: Input, dt: number) {
     place(c, g);
   }
   separate(state, g);
-  for (const c of state.cars) {
-    if (c.player) {
-      c.d = c.body.d;
-      c.x = c.body.x;
-      c.v = c.body.v;
-    }
-    place(c, g);
-  }
+  for (const c of state.cars) place(c, g);
   refreshOrder(state);
   applyDrs(state, g);
   if (state.mode === "quali") {

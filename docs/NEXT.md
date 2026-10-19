@@ -13,7 +13,7 @@ thread one lap ahead of the 2D canvas (`src/ui/race/RaceViewer.tsx`) and re-sim 
 Mini-games feed scores (0-1) into the engine: lights-out start, duel braking bar, pit stop (wheel guns +
 release), qualifying lap (onboard chase cam on the real track), training hot lap + reaction test. You can also
 drive qualifying outright (best clean lap is the time, the field runs with you) and drive the race yourself
-(5, 15 or full distance, from the grid). That session, the qualifying lap's 3D view, the lights-out start, the duel and its TV replay, and the race
+(5, 15 or full distance, from the grid). In those two, your car is the arcade one from that picture's game: W toggles the throttle, S brakes, A and D point the nose, and the barrier pushes you back. That session, the qualifying lap's 3D view, the lights-out start, the duel and its TV replay, and the race
 onboard all use the generated picture from the MIT game hirosichen/ai-f1-racing-game (cars, road, kerbs,
 boards, grandstand, gantry) on the real circuit.
 That result is stored as the round; key moments and the pit wall stay

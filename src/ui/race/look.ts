@@ -398,6 +398,10 @@ export interface LookCar {
   x?: number;
   v?: number;
   slip?: number;
+  /** Nose heading, atan2(dx, dz). Omit and the car points along the racing line. */
+  head?: number;
+  /** Front wheels, -1 right .. 1 left. Omit and they follow the corner. */
+  steer?: number;
   drs?: boolean;
   hide?: boolean;
   ghost?: boolean;
@@ -836,12 +840,12 @@ export function auroraView(el: HTMLElement, g: Geo, title: string, colors: { col
         const dx = f.dx / len;
         const dz = f.dz / len;
         rig.group.position.set(f.px, 0, f.pz);
-        rig.group.rotation.y = Math.atan2(dx, dz);
+        rig.group.rotation.y = c.head !== undefined ? c.head : Math.atan2(dx, dz);
         const v = c.v ?? 0;
         rig.spin += (v * dt) / WHEEL_R;
         for (const w of rig.wheels) w.rotation.x = rig.spin;
         const k = at(g, g.kap, c.d);
-        const st = Math.max(-0.35, Math.min(0.35, -k * 22));
+        const st = c.steer !== undefined ? c.steer * 0.4 : Math.max(-0.35, Math.min(0.35, -k * 22));
         for (const piv of rig.steer) piv.rotation.y = st;
         const flap = c.drs ? -0.75 : 0;
         rig.flapA += (flap - rig.flapA) * Math.min(1, dt * 10);
@@ -851,10 +855,16 @@ export function auroraView(el: HTMLElement, g: Geo, title: string, colors: { col
           pz = f.pz;
           fnx = f.nx;
           fny = f.ny;
-          heading = Math.atan2(dx, dz);
+          if (c.head !== undefined) {
+            fx = Math.sin(c.head);
+            fz = Math.cos(c.head);
+            heading = c.head;
+          } else {
+            heading = Math.atan2(dx, dz);
+            fx = dx;
+            fz = dz;
+          }
           speed = v;
-          fx = dx;
-          fz = dz;
         }
       }
       if (!aimed) {

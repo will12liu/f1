@@ -1,12 +1,12 @@
 // Drive the session yourself: qualifying laps, or the whole race from the grid. The field runs on the
-// same circuit (self.ts). Your car is the qualifying-lap physics. Assists and the 3D view are the ones
-// the flying lap already uses.
+// same circuit (self.ts). Your car runs the qualifying lap's physics with the driving assists: hold W, S brakes,
+// A and D steer.
 import { useEffect, useRef, useState } from "react";
 import type { DrivenRace } from "../../engine/race/driven";
 import { lapTime, raceTime } from "../../lib/format";
 import { loadTrack } from "../components/bits";
-import { ASSIST_GRIP, ASSISTS, assisted, nextAssist, readAssist, saveAssist, type Assist } from "./assist";
 import { build, gearOf, type Geo } from "./drive";
+import { ASSISTS, nextAssist, readAssist, saveAssist, type Assist } from "./assist";
 import { createSelf, drivenResult, endQuali, qualiTimesOf, settling, stepSelf, type SelfSpec, type SelfState } from "./self";
 
 const STEP = 1 / 120;
@@ -14,25 +14,22 @@ const STEP = 1 / 120;
 class Controls {
   keys = new Set<string>();
   pointers = new Map<number, { side: "throttle" | "brake"; x0: number; dx: number }>();
-  tilt = 0;
   steer = 0;
   throttle = 0;
   brake = 0;
-  read(dt: number) {
+  read() {
     const k = this.keys;
     let steerT = (k.has("ArrowLeft") || k.has("KeyA") ? 1 : 0) - (k.has("ArrowRight") || k.has("KeyD") ? 1 : 0);
-    let thr = k.has("ArrowUp") || k.has("KeyW") ? 1 : 0;
-    let brk = k.has("ArrowDown") || k.has("KeyS") || k.has("Space") ? 1 : 0;
+    let brk = k.has("ArrowDown") || k.has("KeyS") ? 1 : 0;
+    let gas = k.has("KeyW") || k.has("ArrowUp");
     for (const p of this.pointers.values()) {
-      if (p.side === "throttle") thr = 1;
+      if (p.side === "throttle") gas = true;
       else brk = 1;
-      steerT -= Math.max(-1, Math.min(1, p.dx / 70));
+      steerT -= Math.max(-1, Math.min(1, p.dx / 90));
     }
-    steerT = Math.max(-1, Math.min(1, steerT + this.tilt));
-    const rate = dt * 9;
-    this.steer += Math.max(-rate, Math.min(rate, steerT - this.steer));
-    this.throttle += Math.max(-rate, Math.min(rate, thr - this.throttle));
-    this.brake += Math.max(-rate * 1.5, Math.min(rate * 1.5, brk - this.brake));
+    this.steer = Math.max(-1, Math.min(1, steerT));
+    this.throttle = gas ? 1 : 0;
+    this.brake = brk;
   }
 }
 
@@ -78,7 +75,7 @@ function readHud(st: SelfState, g: Geo, cue: boolean): Hud {
       speed: Math.round(me.v * 3.6),
       gear: gearOf(me.v),
       lap,
-      pos: me.best ? `P${mine + 1}` : "Out lap",
+      pos: me.best ? `P${mine + 1}` : "-",
       gap: me.best && pole ? (me === pole ? "Pole" : `+${(me.best - pole.best).toFixed(2)}`) : "Flying lap",
       drs: me.drsOpen,
       cue,
@@ -142,19 +139,15 @@ export function SelfDrive({
   onQuit: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const view = useRef<{ draw: (list: { idx: number; frac: number; x?: number; v?: number; drs?: boolean }[], follow: number, cam: "chase" | "far" | "onboard", lights: number) => void; dispose: () => void } | null>(null);
+  const view = useRef<{ draw: (list: { idx: number; frac: number; x?: number; v?: number; drs?: boolean; head?: number; steer?: number }[], follow: number, cam: "chase" | "far" | "onboard", lights: number) => void; dispose: () => void } | null>(null);
   const sim = useRef<SelfState | null>(null);
   const specsRef = useRef(specs);
-  const grip0 = useRef(new Map(specs.map((s) => [s.id, s.grip])));
   const ctl = useRef(new Controls());
   const [geo, setGeo] = useState<Geo | null>(null);
-  const [assist, setAssist] = useState<Assist>(readAssist);
-  const assistRef = useRef(assist);
-  assistRef.current = assist;
   const [cam, setCam] = useState<"chase" | "far" | "onboard">("chase");
   const camRef = useRef(cam);
   camRef.current = cam;
-  const cueRef = useRef(false);
+  const [assist, setAssist] = useState<Assist>(readAssist);
   const keepRef = useRef<() => void>(() => undefined);
   const [hud, setHud] = useState<Hud | null>(null);
   const [rows, setRows] = useState<DrivenRace["rows"] | null>(null);
@@ -164,7 +157,7 @@ export function SelfDrive({
     loadTrack(trackId).then((t) => {
       if (!live) return;
       const g = build(t, km, target);
-      sim.current = createSelf(seed, g, specsRef.current, mode, laps);
+      sim.current = createSelf(seed, g, specsRef.current, mode, laps, readAssist());
       setGeo(g);
     });
     return () => {
@@ -212,7 +205,7 @@ export function SelfDrive({
       }
       if (code === "KeyV" && !e.repeat) setCam((v) => (v === "chase" ? "far" : v === "far" ? "onboard" : "chase"));
       c.keys.add(code);
-      if (code.startsWith("Arrow") || code === "Space" || code === "KeyW" || code === "KeyA" || code === "KeyS" || code === "KeyD") e.preventDefault();
+      if (code.startsWith("Arrow") || code === "KeyW" || code === "KeyA" || code === "KeyS" || code === "KeyD") e.preventDefault();
     };
     const up = (e: KeyboardEvent) => c.keys.delete(codeOf(e));
     const blur = () => {
@@ -220,24 +213,17 @@ export function SelfDrive({
       c.pointers.clear();
     };
     const pointerGone = (e: PointerEvent) => c.pointers.delete(e.pointerId);
-    const tilt = (e: DeviceOrientationEvent) => {
-      const landscape = window.innerWidth > window.innerHeight;
-      const a = landscape ? e.beta : e.gamma;
-      c.tilt = a === null ? 0 : Math.max(-1, Math.min(1, -(a ?? 0) / 22));
-    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
     window.addEventListener("pointerup", pointerGone);
     window.addEventListener("pointercancel", pointerGone);
-    window.addEventListener("deviceorientation", tilt);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
       window.removeEventListener("pointerup", pointerGone);
       window.removeEventListener("pointercancel", pointerGone);
-      window.removeEventListener("deviceorientation", tilt);
     };
   }, []);
 
@@ -256,45 +242,28 @@ export function SelfDrive({
       const readPhase = (s: SelfState): SelfState["phase"] => s.phase;
       if (st && readPhase(st) !== "done") {
         const c = ctl.current;
-        c.read(dt);
+        c.read();
         const fast = settling(st) ? 8 : 1;
         acc += dt * fast;
         let n = 0;
         const cap = fast > 1 ? 36 : 14;
         let phase = readPhase(st);
         while (acc >= STEP && n < cap && phase !== "done") {
-          const me = st.cars.find((car) => car.player);
-          let inp = { throttle: c.throttle, brake: c.brake, steer: c.steer };
-          if (me && phase === "green") {
-            const base = grip0.current.get(me.id) ?? 1;
-            let ahead: number | null = null;
-            for (const o of st.cars) {
-              if (o === me || o.finished) continue;
-              const gap = (o.dist - me.dist) * g.m;
-              if (gap > 0 && gap < 40 && Math.abs(o.x - me.x) < 0.45) ahead = ahead === null ? gap : Math.min(ahead, gap);
-            }
-            const a = assisted(g, me.body, inp, assistRef.current, base, ahead);
-            cueRef.current = a.cue;
-            me.grip = base * ASSIST_GRIP[assistRef.current];
-            inp = a.inp;
-            // medium brakes and steadies the car. The throttle stays yours, so W is the gas.
-            if (assistRef.current === "medium") inp = { ...inp, throttle: inp.brake > 0.5 ? 0 : c.throttle };
-          }
-          stepSelf(st, g, inp, STEP);
+          stepSelf(st, g, { throttle: c.throttle, brake: c.brake, steer: c.steer }, STEP);
           phase = readPhase(st);
           acc -= STEP;
           n++;
         }
         if (phase === "done") {
           setRows(mode === "race" ? drivenResult(st).rows : null);
-          setHud(readHud(st, g, cueRef.current));
+          setHud(readHud(st, g, false));
         }
       }
       const drawSt = sim.current;
       if (drawSt && view.current) {
         const follow = Math.max(0, drawSt.cars.findIndex((car) => car.player));
         view.current.draw(
-          drawSt.cars.map((car, idx) => ({ idx, frac: (car.lap * g.len + car.d) / g.len, x: car.x, v: car.v, drs: car.drsOpen })),
+          drawSt.cars.map((car, idx) => ({ idx, frac: (car.lap * g.len + car.d) / g.len, x: car.x, v: car.v, drs: car.drsOpen, head: car.player ? car.head : undefined, steer: car.player ? car.steer : undefined })),
           follow,
           camRef.current,
           drawSt.phase === "lights" ? drawSt.lights : 0,
@@ -302,7 +271,7 @@ export function SelfDrive({
       }
       if (drawSt && now - shown > 80) {
         shown = now;
-        setHud(readHud(drawSt, g, cueRef.current));
+        setHud(readHud(drawSt, g, drawSt.cars.find((c) => c.player)?.cue ?? false));
       }
       raf = requestAnimationFrame(frame);
     };
@@ -332,7 +301,6 @@ export function SelfDrive({
   const pointerUp = (e: React.PointerEvent<HTMLDivElement>) => ctl.current.pointers.delete(e.pointerId);
 
   const meRow = rows?.find((r) => specsRef.current.some((s) => s.player && s.id === r.driverId));
-  const assistLabel = ASSISTS.find((a) => a.id === assist)?.label ?? "Medium";
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink-950">
@@ -342,8 +310,18 @@ export function SelfDrive({
           <div className="font-display text-2xl font-black uppercase leading-none text-white sm:text-3xl">{title}</div>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <button className="btn bg-ink-800 text-white hover:bg-ink-700" onClick={() => setAssist(saveAssist(nextAssist(assist)))}>
-            Assists: {assistLabel}
+          <button
+            className="btn bg-ink-800 text-white hover:bg-ink-700"
+            title={ASSISTS.find((x) => x.id === assist)?.hint}
+            onClick={() =>
+              setAssist((a) => {
+                const n = saveAssist(nextAssist(a));
+                if (sim.current) sim.current.assist = n;
+                return n;
+              })
+            }
+          >
+            Assists: {ASSISTS.find((x) => x.id === assist)?.label}
           </button>
           <button className="btn bg-ink-800 text-white hover:bg-ink-700" onClick={() => setCam((v) => (v === "chase" ? "far" : v === "far" ? "onboard" : "chase"))}>
             {cam === "chase" ? "Far view" : cam === "far" ? "Onboard" : "Chase view"}
@@ -394,8 +372,8 @@ export function SelfDrive({
                 </div>
               </div>
             </div>
-            {hud.cue && assist !== "off" && hud.phase === "green" && (
-              <div className="pointer-events-none absolute left-1/2 top-[18%] -translate-x-1/2 font-display text-5xl font-black uppercase text-white">{assist === "full" ? "Braking" : "Brake"}</div>
+            {hud.cue && hud.phase === "green" && assist !== "off" && (
+              <div className={`pointer-events-none absolute left-1/2 top-[18%] -translate-x-1/2 px-4 py-1 font-display text-4xl font-black uppercase ${assist === "full" ? "bg-ink-950/80 text-slate-300" : "bg-race text-white"}`}>{assist === "full" ? "Braking" : "Brake"}</div>
             )}
             {hud.settling && <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-ink-950 px-4 py-2 font-display text-xl font-bold uppercase text-white">Field finishing</div>}
             {hud.phase === "lights" && (
@@ -435,7 +413,7 @@ export function SelfDrive({
           </div>
         )}
       </div>
-      <div className="shrink-0 px-4 py-2 text-sm text-slate-500 sm:px-6">W throttle · Space brake · A and D steer. Right of the screen accelerates, left brakes. DRS opens on its own when you are within a second.</div>
+      <div className="shrink-0 px-4 py-2 text-sm text-slate-500 sm:px-6">Hold W (or Up) for the throttle, S or Down brakes, A and D steer, V changes the camera. On a phone: hold the right side to accelerate, the left to brake, drag to steer. Assists: Full drives the pedals for you, Medium brakes if you are late. DRS opens on its own within a second.</div>
     </div>
   );
 }

@@ -10,15 +10,17 @@ function spec(id: string, grid: number, skill: number, player = false): SelfSpec
   return { id, teamId: "t", name: id, code: id.slice(0, 3).toUpperCase(), grid, skill, player, grip: player ? 1.06 : 1, color: "#fff" };
 }
 
-/** Brakes for the reference profile and holds the racing line. */
+/** Holds the racing line and brakes when well above the reference speed. */
 function follow(g: Geo, car: SelfCar): Input {
-  let brake = 0;
-  for (let look = 0; look <= 280; look += 12) {
-    const want = at(g, g.ref.v, car.d + look / g.m);
-    const can = Math.sqrt(Math.max(0, car.v * car.v - 2 * 0.65 * (28 * g.g + 0.0035 * car.v * car.v) * look));
-    if (can > want) brake = 1;
-  }
-  const steer = Math.max(-1, Math.min(1, -car.x * 2.2 - car.vlat * 0.15));
+  const want = at(g, g.line, Math.max(0, car.d));
+  const tx = at(g, g.px, car.d + 1) - at(g, g.px, car.d - 1);
+  const tz = at(g, g.py, car.d + 1) - at(g, g.py, car.d - 1);
+  let dh = Math.atan2(tx, tz) - car.head;
+  while (dh > Math.PI) dh -= 2 * Math.PI;
+  while (dh < -Math.PI) dh += 2 * Math.PI;
+  const steer = Math.max(-1, Math.min(1, (want - car.x) * 1.6 + dh * 1.8));
+  const ref = at(g, g.ref.v, Math.max(0, car.d));
+  const brake = car.v > ref * 1.12 ? 1 : 0;
   return { throttle: brake ? 0 : 1, brake, steer };
 }
 
@@ -71,7 +73,7 @@ describe("self driven race", () => {
 
   it("records a qualifying time for every car and repeats", () => {
     const g = monza();
-    const specs = [spec("me", 1, 1, true), spec("ai", 2, 0.88)];
+    const specs = [spec("me", 1, 1, true), spec("ai", 2, 0.8)];
     const once = () => {
       const state = createSelf(11, g, specs, "quali", 0);
       run(g, state, (car) => follow(g, car), 120 * 360);
@@ -100,5 +102,22 @@ describe("self driven race", () => {
     expect(held.cars[0].jump).toBe(true);
     expect(held.cars[0].hold).toBe(5);
     expect(held.cars[0].pen).toBe(5);
+  });
+});
+
+describe("self driven race with assists", () => {
+  it("full assists, hands off: the player's car laps cleanly, on a front-runner's pace, not faster than a same-skill car", () => {
+    for (const [id, km, base] of [["monza", 5.793, 83.1], ["monaco", 3.337, 75.1], ["silverstone", 5.891, 87.3]] as const) {
+      const g = build(JSON.parse(readFileSync(`public/data/tracks/${id}.json`, "utf8")) as TrackFile, km, base);
+      const state = createSelf(5, g, [spec("me", 2, 0.97, true), spec("ai", 1, 0.97)], "race", 1, "full");
+      run(g, state, () => ZERO, 120 * 200);
+      const me = state.cars.find((c) => c.player)!;
+      const ai = state.cars.find((c) => !c.player)!;
+      expect(me.finished).toBe(true);
+      expect(Math.abs(me.x)).toBeLessThan(1.2);
+      // within a couple of percent of the same-skill AI car over the lap
+      expect(me.finishT / ai.finishT).toBeGreaterThan(0.97);
+      expect(me.finishT / ai.finishT).toBeLessThan(1.05);
+    }
   });
 });
