@@ -108,8 +108,8 @@ export function Weekend({
                   </div>
                 ) : (
                   <button onClick={() => setDriving(i)} className="rounded-lg border-2 border-race bg-ink-900 px-4 py-3 text-left text-white hover:bg-ink-800 max-sm:col-start-2">
-                    <div className="font-display text-xl font-bold uppercase leading-tight">Drive the lap</div>
-                    <div className="text-sm text-slate-400">Or leave it to instinct</div>
+                    <div className="font-display text-xl font-bold uppercase leading-tight">Drive one lap</div>
+                    <div className="text-sm text-slate-400">Sets this run's pace</div>
                   </button>
                 )}
               </div>
@@ -174,10 +174,11 @@ export function Weekend({
       )}
       <div className="grid gap-3">
         {drivenNote && <div className="text-lg text-white">{drivenNote}</div>}
+        {onDrive && <p className="text-base text-slate-400">Drive the whole session yourself: three laps on track with the field, and your best clean lap is your grid slot. Or set the calls above and run it.</p>}
         <div className="flex flex-wrap gap-3">
           {onDrive && (
             <button className="btn-xl bg-white text-ink-950 hover:bg-slate-200" onClick={onDrive}>
-              Drive qualifying
+              Drive qualifying yourself
             </button>
           )}
           <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={busy} onClick={() => onRun({ program, setup, risk, late, laps })}>

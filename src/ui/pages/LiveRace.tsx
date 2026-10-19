@@ -429,7 +429,7 @@ export function LiveRace() {
           )}
           <div className="grid gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
             <div className="font-display text-2xl font-extrabold uppercase text-white">Race it yourself</div>
-            <p className="max-w-3xl text-base text-slate-400">You drive every lap, lights to flag. The field races with you. No pit stops. Lights out below is the pit wall and the key moments.</p>
+            <p className="max-w-3xl text-base text-slate-400">You drive every lap, lights to flag, with the field around you. No pit stops. The driving assists and camera are on the buttons at the top of the screen.</p>
             {myTeamId && planIds.length > 1 && (
               <div className="flex flex-wrap gap-2">
                 {planIds.map((id) => (
@@ -449,13 +449,16 @@ export function LiveRace() {
                 );
               })}
             </div>
-            <button className="btn bg-ink-800 text-white hover:bg-ink-700" onClick={() => setDrive({ mode: "quali" })}>
-              {qualiTimes ? "Drive qualifying again" : "Drive qualifying"}
-            </button>
           </div>
-          <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={chosen < 0} onClick={() => (career ? setStartGame(true) : start())}>
-            Lights out{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""} ›
-          </button>
+          <div className="grid gap-3 rounded-lg border border-ink-700 bg-ink-900 p-6">
+            <div className="font-display text-2xl font-extrabold uppercase text-white">Or race from the pit wall</div>
+            <p className="max-w-3xl text-base text-slate-400">Watch the race, set the dials, call the stops, and jump into the car for the key moments.</p>
+            <div>
+              <button className="btn-xl bg-race text-white hover:bg-red-500" disabled={chosen < 0} onClick={() => (career ? setStartGame(true) : start())}>
+                Lights out{myTeamId || career ? "" : chosen >= 0 ? ` as ${drivers.get(pick!)?.last}` : ""} ›
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
